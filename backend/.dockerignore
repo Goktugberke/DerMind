@@ -1,0 +1,27 @@
+# Maven / IDE
+target/
+.mvn/
+.mvnw
+.mvnw.cmd
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+
+# OS garbage
+.DS_Store
+Thumbs.db
+
+# Logs & temp
+*.log
+logs/
+tmp/
+*.tmp
+
+# Git
+.git
+.gitignore
