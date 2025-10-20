@@ -10,7 +10,7 @@ env:
   APP: "dermind"
   VERSION: "0.0.1"
   NAMESPACE_DEV: "dermind-dev"
-#  DOCKER_SERVER: ghcr.io
+  DOCKER_SERVER: ghcr.io
 
 jobs:
   # Frontend Build
