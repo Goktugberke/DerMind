@@ -102,10 +102,11 @@ jobs:
 
       - name: Build and push Frontend Docker image
         run: |
-          FRONTEND_IMAGE_TAG="${{ env.DOCKER_SERVER }}/${{ github.repository }}-frontend:${{ env.VERSION }}-${{ github.run_id }}"
+          REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          FRONTEND_IMAGE_TAG="${{ env.DOCKER_SERVER }}/${REPO_LC}-frontend:${{ env.VERSION }}-${{ github.run_id }}"
           docker build -t ${FRONTEND_IMAGE_TAG} ./frontend
           docker push ${FRONTEND_IMAGE_TAG}
-          echo "Frontend image ${FRONTEND_IMAGE_TAG} pushed"
+          echo "Frontend image ${FRONTEND_IMAGE_TAG} pushed"  
 
   # Docker Build and Push - Backend
   dev-build-backend-docker:
@@ -137,7 +138,8 @@ jobs:
 
       - name: Build and push Backend Docker image
         run: |
-          BACKEND_IMAGE_TAG="${{ env.DOCKER_SERVER }}/${{ github.repository }}-backend:${{ env.VERSION }}-${{ github.run_id }}"
+          REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          BACKEND_IMAGE_TAG="${{ env.DOCKER_SERVER }}/${REPO_LC}-backend:${{ env.VERSION }}-${{ github.run_id }}"
           docker build -t ${BACKEND_IMAGE_TAG} ./backend
           docker push ${BACKEND_IMAGE_TAG}
           echo "Backend image ${BACKEND_IMAGE_TAG} pushed"
