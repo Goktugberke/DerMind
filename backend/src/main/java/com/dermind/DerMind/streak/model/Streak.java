@@ -3,9 +3,13 @@ package com.dermind.DerMind.streak.model;
 import com.dermind.DerMind.product.model.Product;
 import com.dermind.DerMind.user.model.User;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.LocalDate;
 
+@Getter
+@Setter
 @Entity
 @Table(name = "streaks")
 public class Streak {

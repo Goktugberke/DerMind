@@ -3,7 +3,11 @@ package com.dermind.DerMind.user_product_rating.model;
 import com.dermind.DerMind.product.model.Product;
 import com.dermind.DerMind.user.model.User;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 
+@Getter
+@Setter
 @Entity
 @Table(name = "user_product_ratings")
 public class UserProductRating {
