@@ -15,6 +15,7 @@ public interface UserRepository extends JpaRepository<User, String> {
     // Email ile kullanıcı bulma
     Optional<User> findByEmail(String email);
 
+    Optional<User> findByProviderId(String providerId);
     // Email varlık kontrolü
     boolean existsByEmail(String email);
 

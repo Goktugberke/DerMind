@@ -1,14 +1,23 @@
 package com.dermind.DerMind.user.controller;
 
+import com.dermind.DerMind.user.model.User;
 import com.dermind.DerMind.user.dto.*;
 import com.dermind.DerMind.user.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.*;
-
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/users")
@@ -41,6 +50,23 @@ public class UserController {
         }
     }
 
+    /**
+     * LOGIN OLAN KULLANICI
+     */
+    @GetMapping("/me")
+    public ResponseEntity<User> getCurrentUser(@AuthenticationPrincipal OidcUser principal) {
+        User user = userService.getUserByProviderId(principal.getSubject());
+        return ResponseEntity.ok(user);
+    }
+
+    /**
+     * GOOGLE SUB İLE USER BUL
+     */
+    @GetMapping("/provider/{providerId}")
+    public ResponseEntity<User> getByProviderId(@PathVariable String providerId) {
+        User user = userService.getUserByProviderId(providerId);
+        return ResponseEntity.ok(user);
+    }
     /**
      * Get user by email
      * GET /api/users/email/{email}
@@ -128,5 +154,48 @@ public class UserController {
     public ResponseEntity<List<UserDetailDTO>> getMostActiveUsers() {
         List<UserDetailDTO> users = userService.getMostActiveUsers();
         return ResponseEntity.ok(users);
+    }
+
+    @GetMapping("/home")
+    public ResponseEntity<String> homePage() {
+        return ResponseEntity.ok("Oturum açma başarılı! Ana sayfaya hoş geldiniz.");
+    }
+
+    @GetMapping("/auth-info")
+    public Map<String, Object> getAuthInfo(@AuthenticationPrincipal OAuth2User principal) {
+        Map<String, Object> authInfo = new HashMap<>();
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication instanceof OAuth2AuthenticationToken oauthToken) {
+            authInfo.put("authenticated", true);
+            authInfo.put("authenticationType", "OAuth2");
+            authInfo.put("authorizedClientRegistrationId", oauthToken.getAuthorizedClientRegistrationId());
+
+            if (principal instanceof OidcUser oidcUser) {
+                authInfo.put("principalType", "OidcUser");
+                authInfo.put("userId", oidcUser.getAttribute("sub"));
+                authInfo.put("email", oidcUser.getAttribute("email"));
+                authInfo.put("name", oidcUser.getAttribute("name"));
+                authInfo.put("picture", oidcUser.getAttribute("picture"));
+
+                authInfo.put("idToken", oidcUser.getIdToken().getTokenValue());
+                authInfo.put("tokenExpiresAt", oidcUser.getIdToken().getExpiresAt());
+
+                authInfo.put("allClaims", oidcUser.getClaims());
+
+                authInfo.put("authorities", authentication.getAuthorities().stream()
+                        .map(Object::toString)
+                        .collect(Collectors.toList()));
+            } else {
+                authInfo.put("principalType", "OAuth2User");
+                authInfo.put("attributes", principal.getAttributes());
+            }
+        } else {
+            authInfo.put("authenticated", false);
+            authInfo.put("message", "Not authenticated or not OAuth2");
+        }
+
+        return authInfo;
     }
 }
