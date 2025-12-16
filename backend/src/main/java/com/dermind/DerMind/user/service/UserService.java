@@ -31,6 +31,11 @@ public class UserService {
         return convertToDetailDTO(user);
     }
 
+    public User getUserByProviderId(String providerId) {
+        return userRepository.findByProviderId(providerId)
+                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı: " + providerId));
+    }
+
     // Email ile kullanıcı getir
     public UserResponseDTO getUserByEmail(String email) {
         User user = userRepository.findByEmail(email)
