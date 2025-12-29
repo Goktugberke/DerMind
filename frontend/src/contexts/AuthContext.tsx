@@ -31,7 +31,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (
+    email: string, 
+    // password: string
+  ): Promise<boolean> => {
     // Mock login - gerçek projede API çağrısı yapılacak
     // Şimdilik herhangi bir email/password ile giriş yapılabilir
     const mockUser: User = {
@@ -48,7 +51,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const register = async (
     email: string,
-    password: string,
+    // password: string,
     name: string
   ): Promise<boolean> => {
     // Mock register - gerçek projede API çağrısı yapılacak
