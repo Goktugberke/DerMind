@@ -64,7 +64,10 @@ const ProductDetail = () => {
   const { user } = useAuth();
   const [product, setProduct] = useState<Product | null>(null);
   const [score, setScore] = useState<ProductScore | null>(null);
-  const [userRating, setUserRating] = useState(0);
+  const [
+    // userRating, 
+    setUserRating
+  ] = useState(0);
 
   useEffect(() => {
     const foundProduct = mockProducts.find((p) => p.id === id);
@@ -106,10 +109,10 @@ const ProductDetail = () => {
     });
   };
 
-  const handleRating = (rating: number) => {
-    setUserRating(rating);
-    // Gerçek projede API'ye gönderilecek
-  };
+  // const handleRating = (rating: number) => {
+  //   setUserRating(rating);
+  //   // Gerçek projede API'ye gönderilecek
+  // };
 
   if (!product) {
     return (

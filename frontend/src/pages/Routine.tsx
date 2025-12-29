@@ -1,11 +1,17 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRoutine } from '../contexts/RoutineContext';
-import { useCart, type Product } from '../contexts/CartContext';
+import { 
+  useCart, 
+  // type Product 
+} from '../contexts/CartContext';
 import { Link } from 'react-router-dom';
 
 const Routine = () => {
-  const { user, isAuthenticated } = useAuth();
+  const { 
+    // user, 
+    isAuthenticated 
+  } = useAuth();
   const { tasks, streak, getTodayTasks, addTask, removeTask, completeTask } =
     useRoutine();
   const { cart } = useCart();
