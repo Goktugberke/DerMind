@@ -3,28 +3,66 @@ package com.dermind.DerMind.user_product_rating.model;
 import com.dermind.DerMind.product.model.Product;
 import com.dermind.DerMind.user.model.User;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
-@Getter
-@Setter
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "user_product_ratings")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class UserProductRating {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private Double score; // kullanıcı-ürün eşleşme puanı (0-100)
-
-    @ManyToOne
-    @JoinColumn(name = "user_id")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @ManyToOne
-    @JoinColumn(name = "product_id")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
-    // getter-setter
-}
+    @Column(name = "rating", nullable = false)
+    private Integer rating; // 1-10 arası puan
 
+    @Column(name = "personalized_rating")
+    private Double personalizedRating; // Kişiye özel hesaplanan puan
+
+    @Column(name = "review", length = 2000)
+    private String review; // Kullanıcı yorumu
+
+    @Column(name = "skin_improvement")
+    private Boolean skinImprovement; // Cilt iyileşmesi oldu mu?
+
+    @Column(name = "would_recommend")
+    private Boolean wouldRecommend; // Tavsiye eder mi?
+
+    @Column(name = "usage_duration") // Kaç gün/hafta kullandı
+    private Integer usageDuration;
+
+    @Column(name = "usage_duration_unit") // DAYS, WEEKS, MONTHS
+    private String usageDurationUnit;
+
+    @Column(name = "pros", length = 1000) // Artıları
+    private String pros;
+
+    @Column(name = "cons", length = 1000) // Eksileri
+    private String cons;
+
+    @Column(name = "verified_purchase")
+    private Boolean verifiedPurchase = false; // Doğrulanmış alım mı?
+
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+}
