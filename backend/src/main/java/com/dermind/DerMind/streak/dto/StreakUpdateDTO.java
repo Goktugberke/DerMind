@@ -1,5 +1,7 @@
 package com.dermind.DerMind.streak.dto;
 
+import com.dermind.DerMind.common.enums.UsageFrequency;
+import com.dermind.DerMind.common.enums.UsageTime;
 import lombok.*;
 
 @Data
@@ -7,7 +9,10 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class StreakUpdateDTO {
-    private String usageFrequency;
-    private String usageTime;
+
+    private UsageFrequency usageFrequency;
+
+    private UsageTime usageTime;
+
     private Boolean isActive;
 }

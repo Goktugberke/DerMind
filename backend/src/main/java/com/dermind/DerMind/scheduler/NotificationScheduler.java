@@ -2,6 +2,7 @@ package com.dermind.DerMind.scheduler;
 
 import com.dermind.DerMind.common.enums.NotificationType;
 import com.dermind.DerMind.notification.service.NotificationService;
+import com.dermind.DerMind.product.model.Product;
 import com.dermind.DerMind.purchase.repository.PurchaseRepository;
 import com.dermind.DerMind.streak.model.Streak;
 import com.dermind.DerMind.streak.repository.StreakRepository;
@@ -41,7 +42,7 @@ public class NotificationScheduler {
 
     /**
      * Her sabah 08:00'da çalışır - Aktif kullanıcılara özel sabah mesajları
-     * Test için: // Her 2 dakikada bir
+      // Her 2 dakikada bir
             */
     @Scheduled(cron = "0 0 8 * * *")
     public void sendPersonalizedMorningReminders() {
@@ -76,7 +77,7 @@ public class NotificationScheduler {
 
     /**
      * Her gece 22:00'da çalışır - Akşam rutini hatırlatmaları
-     * Test için:/ Her 3 dakikada bir
+      // Her 3 dakikada bir
             */
     @Scheduled(cron = "0 0 22 * * *")
     public void sendPersonalizedEveningReminders() {
@@ -111,7 +112,7 @@ public class NotificationScheduler {
 
     /**
      * Her gün öğlen 12:00'da çalışır - Tehlikede olan serilere müdahale
-     * Test için: // Her 5 dakikada bir
+      // Her 5 dakikada bir
             */
     @Scheduled(cron = "0 0 12 * * *")
     public void sendStreakWarnings() {
@@ -147,7 +148,7 @@ public class NotificationScheduler {
 
     /**
      * Her Pazar 10:00'da çalışır - Haftalık özet raporu
-     * Test için:// Her 10 dakikada bir
+     // Her 10 dakikada bir
             */
     @Scheduled(cron = "0 0 10 * * SUN")
     public void sendWeeklySummary() {
@@ -180,7 +181,7 @@ public class NotificationScheduler {
 
     /**
      * Her gün 00:01'de çalışır - Geçmiş tarihe düşmüş serileri otomatik sıfırla
-     * Test için:// Her 15 dakikada bir
+      // Her 15 dakikada bir
             */
     @Scheduled(cron = "0 1 0 * * *")
     public void resetExpiredStreaks() {

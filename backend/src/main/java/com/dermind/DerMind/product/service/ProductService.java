@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -236,12 +235,16 @@ public class ProductService {
     }
 
     private ProductDetailDTO convertToDetailDTO(Product product) {
-        double avgRating = product.getRatings() != null && !product.getRatings().isEmpty()
-                ? product.getRatings().stream()
-                .mapToDouble(r -> r.getScore() != null ? r.getScore() : 0.0)
-                .average()
-                .orElse(0.0)
-                : 0.0;
+        double avgRating = 0.0;
+
+        // ⭐ DÜZELTİLDİ - rating (Integer) alanını kullanıyor
+        if (product.getRatings() != null && !product.getRatings().isEmpty()) {
+            avgRating = product.getRatings().stream()
+                    .filter(r -> r.getRating() != null) // null kontrolü
+                    .mapToDouble(r -> r.getRating().doubleValue())
+                    .average()
+                    .orElse(0.0);
+        }
 
         return new ProductDetailDTO(
                 product.getId(),

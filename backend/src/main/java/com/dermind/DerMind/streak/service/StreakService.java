@@ -1,7 +1,6 @@
 package com.dermind.DerMind.streak.service;
 
 import com.dermind.DerMind.common.enums.UsageFrequency;
-import com.dermind.DerMind.common.enums.UsageTime;
 import com.dermind.DerMind.error.BusinessException;
 import com.dermind.DerMind.error.ResourceNotFoundException;
 import com.dermind.DerMind.product.model.Product;
@@ -49,6 +48,7 @@ public class StreakService {
                 .currentStreak(0)
                 .longestStreak(0)
                 .totalUses(0)
+                .dailyUsageCounter(0)
                 .isActive(true)
                 .build();
 
@@ -166,10 +166,11 @@ public class StreakService {
         streakRepository.deleteById(id);
     }
 
-    // YARDIMCI METODLAR
+    // ============== YARDIMCI METODLAR ==============
 
     /**
      * UsageFrequency Enum'una göre günlük maksimum kullanım sayısını döner
+     * ⭐ İŞTE BU METOD!
      */
     private int getMaxDailyUsage(UsageFrequency frequency) {
         if (frequency == null) {
@@ -183,11 +184,16 @@ public class StreakService {
                 return 1;
             case WEEKLY:
                 return 1; // Haftalık kullanımda da günde 1 kez sayılır
+            case AS_NEEDED:
+                return 1; // İhtiyaca göre de varsayılan 1
             default:
                 return 1;
         }
     }
 
+    /**
+     * Streak entity'sini DTO'ya dönüştürür
+     */
     private StreakResponseDTO mapToResponseDTO(Streak streak) {
         return StreakResponseDTO.builder()
                 .id(streak.getId())
