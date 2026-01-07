@@ -1,11 +1,15 @@
 package com.dermind.DerMind.purchase.controller;
 
+import com.dermind.DerMind.common.enums.OrderStatus;
+import com.dermind.DerMind.error.UserNotAuthenticatedException;
 import com.dermind.DerMind.purchase.dto.*;
 import com.dermind.DerMind.purchase.service.PurchaseService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -25,9 +29,15 @@ public class PurchaseController {
      * POST /api/purchases
      */
     @PostMapping
-    public ResponseEntity<?> createPurchase(@Valid @RequestBody PurchaseCreateDTO dto) {
+    public ResponseEntity<?> createPurchase(
+            @AuthenticationPrincipal OidcUser principal,
+            @Valid @RequestBody PurchaseCreateDTO dto) {
         try {
-            PurchaseResponseDTO createdPurchase = purchaseService.createPurchase(dto);
+            // Token'dan userId'yi alıyoruz
+            String userId = getUserIdFromPrincipal(principal);
+
+            // Service artık (userId, dto) kabul ediyor
+            PurchaseResponseDTO createdPurchase = purchaseService.createPurchase(userId, dto);
             return ResponseEntity.status(HttpStatus.CREATED).body(createdPurchase);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -97,7 +107,8 @@ public class PurchaseController {
      * GET /api/purchases/status/{orderStatus}
      */
     @GetMapping("/status/{orderStatus}")
-    public ResponseEntity<List<PurchaseResponseDTO>> getPurchasesByOrderStatus(@PathVariable String orderStatus) {
+    public ResponseEntity<List<PurchaseResponseDTO>> getPurchasesByOrderStatus(@PathVariable OrderStatus orderStatus) {
+        // Spring Boot URL'deki String'i otomatik olarak Enum'a çevirir.
         List<PurchaseResponseDTO> purchases = purchaseService.getPurchasesByOrderStatus(orderStatus);
         return ResponseEntity.ok(purchases);
     }
@@ -109,7 +120,7 @@ public class PurchaseController {
     @GetMapping("/user/{userId}/status/{orderStatus}")
     public ResponseEntity<List<PurchaseResponseDTO>> getPurchasesByUserIdAndStatus(
             @PathVariable String userId,
-            @PathVariable String orderStatus) {
+            @PathVariable OrderStatus orderStatus) {
         List<PurchaseResponseDTO> purchases = purchaseService.getPurchasesByUserIdAndStatus(userId, orderStatus);
         return ResponseEntity.ok(purchases);
     }
@@ -154,5 +165,12 @@ public class PurchaseController {
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
+    }
+
+    private String getUserIdFromPrincipal(OidcUser principal) {
+        if (principal == null) {
+            throw new UserNotAuthenticatedException("Bu işlemi gerçekleştirmek için giriş yapmalısınız.");
+        }
+        return principal.getSubject();
     }
 }

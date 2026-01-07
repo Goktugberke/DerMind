@@ -1,5 +1,6 @@
 package com.dermind.DerMind.purchase.dto;
 
+import com.dermind.DerMind.common.enums.PaymentMethod; // YENİ EKLENDİ
 import jakarta.validation.constraints.*;
 import lombok.*;
 import java.math.BigDecimal;
@@ -9,6 +10,7 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 @Builder
 public class PurchaseCreateDTO {
+    // userId YOK (Security kuralı)
 
     @NotNull(message = "Product ID boş olamaz")
     private Long productId;
@@ -21,8 +23,8 @@ public class PurchaseCreateDTO {
     @DecimalMin(value = "0.0", inclusive = false, message = "Fiyat 0'dan büyük olmalıdır")
     private BigDecimal unitPrice;
 
-    @NotBlank(message = "Ödeme yöntemi seçilmelidir")
-    private String paymentMethod;
+    @NotNull(message = "Ödeme yöntemi seçilmelidir")
+    private PaymentMethod paymentMethod;
 
     @NotBlank(message = "Teslimat adresi boş olamaz")
     @Size(min = 10, max = 500, message = "Adres en az 10, en fazla 500 karakter olmalıdır")

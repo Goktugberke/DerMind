@@ -1,5 +1,6 @@
 package com.dermind.DerMind.purchase.repository;
 
+import com.dermind.DerMind.common.enums.OrderStatus; // Import Ekle
 import com.dermind.DerMind.purchase.model.Purchase;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -13,12 +14,11 @@ import java.util.List;
 public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
 
     List<Purchase> findByUserId(String userId);
-
     List<Purchase> findByProductId(Long productId);
 
-    List<Purchase> findByOrderStatus(String orderStatus);
+    List<Purchase> findByOrderStatus(OrderStatus orderStatus);
 
-    List<Purchase> findByUserIdAndOrderStatus(String userId, String orderStatus);
+    List<Purchase> findByUserIdAndOrderStatus(String userId, OrderStatus orderStatus);
 
     @Query("SELECT p FROM Purchase p WHERE p.user.id = :userId ORDER BY p.purchasedAt DESC")
     List<Purchase> findRecentPurchasesByUserId(@Param("userId") String userId);

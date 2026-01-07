@@ -1,6 +1,8 @@
 package com.dermind.DerMind.purchase.dto;
 
 import com.dermind.DerMind.common.enums.OrderStatus;
+import com.dermind.DerMind.common.enums.PaymentMethod; // YENİ
+import com.dermind.DerMind.common.enums.PaymentStatus; // YENİ
 import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -20,8 +22,8 @@ public class PurchaseResponseDTO {
     private BigDecimal unitPrice;
     private BigDecimal totalPrice;
     private OrderStatus orderStatus;
-    private String paymentMethod;
-    private String paymentStatus;
+    private PaymentMethod paymentMethod;
+    private PaymentStatus paymentStatus;
     private String shippingAddress;
     private String trackingNumber;
     private String notes;

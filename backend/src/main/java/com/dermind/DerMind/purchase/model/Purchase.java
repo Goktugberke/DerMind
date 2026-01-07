@@ -1,6 +1,8 @@
 package com.dermind.DerMind.purchase.model;
 
 import com.dermind.DerMind.common.enums.OrderStatus;
+import com.dermind.DerMind.common.enums.PaymentMethod; // YENİ EKLENDİ
+import com.dermind.DerMind.common.enums.PaymentStatus; // YENİ EKLENDİ
 import com.dermind.DerMind.product.model.Product;
 import com.dermind.DerMind.user.model.User;
 import jakarta.persistence.*;
@@ -44,13 +46,13 @@ public class Purchase {
     @Column(name = "order_status", nullable = false)
     private OrderStatus orderStatus;
 
-    // Not: PaymentMethod ve PaymentStatus için de Enum yapılabilir
-    // ama örnek uzamasın diye String bıraktım veya ayrıca Enum tanımlayabilirsin.
+    @Enumerated(EnumType.STRING)
     @Column(name = "payment_method")
-    private String paymentMethod;
+    private PaymentMethod paymentMethod;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "payment_status")
-    private String paymentStatus;
+    private PaymentStatus paymentStatus;
 
     @Column(name = "shipping_address", length = 500)
     private String shippingAddress;

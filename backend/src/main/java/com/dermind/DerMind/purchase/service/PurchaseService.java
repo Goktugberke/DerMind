@@ -1,5 +1,7 @@
 package com.dermind.DerMind.purchase.service;
 
+import com.dermind.DerMind.common.enums.OrderStatus;
+import com.dermind.DerMind.common.enums.PaymentStatus;
 import com.dermind.DerMind.error.ResourceNotFoundException;
 import com.dermind.DerMind.product.model.Product;
 import com.dermind.DerMind.product.repository.ProductRepository;
@@ -26,9 +28,9 @@ public class PurchaseService {
     private final ProductRepository productRepository;
 
     @Transactional
-    public PurchaseResponseDTO createPurchase(PurchaseCreateDTO dto) {
-        User user = userRepository.findById(dto.getUserId())
-                .orElseThrow(() -> new ResourceNotFoundException("User", "id", dto.getUserId()));
+    public PurchaseResponseDTO createPurchase(String userId, PurchaseCreateDTO dto) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 
         Product product = productRepository.findById(dto.getProductId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", dto.getProductId()));
@@ -41,9 +43,9 @@ public class PurchaseService {
                 .quantity(dto.getQuantity())
                 .unitPrice(dto.getUnitPrice())
                 .totalPrice(totalPrice)
-                .orderStatus("PENDING")
+                .orderStatus(OrderStatus.PENDING)
                 .paymentMethod(dto.getPaymentMethod())
-                .paymentStatus("PENDING")
+                .paymentStatus(PaymentStatus.PENDING)
                 .shippingAddress(dto.getShippingAddress())
                 .notes(dto.getNotes())
                 .purchasedAt(LocalDateTime.now())
@@ -89,14 +91,14 @@ public class PurchaseService {
     }
 
     @Transactional(readOnly = true)
-    public List<PurchaseResponseDTO> getPurchasesByOrderStatus(String orderStatus) {
+    public List<PurchaseResponseDTO> getPurchasesByOrderStatus(OrderStatus orderStatus) {
         return purchaseRepository.findByOrderStatus(orderStatus).stream()
                 .map(this::mapToResponseDTO)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
-    public List<PurchaseResponseDTO> getPurchasesByUserIdAndStatus(String userId, String orderStatus) {
+    public List<PurchaseResponseDTO> getPurchasesByUserIdAndStatus(String userId, OrderStatus orderStatus) {
         return purchaseRepository.findByUserIdAndOrderStatus(userId, orderStatus).stream()
                 .map(this::mapToResponseDTO)
                 .collect(Collectors.toList());
@@ -120,7 +122,7 @@ public class PurchaseService {
 
         if (dto.getOrderStatus() != null) {
             purchase.setOrderStatus(dto.getOrderStatus());
-            if ("DELIVERED".equals(dto.getOrderStatus())) {
+            if (dto.getOrderStatus() == OrderStatus.DELIVERED) {
                 purchase.setDeliveredAt(LocalDateTime.now());
             }
         }

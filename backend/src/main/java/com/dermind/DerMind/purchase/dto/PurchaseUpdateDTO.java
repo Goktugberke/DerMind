@@ -1,5 +1,7 @@
 package com.dermind.DerMind.purchase.dto;
 
+import com.dermind.DerMind.common.enums.OrderStatus;
+import com.dermind.DerMind.common.enums.PaymentStatus;
 import lombok.*;
 
 @Data
@@ -7,8 +9,8 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class PurchaseUpdateDTO {
-    private String orderStatus;
-    private String paymentStatus;
+    private OrderStatus orderStatus;
+    private PaymentStatus paymentStatus;
     private String trackingNumber;
     private String notes;
 }
