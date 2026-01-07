@@ -1,0 +1,197 @@
+package com.dermind.DerMind.purchase.service;
+
+import com.dermind.DerMind.product.model.Product;
+import com.dermind.DerMind.product.repository.ProductRepository;
+import com.dermind.DerMind.purchase.dto.*;
+import com.dermind.DerMind.purchase.model.Purchase;
+import com.dermind.DerMind.purchase.repository.PurchaseRepository;
+import com.dermind.DerMind.user.model.User;
+import com.dermind.DerMind.user.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class PurchaseService {
+
+    private final PurchaseRepository purchaseRepository;
+    private final UserRepository userRepository;
+    private final ProductRepository productRepository;
+
+    @Transactional
+    public PurchaseResponseDTO createPurchase(PurchaseCreateDTO dto) {
+        User user = userRepository.findById(dto.getUserId())
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + dto.getUserId()));
+
+        Product product = productRepository.findById(dto.getProductId())
+                .orElseThrow(() -> new RuntimeException("Product not found with id: " + dto.getProductId()));
+
+        BigDecimal totalPrice = dto.getUnitPrice().multiply(BigDecimal.valueOf(dto.getQuantity()));
+
+        Purchase purchase = Purchase.builder()
+                .user(user)
+                .product(product)
+                .quantity(dto.getQuantity())
+                .unitPrice(dto.getUnitPrice())
+                .totalPrice(totalPrice)
+                .orderStatus("PENDING")
+                .paymentMethod(dto.getPaymentMethod())
+                .paymentStatus("PENDING")
+                .shippingAddress(dto.getShippingAddress())
+                .notes(dto.getNotes())
+                .purchasedAt(LocalDateTime.now())
+                .build();
+
+        Purchase savedPurchase = purchaseRepository.save(purchase);
+        return mapToResponseDTO(savedPurchase);
+    }
+
+    @Transactional(readOnly = true)
+    public PurchaseResponseDTO getPurchaseById(Long id) {
+        Purchase purchase = purchaseRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Purchase not found with id: " + id));
+        return mapToResponseDTO(purchase);
+    }
+
+    @Transactional(readOnly = true)
+    public PurchaseDetailDTO getPurchaseDetailById(Long id) {
+        Purchase purchase = purchaseRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Purchase not found with id: " + id));
+        return mapToDetailDTO(purchase);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PurchaseResponseDTO> getAllPurchases() {
+        return purchaseRepository.findAll().stream()
+                .map(this::mapToResponseDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<PurchaseResponseDTO> getPurchasesByUserId(String userId) {
+        return purchaseRepository.findByUserId(userId).stream()
+                .map(this::mapToResponseDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<PurchaseResponseDTO> getRecentPurchasesByUserId(String userId) {
+        return purchaseRepository.findRecentPurchasesByUserId(userId).stream()
+                .map(this::mapToResponseDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<PurchaseResponseDTO> getPurchasesByOrderStatus(String orderStatus) {
+        return purchaseRepository.findByOrderStatus(orderStatus).stream()
+                .map(this::mapToResponseDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<PurchaseResponseDTO> getPurchasesByUserIdAndStatus(String userId, String orderStatus) {
+        return purchaseRepository.findByUserIdAndOrderStatus(userId, orderStatus).stream()
+                .map(this::mapToResponseDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public Long getTotalPurchaseCountByUserId(String userId) {
+        return purchaseRepository.countPurchasesByUserId(userId);
+    }
+
+    @Transactional(readOnly = true)
+    public Double getTotalSpendingByUserId(String userId) {
+        Double total = purchaseRepository.getTotalSpendingByUserId(userId);
+        return total != null ? total : 0.0;
+    }
+
+    @Transactional
+    public PurchaseResponseDTO updatePurchase(Long id, PurchaseUpdateDTO dto) {
+        Purchase purchase = purchaseRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Purchase not found with id: " + id));
+
+        if (dto.getOrderStatus() != null) {
+            purchase.setOrderStatus(dto.getOrderStatus());
+            if ("DELIVERED".equals(dto.getOrderStatus())) {
+                purchase.setDeliveredAt(LocalDateTime.now());
+            }
+        }
+        if (dto.getPaymentStatus() != null) {
+            purchase.setPaymentStatus(dto.getPaymentStatus());
+        }
+        if (dto.getTrackingNumber() != null) {
+            purchase.setTrackingNumber(dto.getTrackingNumber());
+        }
+        if (dto.getNotes() != null) {
+            purchase.setNotes(dto.getNotes());
+        }
+
+        Purchase updatedPurchase = purchaseRepository.save(purchase);
+        return mapToResponseDTO(updatedPurchase);
+    }
+
+    @Transactional
+    public void deletePurchase(Long id) {
+        if (!purchaseRepository.existsById(id)) {
+            throw new RuntimeException("Purchase not found with id: " + id);
+        }
+        purchaseRepository.deleteById(id);
+    }
+
+    private PurchaseResponseDTO mapToResponseDTO(Purchase purchase) {
+        return PurchaseResponseDTO.builder()
+                .id(purchase.getId())
+                .userId(purchase.getUser().getId())
+                .userName(purchase.getUser().getName())
+                .productId(purchase.getProduct().getId())
+                .productName(purchase.getProduct().getName())
+                .productBrand(purchase.getProduct().getBrand())
+                .quantity(purchase.getQuantity())
+                .unitPrice(purchase.getUnitPrice())
+                .totalPrice(purchase.getTotalPrice())
+                .orderStatus(purchase.getOrderStatus())
+                .paymentMethod(purchase.getPaymentMethod())
+                .paymentStatus(purchase.getPaymentStatus())
+                .shippingAddress(purchase.getShippingAddress())
+                .trackingNumber(purchase.getTrackingNumber())
+                .notes(purchase.getNotes())
+                .purchasedAt(purchase.getPurchasedAt())
+                .deliveredAt(purchase.getDeliveredAt())
+                .createdAt(purchase.getCreatedAt())
+                .updatedAt(purchase.getUpdatedAt())
+                .build();
+    }
+    private PurchaseDetailDTO mapToDetailDTO(Purchase purchase) {
+        return PurchaseDetailDTO.builder()
+                .id(purchase.getId())
+                .userId(purchase.getUser().getId())
+                .userName(purchase.getUser().getName())
+                .userEmail(purchase.getUser().getEmail())
+                .productId(purchase.getProduct().getId())
+                .productName(purchase.getProduct().getName())
+                .productBrand(purchase.getProduct().getBrand())
+                .productIngredients(purchase.getProduct().getIngredients())
+                .productQualityScore(purchase.getProduct().getQualityScore())
+                .quantity(purchase.getQuantity())
+                .unitPrice(purchase.getUnitPrice())
+                .totalPrice(purchase.getTotalPrice())
+                .orderStatus(purchase.getOrderStatus())
+                .paymentMethod(purchase.getPaymentMethod())
+                .paymentStatus(purchase.getPaymentStatus())
+                .shippingAddress(purchase.getShippingAddress())
+                .trackingNumber(purchase.getTrackingNumber())
+                .notes(purchase.getNotes())
+                .purchasedAt(purchase.getPurchasedAt())
+                .deliveredAt(purchase.getDeliveredAt())
+                .createdAt(purchase.getCreatedAt())
+                .updatedAt(purchase.getUpdatedAt())
+                .build();
+    }
+}
