@@ -1,5 +1,7 @@
 package com.dermind.DerMind.streak.service;
 
+import com.dermind.DerMind.common.enums.UsageFrequency;
+import com.dermind.DerMind.common.enums.UsageTime;
 import com.dermind.DerMind.error.BusinessException;
 import com.dermind.DerMind.error.ResourceNotFoundException;
 import com.dermind.DerMind.product.model.Product;
@@ -122,35 +124,25 @@ public class StreakService {
             streak.setDailyUsageCounter(0);
         }
 
-        int maxDailyUsage = 1;
-        if ("TWICE_DAILY".equalsIgnoreCase(streak.getUsageFrequency())) {
-            maxDailyUsage = 2;
-        } else if ("WEEKLY".equalsIgnoreCase(streak.getUsageFrequency())) {
-            maxDailyUsage = 1;
-        }
+        // 2. GÜNLÜK KULLANIM LİMİTİ KONTROLÜ (ENUM kullanarak)
+        int maxDailyUsage = getMaxDailyUsage(streak.getUsageFrequency());
 
         if (streak.getDailyUsageCounter() >= maxDailyUsage) {
             throw new BusinessException("Bugünkü kullanım hedefinizi zaten tamamladınız!");
         }
 
         // 3. SERİ (STREAK) HESAPLAMA MANTIĞI
-        // Eğer gün ilk defa kullanılıyorsa veya gün değişmişse seri kontrolü yap
         if (lastUsed != null && !lastUsed.equals(today)) {
             long daysBetween = ChronoUnit.DAYS.between(lastUsed, today);
 
             if (daysBetween == 1) {
-                // Dün kullanmış, seri devam ediyor
                 streak.setCurrentStreak(streak.getCurrentStreak() + 1);
             } else if (daysBetween > 1) {
-                // Dün kullanmamış, seri bozuldu, 1'den başla
                 streak.setCurrentStreak(1);
             }
         } else if (lastUsed == null) {
-            // İlk kez başlıyor
             streak.setCurrentStreak(1);
         }
-        // NOT: Eğer gün içinde 2. kez basıyorsa (TWICE_DAILY), seri sayısını tekrar artırmıyoruz.
-        // Seri "gün" bazlı artar, kullanım sayısı bazlı değil.
 
         // 4. VERİLERİ GÜNCELLE
         streak.setDailyUsageCounter(streak.getDailyUsageCounter() + 1);
@@ -172,6 +164,28 @@ public class StreakService {
             throw new RuntimeException("Streak not found with id: " + id);
         }
         streakRepository.deleteById(id);
+    }
+
+    // YARDIMCI METODLAR
+
+    /**
+     * UsageFrequency Enum'una göre günlük maksimum kullanım sayısını döner
+     */
+    private int getMaxDailyUsage(UsageFrequency frequency) {
+        if (frequency == null) {
+            return 1; // Default
+        }
+
+        switch (frequency) {
+            case TWICE_DAILY:
+                return 2;
+            case DAILY:
+                return 1;
+            case WEEKLY:
+                return 1; // Haftalık kullanımda da günde 1 kez sayılır
+            default:
+                return 1;
+        }
     }
 
     private StreakResponseDTO mapToResponseDTO(Streak streak) {

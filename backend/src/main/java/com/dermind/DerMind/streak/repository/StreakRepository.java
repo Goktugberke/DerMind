@@ -13,11 +13,8 @@ import java.util.Optional;
 @Repository
 public interface StreakRepository extends JpaRepository<Streak, Long> {
 
+    // MEVCUT METODLAR (Değişmeden kalacak)
     List<Streak> findByUserId(String userId);
-
-    List<Streak> findByUserIdAndIsActive(String userId, Boolean isActive);
-
-    Optional<Streak> findByUserIdAndProductId(String userId, Long productId);
 
     List<Streak> findByProductId(Long productId);
 
@@ -29,4 +26,21 @@ public interface StreakRepository extends JpaRepository<Streak, Long> {
 
     @Query("SELECT s FROM Streak s WHERE s.user.id = :userId AND s.currentStreak > 0 ORDER BY s.currentStreak DESC")
     List<Streak> findActiveStreaksByUser(@Param("userId") String userId);
+
+    // YENİ EKLENECEK METODLAR (StreakService için gerekli)
+
+    /**
+     * Kullanıcı ID'si ve Ürün ID'sine göre streak arar
+     * Aynı kullanıcının aynı ürün için birden fazla streak oluşturmasını engellemek için
+     */
+    @Query("SELECT s FROM Streak s WHERE s.user.id = :userId AND s.product.id = :productId")
+    Optional<Streak> findByUserIdAndProductId(@Param("userId") String userId,
+                                              @Param("productId") Long productId);
+
+    /**
+     * Kullanıcı ID'si ve aktiflik durumuna göre streakları bulur
+     */
+    @Query("SELECT s FROM Streak s WHERE s.user.id = :userId AND s.isActive = :isActive")
+    List<Streak> findByUserIdAndIsActive(@Param("userId") String userId,
+                                         @Param("isActive") Boolean isActive);
 }
