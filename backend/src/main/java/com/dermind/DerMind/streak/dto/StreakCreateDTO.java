@@ -1,5 +1,8 @@
 package com.dermind.DerMind.streak.dto;
 
+import com.dermind.DerMind.common.enums.UsageFrequency;
+import com.dermind.DerMind.common.enums.UsageTime;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 @Data
@@ -7,8 +10,13 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class StreakCreateDTO {
-    private String userId;
+
+    @NotNull(message = "Product ID boş olamaz")
     private Long productId;
-    private String usageFrequency; // DAILY, TWICE_DAILY, WEEKLY
-    private String usageTime; // MORNING, EVENING, BOTH, ANYTIME
+
+    @NotNull(message = "Kullanım sıklığı boş olamaz")
+    private UsageFrequency usageFrequency;
+
+    @NotNull(message = "Kullanım zamanı boş olamaz")
+    private UsageTime usageTime;
 }

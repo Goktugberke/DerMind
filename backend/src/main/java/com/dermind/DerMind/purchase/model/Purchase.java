@@ -1,5 +1,6 @@
 package com.dermind.DerMind.purchase.model;
 
+import com.dermind.DerMind.common.enums.OrderStatus;
 import com.dermind.DerMind.product.model.Product;
 import com.dermind.DerMind.user.model.User;
 import jakarta.persistence.*;
@@ -12,7 +13,8 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "purchases")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -38,14 +40,17 @@ public class Purchase {
     @Column(name = "total_price", nullable = false, precision = 10, scale = 2)
     private BigDecimal totalPrice;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "order_status", nullable = false)
-    private String orderStatus; // PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED
+    private OrderStatus orderStatus;
 
+    // Not: PaymentMethod ve PaymentStatus için de Enum yapılabilir
+    // ama örnek uzamasın diye String bıraktım veya ayrıca Enum tanımlayabilirsin.
     @Column(name = "payment_method")
-    private String paymentMethod; // CREDIT_CARD, DEBIT_CARD, PAYPAL, BANK_TRANSFER
+    private String paymentMethod;
 
     @Column(name = "payment_status")
-    private String paymentStatus; // PENDING, COMPLETED, FAILED, REFUNDED
+    private String paymentStatus;
 
     @Column(name = "shipping_address", length = 500)
     private String shippingAddress;

@@ -1,5 +1,7 @@
 package com.dermind.DerMind.streak.model;
 
+import com.dermind.DerMind.common.enums.UsageFrequency;
+import com.dermind.DerMind.common.enums.UsageTime;
 import com.dermind.DerMind.product.model.Product;
 import com.dermind.DerMind.user.model.User;
 import jakarta.persistence.*;
@@ -12,7 +14,8 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "streaks")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -30,25 +33,30 @@ public class Streak {
     private Product product;
 
     @Column(name = "current_streak", nullable = false)
-    private Integer currentStreak = 0; // Mevcut seri
+    private Integer currentStreak = 0;
 
     @Column(name = "longest_streak", nullable = false)
-    private Integer longestStreak = 0; // En uzun seri
+    private Integer longestStreak = 0;
 
     @Column(name = "last_used_date")
-    private LocalDate lastUsedDate; // Son kullanım tarihi
+    private LocalDate lastUsedDate;
 
-    @Column(name = "usage_frequency") // DAILY, TWICE_DAILY, WEEKLY vb.
-    private String usageFrequency;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "usage_frequency")
+    private UsageFrequency usageFrequency;
 
-    @Column(name = "usage_time") // MORNING, EVENING, BOTH vb.
-    private String usageTime;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "usage_time")
+    private UsageTime usageTime;
+
+    @Column(name = "daily_usage_counter", nullable = false)
+    private Integer dailyUsageCounter = 0;
 
     @Column(name = "total_uses", nullable = false)
-    private Integer totalUses = 0; // Toplam kullanım sayısı
+    private Integer totalUses = 0;
 
     @Column(name = "is_active", nullable = false)
-    private Boolean isActive = true; // Seri aktif mi?
+    private Boolean isActive = true;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

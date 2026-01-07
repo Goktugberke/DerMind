@@ -1,11 +1,14 @@
 package com.dermind.DerMind.streak.controller;
 
+import com.dermind.DerMind.error.UserNotAuthenticatedException;
 import com.dermind.DerMind.streak.dto.*;
 import com.dermind.DerMind.streak.service.StreakService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,26 +22,52 @@ public class StreakController {
     private final StreakService streakService;
 
     /**
-     * Create new streak
+     * Create new streak (Güvenli Versiyon)
+     * Token'daki kullanıcı için seri oluşturur.
      * POST /api/streaks
      */
     @PostMapping
-    public ResponseEntity<?> createStreak(@Valid @RequestBody StreakCreateDTO dto) {
-        try {
-            StreakResponseDTO createdStreak = streakService.createStreak(dto);
-            return ResponseEntity.status(HttpStatus.CREATED).body(createdStreak);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+    public ResponseEntity<StreakResponseDTO> createStreak(
+            @AuthenticationPrincipal OidcUser principal,
+            @Valid @RequestBody StreakCreateDTO dto) {
+
+        String userId = getUserIdFromPrincipal(principal);
+        // Service metodunu (userId, dto) alacak şekilde güncellediğini varsayıyoruz
+        StreakResponseDTO createdStreak = streakService.createStreak(userId, dto);
+        return ResponseEntity.status(HttpStatus.CREATED).body(createdStreak);
     }
 
     /**
-     * Get all streaks
-     * GET /api/streaks
+     * Get MY streaks (Güvenli Versiyon)
+     * Sadece oturum açan kullanıcının serilerini getirir.
+     * GET /api/streaks/my-streaks
      */
-    @GetMapping
-    public ResponseEntity<List<StreakResponseDTO>> getAllStreaks() {
-        List<StreakResponseDTO> streaks = streakService.getAllStreaks();
+    @GetMapping("/my-streaks")
+    public ResponseEntity<List<StreakResponseDTO>> getMyStreaks(@AuthenticationPrincipal OidcUser principal) {
+        String userId = getUserIdFromPrincipal(principal);
+        List<StreakResponseDTO> streaks = streakService.getStreaksByUserId(userId);
+        return ResponseEntity.ok(streaks);
+    }
+
+    /**
+     * Get MY active streaks (Güvenli Versiyon)
+     * GET /api/streaks/my-streaks/active
+     */
+    @GetMapping("/my-streaks/active")
+    public ResponseEntity<List<StreakResponseDTO>> getMyActiveStreaks(@AuthenticationPrincipal OidcUser principal) {
+        String userId = getUserIdFromPrincipal(principal);
+        List<StreakResponseDTO> streaks = streakService.getActiveStreaksByUserId(userId);
+        return ResponseEntity.ok(streaks);
+    }
+
+    /**
+     * Get MY top streaks (Güvenli Versiyon)
+     * GET /api/streaks/my-streaks/top
+     */
+    @GetMapping("/my-streaks/top")
+    public ResponseEntity<List<StreakResponseDTO>> getMyTopStreaks(@AuthenticationPrincipal OidcUser principal) {
+        String userId = getUserIdFromPrincipal(principal);
+        List<StreakResponseDTO> streaks = streakService.getTopStreaksByUserId(userId);
         return ResponseEntity.ok(streaks);
     }
 
@@ -47,43 +76,19 @@ public class StreakController {
      * GET /api/streaks/{id}
      */
     @GetMapping("/{id}")
-    public ResponseEntity<?> getStreakById(@PathVariable Long id) {
-        try {
-            StreakResponseDTO streak = streakService.getStreakById(id);
-            return ResponseEntity.ok(streak);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+    public ResponseEntity<StreakResponseDTO> getStreakById(@PathVariable Long id) {
+        StreakResponseDTO streak = streakService.getStreakById(id);
+        return ResponseEntity.ok(streak);
     }
 
     /**
-     * Get streaks by user ID
-     * GET /api/streaks/user/{userId}
+     * Record product usage (Bugün kullandım butonu)
+     * POST /api/streaks/{id}/use
      */
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<List<StreakResponseDTO>> getStreaksByUserId(@PathVariable String userId) {
-        List<StreakResponseDTO> streaks = streakService.getStreaksByUserId(userId);
-        return ResponseEntity.ok(streaks);
-    }
-
-    /**
-     * Get active streaks by user ID
-     * GET /api/streaks/user/{userId}/active
-     */
-    @GetMapping("/user/{userId}/active")
-    public ResponseEntity<List<StreakResponseDTO>> getActiveStreaksByUserId(@PathVariable String userId) {
-        List<StreakResponseDTO> streaks = streakService.getActiveStreaksByUserId(userId);
-        return ResponseEntity.ok(streaks);
-    }
-
-    /**
-     * Get top streaks by user ID
-     * GET /api/streaks/user/{userId}/top
-     */
-    @GetMapping("/user/{userId}/top")
-    public ResponseEntity<List<StreakResponseDTO>> getTopStreaksByUserId(@PathVariable String userId) {
-        List<StreakResponseDTO> streaks = streakService.getTopStreaksByUserId(userId);
-        return ResponseEntity.ok(streaks);
+    @PostMapping("/{id}/use")
+    public ResponseEntity<StreakResponseDTO> recordUsage(@PathVariable Long id) {
+        StreakResponseDTO updatedStreak = streakService.recordUsage(id);
+        return ResponseEntity.ok(updatedStreak);
     }
 
     /**
@@ -91,29 +96,11 @@ public class StreakController {
      * PUT /api/streaks/{id}
      */
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateStreak(
+    public ResponseEntity<StreakResponseDTO> updateStreak(
             @PathVariable Long id,
             @Valid @RequestBody StreakUpdateDTO dto) {
-        try {
-            StreakResponseDTO updatedStreak = streakService.updateStreak(id, dto);
-            return ResponseEntity.ok(updatedStreak);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
-    }
-
-    /**
-     * Record product usage
-     * POST /api/streaks/{id}/use
-     */
-    @PostMapping("/{id}/use")
-    public ResponseEntity<?> recordUsage(@PathVariable Long id) {
-        try {
-            StreakResponseDTO updatedStreak = streakService.recordUsage(id);
-            return ResponseEntity.ok(updatedStreak);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+        StreakResponseDTO updatedStreak = streakService.updateStreak(id, dto);
+        return ResponseEntity.ok(updatedStreak);
     }
 
     /**
@@ -122,11 +109,34 @@ public class StreakController {
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteStreak(@PathVariable Long id) {
-        try {
-            streakService.deleteStreak(id);
-            return ResponseEntity.noContent().build();
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
+        streakService.deleteStreak(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Admin Endpoint: Get ALL streaks
+     * (Bu genellikle admin paneli için kullanılır)
+     * GET /api/streaks/all
+     */
+    @GetMapping("/all")
+    public ResponseEntity<List<StreakResponseDTO>> getAllStreaks() {
+        // İstersen buraya @PreAuthorize("hasRole('ADMIN')") ekleyebilirsin
+        List<StreakResponseDTO> streaks = streakService.getAllStreaks();
+        return ResponseEntity.ok(streaks);
+    }
+
+    // --- HELPER METHOD ---
+
+    /**
+     * Token'dan kullanıcı ID'sini (Google 'sub') çıkarır.
+     * Kullanıcı giriş yapmamışsa Exception fırlatır.
+     */
+    private String getUserIdFromPrincipal(OidcUser principal) {
+        if (principal == null) {
+            throw new UserNotAuthenticatedException("Bu işlemi gerçekleştirmek için giriş yapmalısınız.");
         }
+        // Google 'sub' claim'i genellikle unique user ID olarak kullanılır.
+        // Eğer veritabanında providerId yerine email kullanıyorsan principal.getEmail() yapmalısın.
+        return principal.getSubject();
     }
 }

@@ -1,5 +1,7 @@
 package com.dermind.DerMind.streak.service;
 
+import com.dermind.DerMind.error.BusinessException;
+import com.dermind.DerMind.error.ResourceNotFoundException;
 import com.dermind.DerMind.product.model.Product;
 import com.dermind.DerMind.product.repository.ProductRepository;
 import com.dermind.DerMind.streak.dto.*;
@@ -25,16 +27,16 @@ public class StreakService {
     private final ProductRepository productRepository;
 
     @Transactional
-    public StreakResponseDTO createStreak(StreakCreateDTO dto) {
-        User user = userRepository.findById(dto.getUserId())
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + dto.getUserId()));
+    public StreakResponseDTO createStreak(String userId, StreakCreateDTO dto) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 
         Product product = productRepository.findById(dto.getProductId())
                 .orElseThrow(() -> new RuntimeException("Product not found with id: " + dto.getProductId()));
 
         // Aynı kullanıcı ve ürün için seri zaten var mı kontrol et
-        if (streakRepository.findByUserIdAndProductId(dto.getUserId(), dto.getProductId()).isPresent()) {
-            throw new RuntimeException("Streak already exists for this user and product");
+        if (streakRepository.findByUserIdAndProductId(userId, dto.getProductId()).isPresent()) {
+            throw new BusinessException("Bu ürün için seri zaten mevcut");
         }
 
         Streak streak = Streak.builder()
@@ -115,33 +117,50 @@ public class StreakService {
         LocalDate today = LocalDate.now();
         LocalDate lastUsed = streak.getLastUsedDate();
 
-        if (lastUsed != null && lastUsed.equals(today)) {
-            throw new RuntimeException("Usage already recorded for today");
+        // 1. GÜN KONTROLÜ VE SAYAÇ SIFIRLAMA
+        if (lastUsed == null || !lastUsed.equals(today)) {
+            streak.setDailyUsageCounter(0);
         }
 
-        // Seri kontrolü
-        if (lastUsed != null) {
+        int maxDailyUsage = 1;
+        if ("TWICE_DAILY".equalsIgnoreCase(streak.getUsageFrequency())) {
+            maxDailyUsage = 2;
+        } else if ("WEEKLY".equalsIgnoreCase(streak.getUsageFrequency())) {
+            maxDailyUsage = 1;
+        }
+
+        if (streak.getDailyUsageCounter() >= maxDailyUsage) {
+            throw new BusinessException("Bugünkü kullanım hedefinizi zaten tamamladınız!");
+        }
+
+        // 3. SERİ (STREAK) HESAPLAMA MANTIĞI
+        // Eğer gün ilk defa kullanılıyorsa veya gün değişmişse seri kontrolü yap
+        if (lastUsed != null && !lastUsed.equals(today)) {
             long daysBetween = ChronoUnit.DAYS.between(lastUsed, today);
 
             if (daysBetween == 1) {
-                // Seri devam ediyor
+                // Dün kullanmış, seri devam ediyor
                 streak.setCurrentStreak(streak.getCurrentStreak() + 1);
             } else if (daysBetween > 1) {
-                // Seri kırıldı
+                // Dün kullanmamış, seri bozuldu, 1'den başla
                 streak.setCurrentStreak(1);
             }
-        } else {
-            // İlk kullanım
+        } else if (lastUsed == null) {
+            // İlk kez başlıyor
             streak.setCurrentStreak(1);
         }
+        // NOT: Eğer gün içinde 2. kez basıyorsa (TWICE_DAILY), seri sayısını tekrar artırmıyoruz.
+        // Seri "gün" bazlı artar, kullanım sayısı bazlı değil.
 
-        // En uzun seriyi güncelle
+        // 4. VERİLERİ GÜNCELLE
+        streak.setDailyUsageCounter(streak.getDailyUsageCounter() + 1);
+        streak.setLastUsedDate(today);
+        streak.setTotalUses(streak.getTotalUses() + 1);
+
+        // Rekor kontrolü
         if (streak.getCurrentStreak() > streak.getLongestStreak()) {
             streak.setLongestStreak(streak.getCurrentStreak());
         }
-
-        streak.setLastUsedDate(today);
-        streak.setTotalUses(streak.getTotalUses() + 1);
 
         Streak updatedStreak = streakRepository.save(streak);
         return mapToResponseDTO(updatedStreak);

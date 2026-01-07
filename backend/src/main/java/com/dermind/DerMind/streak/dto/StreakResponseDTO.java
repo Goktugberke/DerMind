@@ -1,5 +1,7 @@
 package com.dermind.DerMind.streak.dto;
 
+import com.dermind.DerMind.common.enums.UsageFrequency;
+import com.dermind.DerMind.common.enums.UsageTime;
 import lombok.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -18,8 +20,8 @@ public class StreakResponseDTO {
     private Integer currentStreak;
     private Integer longestStreak;
     private LocalDate lastUsedDate;
-    private String usageFrequency;
-    private String usageTime;
+    private UsageFrequency usageFrequency;
+    private UsageTime usageTime;
     private Integer totalUses;
     private Boolean isActive;
     private LocalDateTime createdAt;

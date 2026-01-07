@@ -51,6 +51,40 @@ public class GlobalExceptionHandler {
     }
 
 
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ResponseError> handleResourceNotFoundException(ResourceNotFoundException exception) {
+        log.warn("Resource not found: {}", exception.getMessage());
+
+        ResponseError responseBody = ResponseError.builder()
+                .errorCode("RESOURCE_NOT_FOUND")
+                .errorMessages(List.of(
+                        ResponseError.ErrorMessage.builder()
+                                .field("resource")
+                                .message(exception.getMessage())
+                                .build()
+                ))
+                .build();
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(responseBody);
+    }
+
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ResponseError> handleBusinessException(BusinessException exception) {
+        log.warn("Business logic error: {}", exception.getMessage());
+
+        ResponseError responseBody = ResponseError.builder()
+                .errorCode("BUSINESS_ERROR")
+                .errorMessages(List.of(
+                        ResponseError.ErrorMessage.builder()
+                                .field("businessLogic")
+                                .message(exception.getMessage())
+                                .build()
+                ))
+                .build();
+
+        return ResponseEntity.badRequest().body(responseBody);
+    }
+
     @ExceptionHandler(UserNotAuthenticatedException.class)
     public ResponseEntity<ResponseError> handleUserNotAuthenticatedException(UserNotAuthenticatedException exception) {
         log.warn("Authentication required: {}", exception.getMessage());

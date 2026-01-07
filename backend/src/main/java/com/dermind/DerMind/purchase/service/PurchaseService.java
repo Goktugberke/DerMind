@@ -1,5 +1,6 @@
 package com.dermind.DerMind.purchase.service;
 
+import com.dermind.DerMind.error.ResourceNotFoundException;
 import com.dermind.DerMind.product.model.Product;
 import com.dermind.DerMind.product.repository.ProductRepository;
 import com.dermind.DerMind.purchase.dto.*;
@@ -27,10 +28,10 @@ public class PurchaseService {
     @Transactional
     public PurchaseResponseDTO createPurchase(PurchaseCreateDTO dto) {
         User user = userRepository.findById(dto.getUserId())
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + dto.getUserId()));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", dto.getUserId()));
 
         Product product = productRepository.findById(dto.getProductId())
-                .orElseThrow(() -> new RuntimeException("Product not found with id: " + dto.getProductId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", dto.getProductId()));
 
         BigDecimal totalPrice = dto.getUnitPrice().multiply(BigDecimal.valueOf(dto.getQuantity()));
 
@@ -55,14 +56,14 @@ public class PurchaseService {
     @Transactional(readOnly = true)
     public PurchaseResponseDTO getPurchaseById(Long id) {
         Purchase purchase = purchaseRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Purchase not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase", "id", id));
         return mapToResponseDTO(purchase);
     }
 
     @Transactional(readOnly = true)
     public PurchaseDetailDTO getPurchaseDetailById(Long id) {
         Purchase purchase = purchaseRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Purchase not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase", "id", id));
         return mapToDetailDTO(purchase);
     }
 
@@ -108,14 +109,14 @@ public class PurchaseService {
 
     @Transactional(readOnly = true)
     public Double getTotalSpendingByUserId(String userId) {
-        Double total = purchaseRepository.getTotalSpendingByUserId(userId);
-        return total != null ? total : 0.0;
+        java.math.BigDecimal total = purchaseRepository.getTotalSpendingByUserId(userId);
+        return total != null ? total.doubleValue() : 0.0;
     }
 
     @Transactional
     public PurchaseResponseDTO updatePurchase(Long id, PurchaseUpdateDTO dto) {
         Purchase purchase = purchaseRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Purchase not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase", "id", id));
 
         if (dto.getOrderStatus() != null) {
             purchase.setOrderStatus(dto.getOrderStatus());
@@ -140,7 +141,7 @@ public class PurchaseService {
     @Transactional
     public void deletePurchase(Long id) {
         if (!purchaseRepository.existsById(id)) {
-            throw new RuntimeException("Purchase not found with id: " + id);
+            throw new ResourceNotFoundException("Purchase", "id", id);
         }
         purchaseRepository.deleteById(id);
     }

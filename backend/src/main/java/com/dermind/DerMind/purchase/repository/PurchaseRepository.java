@@ -36,5 +36,5 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
     Long countPurchasesByUserId(@Param("userId") String userId);
 
     @Query("SELECT SUM(p.totalPrice) FROM Purchase p WHERE p.user.id = :userId AND p.paymentStatus = 'COMPLETED'")
-    Double getTotalSpendingByUserId(@Param("userId") String userId);
+    java.math.BigDecimal getTotalSpendingByUserId(@Param("userId") String userId);
 }
