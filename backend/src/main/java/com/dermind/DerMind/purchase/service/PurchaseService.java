@@ -3,6 +3,7 @@ package com.dermind.DerMind.purchase.service;
 import com.dermind.DerMind.common.enums.OrderStatus;
 import com.dermind.DerMind.common.enums.PaymentStatus;
 import com.dermind.DerMind.error.ResourceNotFoundException;
+import com.dermind.DerMind.error.UnauthorizedAccessException;
 import com.dermind.DerMind.product.model.Product;
 import com.dermind.DerMind.product.repository.ProductRepository;
 import com.dermind.DerMind.purchase.dto.*;
@@ -56,9 +57,17 @@ public class PurchaseService {
     }
 
     @Transactional(readOnly = true)
-    public PurchaseResponseDTO getPurchaseById(Long id) {
-        Purchase purchase = purchaseRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase", "id", id));
+    public PurchaseResponseDTO getPurchaseById(String currentUserId, Long purchaseId) {
+        Purchase purchase = purchaseRepository.findById(purchaseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase", "id", purchaseId));
+
+        // KRİTİK KONTROL BURASI:
+        // Eğer verinin sahibi (!=) şu anki kullanıcı değilse HATA VER.
+        if (!purchase.getUser().getId().equals(currentUserId)) {
+            // Loglama yapabilirsin: "Kullanıcı X, Y kullanıcısının verisine erişmeye çalıştı!"
+            throw new UnauthorizedAccessException("Bu siparişi görüntüleme yetkiniz yok.");
+        }
+
         return mapToResponseDTO(purchase);
     }
 

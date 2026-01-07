@@ -59,13 +59,14 @@ public class PurchaseController {
      * GET /api/purchases/{id}
      */
     @GetMapping("/{id}")
-    public ResponseEntity<?> getPurchaseById(@PathVariable Long id) {
-        try {
-            PurchaseResponseDTO purchase = purchaseService.getPurchaseById(id);
-            return ResponseEntity.ok(purchase);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+    public ResponseEntity<?> getPurchaseById(
+            @AuthenticationPrincipal OidcUser principal,
+            @PathVariable Long id) {
+
+        String userId = getUserIdFromPrincipal(principal);
+        PurchaseResponseDTO purchase = purchaseService.getPurchaseById(userId, id);
+
+        return ResponseEntity.ok(purchase);
     }
 
     /**
