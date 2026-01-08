@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAppDispatch } from '../store/hooks';
+import { login as loginAction } from '../store/slices/authSlice';
+import type { User } from '../store/slices/authSlice';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -8,7 +10,7 @@ const Login = () => {
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState('');
   const [error, setError] = useState('');
-  const { login, register } = useAuth();
+  const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -21,19 +23,29 @@ const Login = () => {
           setError('Lütfen adınızı girin');
           return;
         }
-        const success = await register(email, password, name);
-        if (success) {
-          navigate('/');
-        }
+        // Mock register
+        const mockUser: User = {
+          id: Date.now().toString(),
+          email,
+          name,
+          skinType: undefined,
+          allergies: [],
+        };
+        dispatch(loginAction(mockUser));
+        navigate('/');
       } else {
-        const success = await login(email, password);
-        if (success) {
-          navigate('/');
-        } else {
-          setError('Giriş başarısız. Lütfen bilgilerinizi kontrol edin.');
-        }
+        // Mock login
+        const mockUser: User = {
+          id: '1',
+          email,
+          name: email.split('@')[0],
+          skinType: 'Karma',
+          allergies: [],
+        };
+        dispatch(loginAction(mockUser));
+        navigate('/');
       }
-    } catch (err) {
+    } catch {
       setError('Bir hata oluştu. Lütfen tekrar deneyin.');
     }
   };

@@ -1,8 +1,11 @@
 import { Link } from 'react-router-dom';
-import { useCart } from '../contexts/CartContext';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { removeFromCart, updateQuantity, clearCart, selectCartItems, selectTotalPrice } from '../store/slices/cartSlice';
 
 const Cart = () => {
-  const { cart, removeFromCart, updateQuantity, getTotalPrice, clearCart } = useCart();
+  const dispatch = useAppDispatch();
+  const cart = useAppSelector(selectCartItems);
+  const totalPrice = useAppSelector(selectTotalPrice);
 
   if (cart.length === 0) {
     return (
@@ -25,7 +28,7 @@ const Cart = () => {
       <div className="container">
         <div className="cart-header">
           <h1>Sepetim</h1>
-          <button className="btn btn-secondary" onClick={clearCart}>
+          <button className="btn btn-secondary" onClick={() => dispatch(clearCart())}>
             Sepeti Temizle
           </button>
         </div>
@@ -51,21 +54,21 @@ const Cart = () => {
                 <div className="cart-item-controls">
                   <div className="quantity-controls">
                     <button
-                      onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                      onClick={() => dispatch(updateQuantity({ productId: item.id, quantity: item.quantity - 1 }))}
                       className="quantity-btn"
                     >
                       -
                     </button>
                     <span className="quantity">{item.quantity}</span>
                     <button
-                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                      onClick={() => dispatch(updateQuantity({ productId: item.id, quantity: item.quantity + 1 }))}
                       className="quantity-btn"
                     >
                       +
                     </button>
                   </div>
                   <button
-                    onClick={() => removeFromCart(item.id)}
+                    onClick={() => dispatch(removeFromCart(item.id))}
                     className="btn btn-danger btn-sm"
                   >
                     Kaldır
@@ -80,7 +83,7 @@ const Cart = () => {
               <h2>Sipariş Özeti</h2>
               <div className="summary-row">
                 <span>Ara Toplam:</span>
-                <span>{getTotalPrice().toFixed(2)} ₺</span>
+                <span>{totalPrice.toFixed(2)} ₺</span>
               </div>
               <div className="summary-row">
                 <span>Kargo:</span>
@@ -88,7 +91,7 @@ const Cart = () => {
               </div>
               <div className="summary-row summary-total">
                 <span>Toplam:</span>
-                <span>{getTotalPrice().toFixed(2)} ₺</span>
+                <span>{totalPrice.toFixed(2)} ₺</span>
               </div>
               <Link to="/checkout" className="btn btn-primary btn-block">
                 Satın Al

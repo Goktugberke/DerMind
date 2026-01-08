@@ -1255,6 +1255,11 @@ body {
   font-size: 0.875rem;
 }
 
+#email,
+#password {
+  @apply text-black !important;
+}
+
 .profile-info {
   display: flex;
   flex-direction: column;

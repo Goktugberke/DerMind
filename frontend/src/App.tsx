@@ -1,8 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { ThemeProvider } from './contexts/ThemeContext';
-import { CartProvider } from './contexts/CartContext';
-import { AuthProvider } from './contexts/AuthContext';
-import { RoutineProvider } from './contexts/RoutineContext';
+import { useEffect } from 'react';
+import { useAppSelector } from './store/hooks';
+import { selectTheme } from './store/slices/themeSlice';
 import Layout from './components/Layout';
 import Landing from './pages/Landing';
 import Products from './pages/Products';
@@ -15,29 +14,28 @@ import Profile from './pages/Profile';
 import './App.css';
 
 function App() {
+  const theme = useAppSelector(selectTheme);
+
+  // Theme'i document'e uygula
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <CartProvider>
-          <RoutineProvider>
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Layout />}>
-                  <Route index element={<Landing />} />
-                  <Route path="products" element={<Products />} />
-                  <Route path="products/:id" element={<ProductDetail />} />
-                  <Route path="cart" element={<Cart />} />
-                  <Route path="checkout" element={<Checkout />} />
-                  <Route path="login" element={<Login />} />
-                  <Route path="routine" element={<Routine />} />
-                  <Route path="profile" element={<Profile />} />
-                </Route>
-              </Routes>
-            </BrowserRouter>
-          </RoutineProvider>
-        </CartProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Layout />}>
+          <Route index element={<Landing />} />
+          <Route path="products" element={<Products />} />
+          <Route path="products/:id" element={<ProductDetail />} />
+          <Route path="cart" element={<Cart />} />
+          <Route path="checkout" element={<Checkout />} />
+          <Route path="login" element={<Login />} />
+          <Route path="routine" element={<Routine />} />
+          <Route path="profile" element={<Profile />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 }
 
