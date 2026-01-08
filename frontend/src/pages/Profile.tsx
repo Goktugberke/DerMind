@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { updateProfile, logout } from '../store/slices/authSlice';
 import { Link, useNavigate } from 'react-router-dom';
 
 const Profile = () => {
-  const { user, updateProfile, logout } = useAuth();
+  const dispatch = useAppDispatch();
+  const user = useAppSelector((state) => state.auth.user);
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
@@ -38,16 +40,16 @@ const Profile = () => {
       .map((a) => a.trim())
       .filter((a) => a.length > 0);
 
-    updateProfile({
+    dispatch(updateProfile({
       name: formData.name,
       skinType: formData.skinType,
       allergies,
-    });
+    }));
     setIsEditing(false);
   };
 
   const handleLogout = () => {
-    logout();
+    dispatch(logout());
     navigate('/');
   };
 

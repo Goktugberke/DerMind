@@ -1,7 +1,8 @@
 import { useParams, Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { useCart, type Product } from '../contexts/CartContext';
-import { useAuth } from '../contexts/AuthContext';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { addToCart } from '../store/slices/cartSlice';
+import type { Product } from '../store/slices/cartSlice';
 
 // Mock ürün verileri - gerçek projede API'den gelecek
 const mockProducts: Product[] = [
@@ -60,8 +61,8 @@ interface ProductScore {
 
 const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
-  const { addToCart } = useCart();
-  const { user } = useAuth();
+  const dispatch = useAppDispatch();
+  const user = useAppSelector((state) => state.auth.user);
   const [product, setProduct] = useState<Product | null>(null);
   const [score, setScore] = useState<ProductScore | null>(null);
   // const [userRating, setUserRating] = useState(0);
@@ -73,6 +74,7 @@ const ProductDetail = () => {
       // Mock ML scoring - gerçek projede API'den gelecek
       calculateMLScore(foundProduct);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const calculateMLScore = (prod: Product) => {
@@ -230,7 +232,7 @@ const ProductDetail = () => {
             <div className="product-actions">
               <button
                 className="btn btn-primary btn-large"
-                onClick={() => addToCart(product)}
+                onClick={() => dispatch(addToCart(product))}
               >
                 Sepete Ekle
               </button>

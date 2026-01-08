@@ -1,27 +1,31 @@
 import { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { useRoutine } from '../contexts/RoutineContext';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { selectCartItems } from '../store/slices/cartSlice';
 import { 
-  useCart, 
-  // type Product 
-} from '../contexts/CartContext';
+  selectTasks, 
+  selectStreak, 
+  selectTodayTasks,
+  addTask,
+  removeTask,
+  completeTask,
+} from '../store/slices/routineSlice';
 import { Link } from 'react-router-dom';
 
 const Routine = () => {
-  const { 
-    // user, 
-    isAuthenticated 
-  } = useAuth();
-  const { tasks, streak, getTodayTasks, addTask, removeTask, completeTask } =
-    useRoutine();
-  const { cart } = useCart();
+  const dispatch = useAppDispatch();
+  const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
+  const tasks = useAppSelector(selectTasks);
+  const streak = useAppSelector(selectStreak);
+  const todayTasks = useAppSelector(selectTodayTasks);
+  const cart = useAppSelector(selectCartItems);
   const [showAddTask, setShowAddTask] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState('');
   const [taskTime, setTaskTime] = useState('09:00');
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
 
-  const todayTasks = getTodayTasks();
   const dayNames = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+
+  // Redux Persist otomatik olarak localStorage'a kaydediyor
 
   // Sepetteki ürünlerden rutin oluştur
   const cartProducts = cart.map((item) => ({
@@ -37,12 +41,12 @@ const Routine = () => {
 
     const product = cart.find((item) => item.id === selectedProduct);
     if (product) {
-      addTask({
+      dispatch(addTask({
         productId: product.id,
         productName: product.name,
         time: taskTime,
         days: selectedDays,
-      });
+      }));
       setShowAddTask(false);
       setSelectedProduct('');
       setSelectedDays([]);
@@ -178,7 +182,7 @@ const Routine = () => {
                         </div>
                         <button
                           className="btn btn-success"
-                          onClick={() => completeTask(task.id)}
+                          onClick={() => dispatch(completeTask(task.id))}
                         >
                           Tamamla ✓
                         </button>
@@ -214,7 +218,7 @@ const Routine = () => {
                           </div>
                           <button
                             className="btn btn-danger btn-sm"
-                            onClick={() => removeTask(task.id)}
+                            onClick={() => dispatch(removeTask(task.id))}
                           >
                             Sil
                           </button>

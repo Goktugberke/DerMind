@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { useCart } from '../contexts/CartContext';
-import type { Product } from '../contexts/CartContext';
+import { useAppDispatch } from '../store/hooks';
+import { addToCart } from '../store/slices/cartSlice';
+import type { Product } from '../store/slices/cartSlice';
 import SearchBar from '../components/SearchBar';
 import ProductFilters from '../components/ProductFilters';
 
@@ -70,7 +71,7 @@ const Products = () => {
     category: '',
     skinType: '',
   });
-  const { addToCart } = useCart();
+  const dispatch = useAppDispatch();
 
   useEffect(() => {
     let filtered = [...mockProducts];
@@ -174,7 +175,7 @@ const Products = () => {
                   <span className="product-price">{product.price.toFixed(2)} ₺</span>
                   <button
                     className="btn btn-primary btn-sm"
-                    onClick={() => addToCart(product)}
+                    onClick={() => dispatch(addToCart(product))}
                   >
                     Sepete Ekle
                   </button>

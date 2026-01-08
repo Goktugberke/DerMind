@@ -1,12 +1,23 @@
 import { Link } from 'react-router-dom';
-import { useCart } from '../contexts/CartContext';
-import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { selectTotalItems } from '../store/slices/cartSlice';
+import { logout } from '../store/slices/authSlice';
+import { selectTheme, toggleTheme } from '../store/slices/themeSlice';
 
 const Navbar = () => {
-  const { getTotalItems } = useCart();
-  const { user, logout, isAuthenticated } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  const dispatch = useAppDispatch();
+  const totalItems = useAppSelector(selectTotalItems);
+  const user = useAppSelector((state) => state.auth.user);
+  const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
+  const theme = useAppSelector(selectTheme);
+
+  const handleLogout = () => {
+    dispatch(logout());
+  };
+
+  const handleToggleTheme = () => {
+    dispatch(toggleTheme());
+  };
 
   return (
     <nav className="navbar">
@@ -20,13 +31,13 @@ const Navbar = () => {
           <Link to="/routine">Rutinler</Link>
           <Link to="/cart" className="cart-link">
             Sepet
-            {getTotalItems() > 0 && (
-              <span className="cart-badge">{getTotalItems()}</span>
+            {totalItems > 0 && (
+              <span className="cart-badge">{totalItems}</span>
             )}
           </Link>
           <button
             className="theme-toggle"
-            onClick={toggleTheme}
+            onClick={handleToggleTheme}
             title={theme === 'light' ? 'Karanlık moda geç' : 'Aydınlık moda geç'}
           >
             {theme === 'light' ? '🌙' : '☀️'}
@@ -36,7 +47,7 @@ const Navbar = () => {
               <Link to="/profile" className="user-name">
                 {user?.name}
               </Link>
-              <button className="btn btn-secondary btn-sm" onClick={logout}>
+              <button className="btn btn-secondary btn-sm" onClick={handleLogout}>
                 Çıkış
               </button>
             </>

@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCart } from '../contexts/CartContext';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { clearCart, selectCartItems, selectTotalPrice } from '../store/slices/cartSlice';
 
 const Checkout = () => {
-  const { cart, getTotalPrice, clearCart } = useCart();
+  const dispatch = useAppDispatch();
+  const cart = useAppSelector(selectCartItems);
+  const totalPrice = useAppSelector(selectTotalPrice);
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
@@ -29,7 +32,7 @@ const Checkout = () => {
     e.preventDefault();
     // Burada gerçek projede API çağrısı yapılacak
     alert('Siparişiniz alındı! Teşekkür ederiz.');
-    clearCart();
+    dispatch(clearCart());
     navigate('/');
   };
 
@@ -183,7 +186,7 @@ const Checkout = () => {
             </section>
 
             <button type="submit" className="btn btn-primary btn-block">
-              Siparişi Tamamla ({getTotalPrice().toFixed(2)} ₺)
+              Siparişi Tamamla ({totalPrice.toFixed(2)} ₺)
             </button>
           </form>
 
@@ -200,7 +203,7 @@ const Checkout = () => {
               </div>
               <div className="summary-row summary-total">
                 <span>Toplam:</span>
-                <span>{getTotalPrice().toFixed(2)} ₺</span>
+                <span>{totalPrice.toFixed(2)} ₺</span>
               </div>
             </div>
           </div>
