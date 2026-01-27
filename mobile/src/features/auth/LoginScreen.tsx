@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  KeyboardAvoidingView, 
-  ScrollView, 
-  Platform 
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  ScrollView,
+  Platform
 } from 'react-native';
 import { theme } from '@constants/theme';
 import { globalStyles } from '@constants/globalstyles';
@@ -16,26 +16,40 @@ import { CustomInput } from '@components/CustomInput';
 export const LoginScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [errors, setErrors] = useState({
+    fullName: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
+  });
+
+    const validateEmail = (text: string) => {
+    setEmail(text);
+    const emailRegex = /\S+@\S+\.\S+/;
+    if (text.length > 0 && !emailRegex.test(text) || text.length == 0) {
+      setErrors(prev => ({ ...prev, email: 'Please enter a valid email address' }));
+    } else {
+      setErrors(prev => ({ ...prev, email: '' }));
+    }
+  };
 
   return (
-    // 1. En dışta KeyboardAvoidingView: Tüm ekranı kaplar
-    <KeyboardAvoidingView 
-      style={{ flex: 1, backgroundColor: theme.colors.background }} 
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: theme.colors.background }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView 
-        // 2. ScrollView: İçeriğin taşmasına izin verir
-        style={{ flex: 1 }} 
-        contentContainerStyle={{ 
-          flexGrow: 1, // İçeriğin ekran boyundan daha fazla uzayabilmesini sağlar
-          paddingHorizontal: 20, // globalStyles'daki padding değerin
-          paddingBottom: 40 // En altta mola payı
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingHorizontal: 20,
+          paddingBottom: 40
         }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        
-        {/* Header Alanı - 100/160 Değerlerin Korundu */}
+
+        {/* Header Alanı */}
         <View style={styles.headerArea}>
           <Text style={[globalStyles.title, {
             color: theme.colors.primary,
@@ -58,8 +72,9 @@ export const LoginScreen = ({ navigation }: any) => {
             label=""
             placeholder="Email"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={validateEmail}
             keyboardType='email-address'
+            error={errors.email}
           />
 
           <CustomInput
@@ -95,8 +110,8 @@ export const LoginScreen = ({ navigation }: any) => {
 
 const styles = StyleSheet.create({
   headerArea: {
-    marginTop: 100, 
-    marginBottom: 160, 
+    marginTop: 100,
+    marginBottom: 160,
     alignItems: 'center',
   },
   loginTitle: {
@@ -104,7 +119,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: theme.colors.gray,
     alignSelf: 'flex-start',
-    marginBottom: theme.spacing.xs,
+    marginBottom: theme.spacing.l,
     paddingLeft: theme.spacing.xs,
   },
   inputArea: {

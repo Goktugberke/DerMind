@@ -10,6 +10,7 @@ interface CustomInputProps {
   onChangeText: (text: string) => void;
   isPassword?: boolean;
   keyboardType?: KeyboardTypeOptions;
+  error?: string;
 }
 
 export const CustomInput = ({
@@ -19,6 +20,7 @@ export const CustomInput = ({
   onChangeText,
   isPassword = false,
   keyboardType = 'default',
+  error,
 }: CustomInputProps) => {
   const [isSecure, setIsSecure] = useState(isPassword);
   const inputRef = useRef<TextInput>(null);
@@ -29,9 +31,15 @@ export const CustomInput = ({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>{label}</Text>
+      {label ? <Text style={styles.label}>{label}</Text> : null}
       
-      <Pressable style={styles.inputWrapper} onPress={handlePress}>
+      <Pressable 
+        style={[
+          styles.inputWrapper, 
+          error ? { borderColor: 'red' } : {}
+        ]} 
+        onPress={handlePress}
+      >
         <TextInput
           ref={inputRef}
           style={styles.input}
@@ -59,6 +67,9 @@ export const CustomInput = ({
           </TouchableOpacity>
         )}
       </Pressable>
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
     </View>
   );
 };
@@ -66,7 +77,7 @@ export const CustomInput = ({
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    marginBottom: 1,
+    marginBottom: theme.spacing.m,
   },
   label: {
     fontSize: theme.fontSize.small,
@@ -94,5 +105,11 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     padding: 10,
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 12,
+    marginTop: 2,
+    marginLeft: 4,
   },
 });

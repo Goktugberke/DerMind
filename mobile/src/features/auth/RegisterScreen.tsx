@@ -19,6 +19,57 @@ export const RegisterScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [errors, setErrors] = useState({
+    fullName: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
+  });
+
+  const validateFullName = (text: string) => {
+    setFullName(text);
+    if (text.length == 0 || text.length == 1) {
+      setErrors(prev => ({ ...prev, fullName: 'Name is too short' }));
+    } else {
+      setErrors(prev => ({ ...prev, fullName: '' }));
+    }
+  };
+
+  const validateEmail = (text: string) => {
+    setEmail(text);
+    const emailRegex = /\S+@\S+\.\S+/;
+    if (text.length > 0 && !emailRegex.test(text) || text.length == 0) {
+      setErrors(prev => ({ ...prev, email: 'Please enter a valid email address' }));
+    } else {
+      setErrors(prev => ({ ...prev, email: '' }));
+    }
+  };
+
+  const validatePassword = (text: string) => {
+  setPassword(text);
+  const passwordRegex = /^(?=.*[0-9])(?=.*[!@#$%^&*.,:;~<|>_-])[a-zA-Z0-9!@#$%^&*]{6,}$/;
+
+  if (text.length === 0) {
+    setErrors(prev => ({ ...prev, password: '' }));
+  } else if (text.length < 6) {
+    setErrors(prev => ({ ...prev, password: 'Min. 6 characters required' }));
+  } else if (!/(?=.*[0-9])/.test(text)) {
+    setErrors(prev => ({ ...prev, password: 'Must include at least one number' }));
+  } else if (!/(?=.*[!@#$%^&*.,:;~<|>_-])/.test(text)) {
+    setErrors(prev => ({ ...prev, password: 'Must include one special character (@#$!..)' }));
+  } else {
+    setErrors(prev => ({ ...prev, password: '' }));
+  }
+};
+
+  const validateConfirmPassword = (text: string) => {
+    setConfirmPassword(text);
+    if (text.length > 0 && text !== password) {
+      setErrors(prev => ({ ...prev, confirmPassword: 'Passwords do not match' }));
+    } else {
+      setErrors(prev => ({ ...prev, confirmPassword: '' }));
+    }
+  };
 
   const handleRegister = () => {
     if (!fullName || !email || !password || !confirmPassword) {
@@ -26,23 +77,12 @@ export const RegisterScreen = ({ navigation }: any) => {
       return;
     }
 
-    const emailRegex = /\S+@\S+\.\S+/;
-    if (!emailRegex.test(email)) {
-      Alert.alert("Error", "Please enter a valid email address!");
+    if(Object.values(errors).some(error => error !== '')) {
+      Alert.alert("Error", "Please fix the errors before registering.");
       return;
     }
 
-    if (password.length < 6) {
-      Alert.alert("Error", "Password must be at least 6 characters long!");
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      Alert.alert("Error", "Passwords do not match!");
-      return;
-    }
-
-    console.log("Kayıt başarılı, veriler hazırlanıyor...");
+    console.log("successfully registered");
   };
 
 return (
@@ -61,7 +101,7 @@ return (
         keyboardShouldPersistTaps="handled"
       >
         
-        {/* Header Alanı - Margiler çok yüksek olduğu için kaymama ihtimali artıyor */}
+        {/* Header Alanı */}
         <View style={styles.headerArea}>
           <Text style={[globalStyles.title, { color: theme.colors.primary, fontSize: 38 }]}>
             DerMind
@@ -72,10 +112,37 @@ return (
         <Text style={styles.registerTitle}>Register</Text>
 
         <View style={styles.inputArea}>
-          <CustomInput label="" placeholder="Full Name" value={fullName} onChangeText={setFullName} />
-          <CustomInput label="" placeholder="Email" value={email} onChangeText={setEmail} keyboardType='email-address' />
-          <CustomInput label="" placeholder="Password" value={password} onChangeText={setPassword} isPassword={true} />
-          <CustomInput label="" placeholder="Confirm Password" value={confirmPassword} onChangeText={setConfirmPassword} isPassword={true} />
+          <CustomInput 
+            label="" 
+            placeholder="Full Name" 
+            value={fullName} 
+            onChangeText={validateFullName} 
+            error={errors.fullName}
+          />
+          <CustomInput 
+            label="" 
+            placeholder="Email" 
+            value={email} 
+            onChangeText={validateEmail} 
+            keyboardType='email-address' 
+            error={errors.email}
+          />
+          <CustomInput 
+            label="" 
+            placeholder="Password" 
+            value={password} 
+            onChangeText={validatePassword} 
+            isPassword={true} 
+            error={errors.password}
+          />
+          <CustomInput 
+            label="" 
+            placeholder="Confirm Password" 
+            value={confirmPassword} 
+            onChangeText={validateConfirmPassword} 
+            isPassword={true} 
+            error={errors.confirmPassword}
+          />
         </View>
 
         <CustomButton title="Register" onPress={handleRegister} />
@@ -109,7 +176,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: theme.colors.gray,
     alignSelf: 'flex-start',
-    marginBottom: theme.spacing.xs,
+    marginBottom: theme.spacing.l,
     paddingLeft: theme.spacing.xs,
   },
   inputArea: {
