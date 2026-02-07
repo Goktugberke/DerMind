@@ -1,52 +1,56 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAppDispatch } from '../store/hooks';
-import { login as loginAction } from '../store/slices/authSlice';
-import type { User } from '../store/slices/authSlice';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { registerUser, loginUser, clearError } from '../store/slices/authSlice';
+import { auth, googleProvider } from '../firebase';
+import { signInWithPopup } from 'firebase/auth';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState('');
-  const [error, setError] = useState('');
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const { loading, error } = useAppSelector((state) => state.auth);
+
+  const handleGoogleLogin = async () => {
+    try {
+      dispatch(clearError());
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      const token = await user.getIdToken();
+
+      await dispatch(loginUser({
+        token,
+        email: user.email || '',
+        name: user.displayName || 'Google User',
+        picture: user.photoURL || '',
+        uid: user.uid
+      })).unwrap();
+      navigate('/');
+    } catch (err: any) {
+      console.error('Google Auth error:', err);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    dispatch(clearError());
 
     try {
       if (isRegister) {
-        if (!name.trim()) {
-          setError('Lütfen adınızı girin');
+        if (!name.trim() || !password || password.length < 6) {
           return;
         }
-        // Mock register
-        const mockUser: User = {
-          id: Date.now().toString(),
-          email,
-          name,
-          skinType: undefined,
-          allergies: [],
-        };
-        dispatch(loginAction(mockUser));
+        await dispatch(registerUser({ email, name, password })).unwrap();
         navigate('/');
       } else {
-        // Mock login
-        const mockUser: User = {
-          id: '1',
-          email,
-          name: email.split('@')[0],
-          skinType: 'Karma',
-          allergies: [],
-        };
-        dispatch(loginAction(mockUser));
+        await dispatch(loginUser({ email, password })).unwrap();
         navigate('/');
       }
-    } catch {
-      setError('Bir hata oluştu. Lütfen tekrar deneyin.');
+    } catch (err) {
+      console.error('Auth error:', err);
     }
   };
 
@@ -63,6 +67,21 @@ const Login = () => {
 
           {error && <div className="error-message">{error}</div>}
 
+          <div className="social-auth">
+            <button
+              type="button"
+              className="btn btn-primary btn-block"
+              onClick={handleGoogleLogin}
+              disabled={loading}
+            >
+              Google ile devam et
+            </button>
+          </div>
+
+          <div className="auth-divider">
+            <span>veya e-posta ile devam et</span>
+          </div>
+
           <form onSubmit={handleSubmit} className="auth-form">
             {isRegister && (
               <div className="form-group">
@@ -70,7 +89,6 @@ const Login = () => {
                 <input
                   type="text"
                   id="name"
-                  name="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Adınız ve soyadınız"
@@ -84,7 +102,6 @@ const Login = () => {
               <input
                 type="email"
                 id="email"
-                name="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="ornek@email.com"
@@ -97,7 +114,6 @@ const Login = () => {
               <input
                 type="password"
                 id="password"
-                name="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
@@ -106,8 +122,12 @@ const Login = () => {
               />
             </div>
 
-            <button type="submit" className="btn btn-primary btn-block">
-              {isRegister ? 'Kayıt Ol' : 'Giriş Yap'}
+            <button
+              type="submit"
+              className="btn btn-primary btn-block"
+              disabled={loading}
+            >
+              {loading ? 'İşleniyor...' : isRegister ? 'Kayıt Ol' : 'Giriş Yap'}
             </button>
           </form>
 
@@ -119,7 +139,7 @@ const Login = () => {
                 className="link-button"
                 onClick={() => {
                   setIsRegister(!isRegister);
-                  setError('');
+                  dispatch(clearError());
                 }}
               >
                 {isRegister ? 'Giriş yap' : 'Kayıt ol'}
@@ -139,4 +159,3 @@ const Login = () => {
 };
 
 export default Login;
-

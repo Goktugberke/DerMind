@@ -17,9 +17,10 @@ public class UserCreateDto {
     @Email(message = "Email should be valid")
     private String email;
 
+    private String password;
+
     private String name;
     private String allergens;
     private String skinType;
     private String picture;
 }
-

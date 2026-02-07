@@ -1,10 +1,10 @@
 package com.dermind.DerMind.user.controller;
 
-import com.dermind.DerMind.user.model.User;
-import com.dermind.DerMind.user.dto.*;
-import com.dermind.DerMind.user.service.UserService;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -13,11 +13,26 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.core.user.OAuth2User;
-import org.springframework.web.bind.annotation.*;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.dermind.DerMind.user.dto.UserCreateDto;
+import com.dermind.DerMind.user.dto.UserDetailDTO;
+import com.dermind.DerMind.user.dto.UserResponseDTO;
+import com.dermind.DerMind.user.dto.UserUpdateDto;
+import com.dermind.DerMind.user.model.User;
+import com.dermind.DerMind.user.service.UserService;
+
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/users")
@@ -30,6 +45,28 @@ public class UserController {
      * Get all users
      * GET /api/users
      */
+    /**
+     * FIREBASE TOKEN DOĞRULAMA
+     */
+    @PostMapping("/firebase")
+    public ResponseEntity<?> verifyFirebaseToken(@RequestBody Map<String, String> body) {
+        try {
+            // Frontend'den gelen verileri al
+            String token = body.get("token");
+            String email = body.get("email");
+            String name = body.get("name");
+            String picture = body.get("picture");
+            String uid = body.get("uid");
+
+            // Servis üzerinden işlem yap (Kaydet veya Güncelle)
+            UserResponseDTO userResponse = userService.handleGoogleLogin(email, name, picture, uid);
+
+            return ResponseEntity.ok(userResponse);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
+        }
+    }
+
     @GetMapping
     public ResponseEntity<List<UserResponseDTO>> getAllUsers() {
         List<UserResponseDTO> users = userService.getAllUsers();
@@ -54,8 +91,18 @@ public class UserController {
      * LOGIN OLAN KULLANICI
      */
     @GetMapping("/me")
-    public ResponseEntity<User> getCurrentUser(@AuthenticationPrincipal OidcUser principal) {
-        User user = userService.getUserByProviderId(principal.getSubject());
+    public ResponseEntity<UserResponseDTO> getCurrentUser(Authentication authentication) {
+        String email;
+        if (authentication.getPrincipal() instanceof org.springframework.security.core.userdetails.UserDetails) {
+            email = ((org.springframework.security.core.userdetails.UserDetails) authentication.getPrincipal())
+                    .getUsername();
+        } else if (authentication.getPrincipal() instanceof OidcUser) {
+            email = ((OidcUser) authentication.getPrincipal()).getEmail();
+        } else {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        UserResponseDTO user = userService.getUserByEmail(email);
         return ResponseEntity.ok(user);
     }
 
@@ -67,6 +114,7 @@ public class UserController {
         User user = userService.getUserByProviderId(providerId);
         return ResponseEntity.ok(user);
     }
+
     /**
      * Get user by email
      * GET /api/users/email/{email}

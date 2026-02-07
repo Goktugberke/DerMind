@@ -12,6 +12,8 @@ const Navbar = () => {
   const theme = useAppSelector(selectTheme);
 
   const handleLogout = () => {
+    // Backend logout isteğini şimdilik devre dışı bıraktık çünkü api.ts'de tanımlı değil.
+    // Frontend durumunu temizlemek yeterli olacaktır.
     dispatch(logout());
   };
 
@@ -63,4 +65,3 @@ const Navbar = () => {
 };
 
 export default Navbar;
-

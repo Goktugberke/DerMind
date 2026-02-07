@@ -29,7 +29,11 @@ public class User {
 
     @Column(name = "email", unique = true)
     @NotNull
+    @NotNull
     private String email;
+
+    @Column(name = "password")
+    private String password;
 
     @Column(name = "name")
     private String name;
