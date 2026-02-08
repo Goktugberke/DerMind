@@ -41,6 +41,10 @@ public class SecurityConfig {
                                                 .permitAll() // Sadece kayıt olmaya izin ver
                                                 .requestMatchers("/api/users/email/**").permitAll() // Email kontrolüne
                                                                                                     // izin ver
+                                                .requestMatchers("/api/products/**").permitAll() // Ürünlere herkes
+                                                                                                 // bakabilsin
+                                                .requestMatchers("/api/ratings/**").permitAll() // Yorumları herkes
+                                                                                                // okuyabilsin
                                                 .requestMatchers("/", "/login").permitAll()
                                                 .anyRequest().authenticated())
                                 .httpBasic(Customizer.withDefaults()); // Basic Auth'u etkinleştir

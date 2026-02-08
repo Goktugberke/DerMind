@@ -10,12 +10,16 @@ import type { ProductResponseDTO } from '../types/api';
 
 // Convert ProductResponseDTO to Product (for cart)
 const convertToProduct = (dto: ProductResponseDTO): Product => {
+  // Mock price based on ID if missing (between 100 and 500)
+  const mockPrice = dto.price || (100 + (parseInt(dto.id, 10) * 12345 % 400));
+
   return {
     id: dto.id.toString(),
     name: dto.name,
-    price: 0, // Backend'de price yok, default 0
-    description: dto.ingredients || '',
+    price: mockPrice,
+    description: dto.ingredients || 'Cilt dostu içerik',
     rating: dto.qualityScore || 0,
+    image: dto.imageUrl,
   };
 };
 

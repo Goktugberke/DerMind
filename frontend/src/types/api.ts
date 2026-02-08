@@ -62,7 +62,7 @@ export interface ProductResponseDTO {
   id: string;
   name: string;
   brand: string;
-  price: number;
+  price?: number;
   imageUrl?: string;
   category?: string;
   ingredients?: string;
@@ -191,18 +191,17 @@ export const userApi = {
 export const productApi = {
   getProductById: async (id: number) => (await apiClient.get<ProductDetailDTO>(`/api/products/${id}`)).data,
   getAllProducts: async () => (await apiClient.get<ProductResponseDTO[]>('/api/products')).data,
-  // Bu satırı ekle:
   searchProducts: async (query: string) => (await apiClient.get<ProductResponseDTO[]>(`/api/products/search?query=${query}`)).data,
 };
 
 export const streakApi = {
-  getMyStreaks: async () => (await apiClient.get<StreakResponseDTO[]>('/api/streaks')).data,
+  getMyStreaks: async () => (await apiClient.get<StreakResponseDTO[]>('/api/streaks/my-streaks')).data,
   createStreak: async (data: StreakCreateDTO) => (await apiClient.post<StreakResponseDTO>('/api/streaks', data)).data,
   recordUsage: async (id: number) => (await apiClient.post(`/api/streaks/${id}/usage`)).data,
   deleteStreak: async (id: number) => (await apiClient.delete(`/api/streaks/${id}`)).data,
 };
 
 export const ratingApi = {
-  getRatingsByProductId: async (id: number) => (await apiClient.get<RatingResponseDTO[]>(`/api/products/${id}/ratings`)).data,
-  getProductRatingStats: async (id: number) => (await apiClient.get<ProductRatingStatsDTO>(`/api/products/${id}/stats`)).data,
+  getRatingsByProductId: async (id: number) => (await apiClient.get<RatingResponseDTO[]>(`/api/ratings/product/${id}`)).data,
+  getProductRatingStats: async (id: number) => (await apiClient.get<ProductRatingStatsDTO>(`/api/ratings/product/${id}/stats`)).data,
 };

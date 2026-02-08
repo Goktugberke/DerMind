@@ -59,3 +59,6 @@ firebase-service-account.json
 
 # endpoints
 all_api_endpoints.txt
+
+# mock data
+mock_data.sql
