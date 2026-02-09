@@ -1,4 +1,4 @@
-package com.mobile
+package com.dermind.app
 
 import android.app.Application
 import com.facebook.react.PackageList

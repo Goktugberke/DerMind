@@ -1,4 +1,4 @@
-package com.mobile
+package com.dermind.app
 
 import android.os.Bundle
 import com.facebook.react.ReactActivity

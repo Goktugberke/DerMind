@@ -1,17 +1,15 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  ScrollView,
-  Platform
-} from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { getAuth, signInWithEmailAndPassword, signInWithCredential, GoogleAuthProvider } from '@react-native-firebase/auth';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { View, Text, Image, StyleSheet, TouchableOpacity, KeyboardAvoidingView, ScrollView, Platform, Alert } from 'react-native';
 import { theme } from '@constants/theme';
-import { globalStyles } from '@constants/globalstyles';
 import { CustomButton } from '@components/CustomButton';
 import { CustomInput } from '@components/CustomInput';
+import { authService } from '@services/api';
+
+// Firebase Authentication instance
+const auth = getAuth();
+
 
 export const LoginScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
@@ -23,13 +21,78 @@ export const LoginScreen = ({ navigation }: any) => {
     confirmPassword: ''
   });
 
-    const validateEmail = (text: string) => {
+  // Google Sign-In Configuration
+  useEffect(() => {
+    GoogleSignin.configure({
+      webClientId: "501421333036-kj31viigcrge47ulo2j3li4qedn4gtif.apps.googleusercontent.com",
+    });
+  }, []);
+
+  const validateEmail = (text: string) => {
     setEmail(text);
     const emailRegex = /\S+@\S+\.\S+/;
     if (text.length > 0 && !emailRegex.test(text) || text.length == 0) {
       setErrors(prev => ({ ...prev, email: 'Please enter a valid email address' }));
     } else {
       setErrors(prev => ({ ...prev, email: '' }));
+    }
+  };
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert("Error", "Please fill in all fields.");
+      return;
+    }
+
+    try {
+
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const { uid } = userCredential.user;
+
+      Alert.alert("Success", "User UID: " + userCredential.user.uid);
+      navigation.navigate('Home');
+
+    } catch (error: any) {
+      console.error("Login Error:", error);
+      let errorMessage = "Wrong password.";
+
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+        errorMessage = "Invalid email or password.";
+      }
+
+      Alert.alert("Login Failed", errorMessage);
+    }
+  };
+
+  const onGoogleButtonPress = async () => {
+
+    try {
+      const response = await GoogleSignin.signIn();
+      const idToken = response.data?.idToken;
+      const googleUser = response.data?.user;
+
+      if (!idToken) throw new Error("Google Sign-In failed: No ID token returned");
+
+      const googleCredential = GoogleAuthProvider.credential(idToken);
+      const userCredential = await signInWithCredential(auth, googleCredential);
+
+      try {
+        await authService.firebaseLogin({
+          token: idToken,
+          email: googleUser?.email,
+          name: googleUser?.name,
+          picture: googleUser?.photo,
+          uid: userCredential.user.uid
+        });
+
+        console.log('Google login successful, navigating to Home');
+        navigation.navigate('Home');
+      } catch (backendError) {
+        await auth.signOut();
+        Alert.alert("Login Failed", "Database sync failed. Please try again.");
+      }
+    } catch (error) {
+      console.error('Google Giriş Hatası:', error);
     }
   };
 
@@ -51,12 +114,7 @@ export const LoginScreen = ({ navigation }: any) => {
 
         {/* Header Alanı */}
         <View style={styles.headerArea}>
-          <Text style={[globalStyles.title, {
-            color: theme.colors.primary,
-            fontSize: 38,
-            fontWeight: '800',
-            letterSpacing: 1.2
-          }]}>
+          <Text style={styles.logoText}>
             DerMind
           </Text>
           <Text style={styles.subtitle}>
@@ -64,36 +122,58 @@ export const LoginScreen = ({ navigation }: any) => {
           </Text>
         </View>
 
-        <Text style={styles.loginTitle}>Login</Text>
+        <View style={styles.mainFormContainer}>
+          <Text style={styles.loginTitle}>Login</Text>
 
-        {/* Input Alanları */}
-        <View style={styles.inputArea}>
-          <CustomInput
-            label=""
-            placeholder="Email"
-            value={email}
-            onChangeText={validateEmail}
-            keyboardType='email-address'
-            error={errors.email}
-          />
+          {/* Input Alanları */}
+          <View style={styles.inputArea}>
+            <CustomInput
+              label=""
+              placeholder="Email"
+              value={email}
+              onChangeText={validateEmail}
+              keyboardType='email-address'
+              error={errors.email}
+            />
 
-          <CustomInput
-            label=""
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            isPassword={true}
-          />
+            <CustomInput
+              label=""
+              placeholder="Password"
+              value={password}
+              onChangeText={setPassword}
+              isPassword={true}
+            />
+          </View>
+
+          <TouchableOpacity
+            onPress={() => navigation.navigate('ForgotPassword')}
+            style={styles.forgotPasswordContainer}
+          >
+            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+          </TouchableOpacity>
+
+          {/* Login Butonu */}
+          <CustomButton title="Login" onPress={handleLogin} />
+
+          <View style={styles.dividerContainer}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>OR</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <TouchableOpacity
+            style={styles.googleButton}
+            onPress={onGoogleButtonPress}
+          >
+            <Image
+              source={require('@assets/google_logo.png')}
+              style={styles.googleLogo}
+            />
+
+            <Text style={styles.googleButtonText}>Sign in with Google</Text>
+          </TouchableOpacity>
+
         </View>
-
-        {/* Login Butonu */}
-        <CustomButton
-          title="Login"
-          onPress={() => {
-            console.log("Giriş denemesi:", email, password);
-            navigation.navigate('Home');
-          }}
-        />
 
         {/* Footer Alanı */}
         <View style={styles.footerContainer}>
@@ -110,20 +190,31 @@ export const LoginScreen = ({ navigation }: any) => {
 
 const styles = StyleSheet.create({
   headerArea: {
-    marginTop: 100,
-    marginBottom: 160,
+    marginVertical: 100,
     alignItems: 'center',
   },
+  logoText: {
+    fontSize: 44,
+    fontWeight: '900',
+    color: theme.colors.primary,
+    letterSpacing: -1,
+    textTransform: 'none',
+  },
+  mainFormContainer: {
+    width: '90%',
+    alignSelf: 'center',
+  },
   loginTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: theme.colors.gray,
     alignSelf: 'flex-start',
-    marginBottom: theme.spacing.l,
-    paddingLeft: theme.spacing.xs,
+    marginBottom: 20,
+    paddingLeft: 5,
   },
   inputArea: {
-    marginBottom: theme.spacing.l,
+    marginBottom: 0,
+    width: '100%',
   },
   subtitle: {
     fontSize: theme.fontSize.medium,
@@ -145,5 +236,52 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.small,
     color: theme.colors.secondary,
     fontWeight: 'bold',
+  },
+
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 10,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: theme.colors.gray,
+    opacity: 0.3,
+  },
+  dividerText: {
+    marginHorizontal: 10,
+    color: theme.colors.gray,
+  },
+  googleButton: {
+    backgroundColor: '#FFF',
+    padding: 15,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#DDD',
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  googleButtonText: {
+    color: '#000000',
+    fontWeight: '600',
+  },
+  googleLogo: {
+    width: 20,
+    height: 20,
+    marginRight: 12,
+    resizeMode: 'contain',
+  },
+  forgotPasswordContainer: {
+    alignSelf: 'flex-end',
+    marginTop: -10,
+    marginBottom: 30,
+    paddingRight: 5,
+  },
+  forgotPasswordText: {
+    color: theme.colors.secondary,
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
