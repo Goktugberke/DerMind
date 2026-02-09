@@ -11,4 +11,15 @@ const api = axios.create({
   timeout: 5000,
 });
 
+export const authService = {
+  // Standart Kayıt (POST /api/users)
+  register: (userData) => api.post('/api/users', userData),
+
+  // Google/Firebase Senkronizasyonu (POST /api/users/firebase)
+  firebaseLogin: (firebaseData) => api.post('/api/users/firebase', firebaseData),
+
+  // Kullanıcı Detayı Çekme (GET /api/users/me)
+  getCurrentUser: () => api.get('/api/users/me'),
+};
+
 export default api;

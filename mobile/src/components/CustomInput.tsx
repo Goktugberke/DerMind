@@ -62,7 +62,7 @@ export const CustomInput = ({
             {isSecure ? (
               <EyeOff size={20} color={theme.colors.gray} />
             ) : (
-              <Eye size={20} color={theme.colors.primary} />
+              <Eye size={20} color={theme.colors.secondary} />
             )}
           </TouchableOpacity>
         )}
