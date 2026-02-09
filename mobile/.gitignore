@@ -92,3 +92,5 @@ desktop.ini
 *.p12
 *.key
 !debug.keystore
+
+google-services.json
