@@ -12,6 +12,7 @@ const Navbar = () => {
   const theme = useAppSelector(selectTheme);
 
   const handleLogout = () => {
+
     dispatch(logout());
   };
 
@@ -63,4 +64,3 @@ const Navbar = () => {
 };
 
 export default Navbar;
-

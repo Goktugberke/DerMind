@@ -52,3 +52,13 @@ build/
 
 # macOS
 .DS_Store
+
+# firebase
+firebase-service-account.json
+/frontend/src/firebase.ts
+
+# endpoints
+all_api_endpoints.txt
+
+# mock data
+mock_data.sql

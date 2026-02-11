@@ -54,10 +54,14 @@ public class ProductService {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found with id: " + id));
 
-        if (dto.getName() != null) product.setName(dto.getName());
-        if (dto.getBrand() != null) product.setBrand(dto.getBrand());
-        if (dto.getIngredients() != null) product.setIngredients(dto.getIngredients());
-        if (dto.getQualityScore() != null) product.setQualityScore(dto.getQualityScore());
+        if (dto.getName() != null)
+            product.setName(dto.getName());
+        if (dto.getBrand() != null)
+            product.setBrand(dto.getBrand());
+        if (dto.getIngredients() != null)
+            product.setIngredients(dto.getIngredients());
+        if (dto.getQualityScore() != null)
+            product.setQualityScore(dto.getQualityScore());
 
         Product updatedProduct = productRepository.save(product);
         return convertToResponseDTO(updatedProduct);
@@ -198,8 +202,10 @@ public class ProductService {
         }
 
         // Sınır kontrolü
-        if (matchScore > 100) matchScore = 100.0;
-        if (matchScore < 0) matchScore = 0.0;
+        if (matchScore > 100)
+            matchScore = 100.0;
+        if (matchScore < 0)
+            matchScore = 0.0;
 
         // Öneri seviyesini puana göre ayarla
         if (matchScore < 40 && !recommendation.equals("Not Recommended")) {
@@ -219,8 +225,7 @@ public class ProductService {
                 product.getQualityScore(),
                 matchScore,
                 recommendation,
-                reason.toString().trim()
-        );
+                reason.toString().trim());
     }
 
     // DTO Dönüşüm metodları
@@ -230,8 +235,7 @@ public class ProductService {
                 product.getName(),
                 product.getBrand(),
                 product.getIngredients(),
-                product.getQualityScore()
-        );
+                product.getQualityScore());
     }
 
     private ProductDetailDTO convertToDetailDTO(Product product) {
@@ -254,7 +258,6 @@ public class ProductService {
                 product.getQualityScore(),
                 avgRating,
                 product.getRatings() != null ? product.getRatings().size() : 0,
-                product.getPurchases() != null ? product.getPurchases().size() : 0
-        );
+                product.getPurchases() != null ? product.getPurchases().size() : 0);
     }
 }

@@ -1,31 +1,45 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { selectCartItems } from '../store/slices/cartSlice';
 import { 
-  selectTasks, 
-  selectStreak, 
-  selectTodayTasks,
+  selectStreak,
   addTask,
-  removeTask,
-  completeTask,
 } from '../store/slices/routineSlice';
+import { streakApi } from '../types/api';
+import { UsageFrequency, UsageTime } from '../types/api';
+import type { StreakResponseDTO } from '../types/api';
 import { Link } from 'react-router-dom';
 
 const Routine = () => {
   const dispatch = useAppDispatch();
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
-  const tasks = useAppSelector(selectTasks);
+  const user = useAppSelector((state) => state.auth.user);
   const streak = useAppSelector(selectStreak);
-  const todayTasks = useAppSelector(selectTodayTasks);
   const cart = useAppSelector(selectCartItems);
   const [showAddTask, setShowAddTask] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState('');
-  const [taskTime, setTaskTime] = useState('09:00');
-  const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  const [backendStreaks, setBackendStreaks] = useState<StreakResponseDTO[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [usageFrequency, setUsageFrequency] = useState<UsageFrequency>('DAILY');
+  const [usageTime, setUsageTime] = useState<UsageTime>('MORNING');
 
-  const dayNames = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
-
-  // Redux Persist otomatik olarak localStorage'a kaydediyor
+  // Fetch streaks from backend
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      const fetchStreaks = async () => {
+        try {
+          setLoading(true);
+          const streaks = await streakApi.getMyStreaks();
+          setBackendStreaks(streaks);
+        } catch (err) {
+          console.error('Error fetching streaks:', err);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchStreaks();
+    }
+  }, [isAuthenticated, user]);
 
   // Sepetteki ürünlerden rutin oluştur
   const cartProducts = cart.map((item) => ({
@@ -33,31 +47,70 @@ const Routine = () => {
     name: item.name,
   }));
 
-  const handleAddTask = () => {
-    if (!selectedProduct || selectedDays.length === 0) {
-      alert('Lütfen ürün ve günleri seçin');
+  const handleAddTask = async () => {
+    if (!selectedProduct) {
+      alert('Lütfen ürün seçin');
       return;
     }
 
     const product = cart.find((item) => item.id === selectedProduct);
     if (product) {
-      dispatch(addTask({
-        productId: product.id,
-        productName: product.name,
-        time: taskTime,
-        days: selectedDays,
-      }));
-      setShowAddTask(false);
-      setSelectedProduct('');
-      setSelectedDays([]);
+      try {
+        // Create streak in backend
+        const productId = parseInt(product.id, 10);
+        if (!isNaN(productId)) {
+          await streakApi.createStreak({
+            productId,
+            usageFrequency,
+            usageTime,
+          });
+          
+          // Refresh streaks
+          const streaks = await streakApi.getMyStreaks();
+          setBackendStreaks(streaks);
+        }
+
+        // Also add to local state (for backward compatibility)
+        dispatch(addTask({
+          productId: product.id,
+          productName: product.name,
+          time: '09:00',
+          days: [],
+        }));
+        
+        setShowAddTask(false);
+        setSelectedProduct('');
+      } catch (err) {
+        console.error('Error creating streak:', err);
+        alert('Rutin oluşturulurken bir hata oluştu');
+      }
     }
   };
 
-  const toggleDay = (day: number) => {
-    setSelectedDays((prev) =>
-      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
-    );
+  const handleRecordUsage = async (streakId: number) => {
+    try {
+      await streakApi.recordUsage(streakId);
+      // Refresh streaks
+      const streaks = await streakApi.getMyStreaks();
+      setBackendStreaks(streaks);
+    } catch (err) {
+      console.error('Error recording usage:', err);
+      alert('Kullanım kaydedilirken bir hata oluştu');
+    }
   };
+
+  const handleDeleteStreak = async (streakId: number) => {
+    try {
+      await streakApi.deleteStreak(streakId);
+      // Refresh streaks
+      const streaks = await streakApi.getMyStreaks();
+      setBackendStreaks(streaks);
+    } catch (err) {
+      console.error('Error deleting streak:', err);
+      alert('Rutin silinirken bir hata oluştu');
+    }
+  };
+
 
   if (!isAuthenticated) {
     return (
@@ -88,7 +141,11 @@ const Routine = () => {
           <div className="streak-display">
             <div className="streak-icon">🔥</div>
             <div>
-              <div className="streak-number">{streak}</div>
+              <div className="streak-number">
+                {backendStreaks.length > 0 
+                  ? Math.max(...backendStreaks.map(s => s.currentStreak))
+                  : streak}
+              </div>
               <div className="streak-label">Günlük Seri</div>
             </div>
           </div>
@@ -132,31 +189,31 @@ const Routine = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>Saat</label>
-                  <input
-                    type="time"
-                    value={taskTime}
-                    onChange={(e) => setTaskTime(e.target.value)}
-                    className="form-input"
-                  />
+                  <label>Kullanım Sıklığı</label>
+                  <select
+                    value={usageFrequency}
+                    onChange={(e) => setUsageFrequency(e.target.value as UsageFrequency)}
+                    className="form-select"
+                  >
+                    <option value="DAILY">Günde 1 Kez</option>
+                    <option value="TWICE_DAILY">Günde 2 Kez</option>
+                    <option value="WEEKLY">Haftada 1 Kez</option>
+                    <option value="AS_NEEDED">İhtiyaca Göre</option>
+                  </select>
                 </div>
 
                 <div className="form-group">
-                  <label>Günler</label>
-                  <div className="days-selector">
-                    {dayNames.map((day, index) => (
-                      <button
-                        key={index}
-                        type="button"
-                        className={`day-button ${
-                          selectedDays.includes(index) ? 'active' : ''
-                        }`}
-                        onClick={() => toggleDay(index)}
-                      >
-                        {day.substring(0, 3)}
-                      </button>
-                    ))}
-                  </div>
+                  <label>Kullanım Zamanı</label>
+                  <select
+                    value={usageTime}
+                    onChange={(e) => setUsageTime(e.target.value as UsageTime)}
+                    className="form-select"
+                  >
+                    <option value="MORNING">Sabah</option>
+                    <option value="EVENING">Akşam</option>
+                    <option value="MORNING_AND_EVENING">Sabah ve Akşam</option>
+                    <option value="ANYTIME">Herhangi Bir Zaman</option>
+                  </select>
                 </div>
 
                 <button className="btn btn-primary" onClick={handleAddTask}>
@@ -167,64 +224,126 @@ const Routine = () => {
 
             <div className="routine-content">
               <div className="today-tasks">
-                <h2>Bugünkü Görevler</h2>
-                {todayTasks.length === 0 ? (
+                <h2>Aktif Serilerim</h2>
+                {loading ? (
                   <div className="no-tasks">
-                    <p>Bugün için görev yok! 🎉</p>
+                    <p>Yükleniyor...</p>
+                  </div>
+                ) : backendStreaks.filter(s => s.isActive).length === 0 ? (
+                  <div className="no-tasks">
+                    <p>Henüz aktif seri yok.</p>
                   </div>
                 ) : (
                   <div className="tasks-list">
-                    {todayTasks.map((task) => (
-                      <div key={task.id} className="task-card">
-                        <div className="task-info">
-                          <h3>{task.productName}</h3>
-                          <p className="task-time">⏰ {task.time}</p>
+                    {backendStreaks
+                      .filter(s => s.isActive)
+                      .map((streak) => (
+                        <div key={streak.id} className="task-card">
+                          <div className="task-info">
+                            <h3>{streak.productName || `Ürün #${streak.productId}`}</h3>
+                            <p className="task-time">
+                              🔥 Seri: {streak.currentStreak} gün
+                            </p>
+                            <p className="task-time">
+                              📅 En Uzun: {streak.longestStreak} gün
+                            </p>
+                            <p className="task-time">
+                              {streak.usageFrequency === 'DAILY' && 'Günde 1 Kez'}
+                              {streak.usageFrequency === 'TWICE_DAILY' && 'Günde 2 Kez'}
+                              {streak.usageFrequency === 'WEEKLY' && 'Haftada 1 Kez'}
+                              {streak.usageFrequency === 'AS_NEEDED' && 'İhtiyaca Göre'}
+                              {' - '}
+                              {streak.usageTime === 'MORNING' && 'Sabah'}
+                              {streak.usageTime === 'EVENING' && 'Akşam'}
+                              {streak.usageTime === 'MORNING_AND_EVENING' && 'Sabah ve Akşam'}
+                              {streak.usageTime === 'ANYTIME' && 'Herhangi Bir Zaman'}
+                            </p>
+                            {streak.lastUsedDate && (
+                              <p className="task-time">
+                                Son Kullanım: {new Date(streak.lastUsedDate).toLocaleDateString('tr-TR')}
+                              </p>
+                            )}
+                          </div>
+                          <div className="task-actions">
+                            <button
+                              className="btn btn-success"
+                              onClick={() => handleRecordUsage(streak.id)}
+                            >
+                              Bugün Kullandım ✓
+                            </button>
+                            <button
+                              className="btn btn-danger btn-sm"
+                              onClick={() => handleDeleteStreak(streak.id)}
+                            >
+                              Sil
+                            </button>
+                          </div>
                         </div>
-                        <button
-                          className="btn btn-success"
-                          onClick={() => dispatch(completeTask(task.id))}
-                        >
-                          Tamamla ✓
-                        </button>
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 )}
               </div>
 
               <div className="all-tasks">
-                <h2>Tüm Rutinler</h2>
-                {tasks.length === 0 ? (
+                <h2>Tüm Serilerim</h2>
+                {loading ? (
                   <div className="no-tasks">
-                    <p>Henüz rutin eklenmemiş.</p>
+                    <p>Yükleniyor...</p>
+                  </div>
+                ) : backendStreaks.length === 0 ? (
+                  <div className="no-tasks">
+                    <p>Henüz seri eklenmemiş.</p>
                   </div>
                 ) : (
                   <div className="tasks-list">
-                    {tasks.map((task) => {
-                      const taskDays = task.days
-                        .map((d) => dayNames[d].substring(0, 3))
-                        .join(', ');
-                      return (
-                        <div key={task.id} className="task-card">
-                          <div className="task-info">
-                            <h3>{task.productName}</h3>
-                            <p className="task-time">⏰ {task.time}</p>
-                            <p className="task-days">📅 {taskDays}</p>
-                            {task.completed && (
-                              <span className="task-completed">
-                                ✓ {task.completedDate}
-                              </span>
-                            )}
-                          </div>
+                    {backendStreaks.map((streak) => (
+                      <div key={streak.id} className="task-card">
+                        <div className="task-info">
+                          <h3>{streak.productName || `Ürün #${streak.productId}`}</h3>
+                          <p className="task-time">
+                            🔥 Mevcut Seri: {streak.currentStreak} gün
+                          </p>
+                          <p className="task-time">
+                            🏆 En Uzun Seri: {streak.longestStreak} gün
+                          </p>
+                          <p className="task-time">
+                            📊 Toplam Kullanım: {streak.totalUses} kez
+                          </p>
+                          <p className="task-time">
+                            {streak.usageFrequency === 'DAILY' && 'Günde 1 Kez'}
+                            {streak.usageFrequency === 'TWICE_DAILY' && 'Günde 2 Kez'}
+                            {streak.usageFrequency === 'WEEKLY' && 'Haftada 1 Kez'}
+                            {streak.usageFrequency === 'AS_NEEDED' && 'İhtiyaca Göre'}
+                            {' - '}
+                            {streak.usageTime === 'MORNING' && 'Sabah'}
+                            {streak.usageTime === 'EVENING' && 'Akşam'}
+                            {streak.usageTime === 'MORNING_AND_EVENING' && 'Sabah ve Akşam'}
+                            {streak.usageTime === 'ANYTIME' && 'Herhangi Bir Zaman'}
+                          </p>
+                          {streak.lastUsedDate && (
+                            <p className="task-time">
+                              Son Kullanım: {new Date(streak.lastUsedDate).toLocaleDateString('tr-TR')}
+                            </p>
+                          )}
+                        </div>
+                        <div className="task-actions">
+                          {streak.isActive && (
+                            <button
+                              className="btn btn-success"
+                              onClick={() => handleRecordUsage(streak.id)}
+                            >
+                              Bugün Kullandım ✓
+                            </button>
+                          )}
                           <button
                             className="btn btn-danger btn-sm"
-                            onClick={() => dispatch(removeTask(task.id))}
+                            onClick={() => handleDeleteStreak(streak.id)}
                           >
                             Sil
                           </button>
                         </div>
-                      );
-                    })}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -237,4 +356,3 @@ const Routine = () => {
 };
 
 export default Routine;
-

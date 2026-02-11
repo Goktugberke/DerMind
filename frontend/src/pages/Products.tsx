@@ -5,52 +5,23 @@ import { addToCart } from '../store/slices/cartSlice';
 import type { Product } from '../store/slices/cartSlice';
 import SearchBar from '../components/SearchBar';
 import ProductFilters from '../components/ProductFilters';
+import { productApi } from '../types/api';
+import type { ProductResponseDTO } from '../types/api';
 
-// Mock data - gerçek projede API'den gelecek
-const mockProducts: Product[] = [
-  {
-    id: '1',
-    name: 'Yüz Temizleme Jeli',
-    price: 149.99,
-    description: 'Hassas ciltler için özel formül',
-    rating: 4.5,
-  },
-  {
-    id: '2',
-    name: 'Nemlendirici Krem',
-    price: 199.99,
-    description: '24 saat nemlendirme garantisi',
-    rating: 4.8,
-  },
-  {
-    id: '3',
-    name: 'Güneş Koruyucu SPF 50',
-    price: 179.99,
-    description: 'UVA/UVB koruması',
-    rating: 4.7,
-  },
-  {
-    id: '4',
-    name: 'Göz Çevresi Kremi',
-    price: 249.99,
-    description: 'Kırışıklık önleyici',
-    rating: 4.6,
-  },
-  {
-    id: '5',
-    name: 'Tonik',
-    price: 129.99,
-    description: 'Gözenek sıkılaştırıcı',
-    rating: 4.4,
-  },
-  {
-    id: '6',
-    name: 'Serum C Vitamini',
-    price: 299.99,
-    description: 'Parlaklık ve canlılık',
-    rating: 4.9,
-  },
-];
+// Convert ProductResponseDTO to Product (for cart)
+const convertToProduct = (dto: ProductResponseDTO): Product => {
+  // Mock price based on ID if missing (between 100 and 500)
+  const mockPrice = dto.price || (100 + (parseInt(dto.id, 10) * 12345 % 400));
+
+  return {
+    id: dto.id.toString(),
+    name: dto.name,
+    price: mockPrice,
+    description: dto.ingredients || 'Cilt dostu içerik',
+    rating: dto.qualityScore || 0,
+    image: dto.imageUrl,
+  };
+};
 
 interface FilterOptions {
   minPrice: number;
@@ -63,7 +34,10 @@ interface FilterOptions {
 const Products = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const searchQuery = searchParams.get('search') || '';
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>(mockProducts);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterOptions>({
     minPrice: 0,
     maxPrice: 1000,
@@ -73,16 +47,36 @@ const Products = () => {
   });
   const dispatch = useAppDispatch();
 
+  // Fetch products from API
   useEffect(() => {
-    let filtered = [...mockProducts];
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        let productsData: ProductResponseDTO[];
 
-    // Arama filtresi
-    if (searchQuery) {
-      filtered = filtered.filter((product) =>
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.description?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
+        if (searchQuery) {
+          productsData = await productApi.searchProducts(searchQuery);
+        } else {
+          productsData = await productApi.getAllProducts();
+        }
+
+        const convertedProducts = productsData.map(convertToProduct);
+        setProducts(convertedProducts);
+      } catch (err) {
+        setError('Ürünler yüklenirken bir hata oluştu');
+        console.error('Error fetching products:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, [searchQuery]);
+
+  // Apply filters
+  useEffect(() => {
+    let filtered = [...products];
 
     // Fiyat filtresi
     if (filters.minPrice > 0) {
@@ -99,11 +93,8 @@ const Products = () => {
       );
     }
 
-    // Kategori filtresi (mock - gerçek projede ürünlerde kategori olacak)
-    // Şimdilik sadece isim bazlı filtreleme yapıyoruz
-
     setFilteredProducts(filtered);
-  }, [searchQuery, filters]);
+  }, [products, filters]);
 
   const handleSearch = (query: string) => {
     if (query.trim()) {
@@ -126,6 +117,26 @@ const Products = () => {
       skinType: '',
     });
   };
+
+  if (loading) {
+    return (
+      <div className="products-page">
+        <div className="container">
+          <p>Ürünler yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="products-page">
+        <div className="container">
+          <div className="error-message">{error}</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="products-page">
