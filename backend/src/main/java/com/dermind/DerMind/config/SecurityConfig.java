@@ -4,14 +4,14 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration; // Bunu ekle
+import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.web.SecurityFilterChain; // Bunu ekle
-import org.springframework.web.cors.CorsConfiguration; // Bunu ekle
-import org.springframework.web.cors.CorsConfigurationSource; // Bunu ekle
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.dermind.DerMind.security.CustomOAuth2UserService;
@@ -36,28 +36,22 @@ public class SecurityConfig {
                 http
                                 .cors(Customizer.withDefaults())
                                 .csrf(csrf -> csrf.disable())
-                                // BU SATIRI EKLE: Spring'in seni kafasına göre yönlendirmesini engeller
                                 .sessionManagement(session -> session
                                                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                                 .authorizeHttpRequests(auth -> auth
-                                                // Firebase adresine ÖZEL İZİN VER (Yolun doğruluğundan emin ol)
                                                 .requestMatchers("/api/users/firebase").permitAll()
                                                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/users")
-                                                .permitAll() // Sadece kayıt olmaya izin ver
-                                                .requestMatchers("/api/users/email/**").permitAll() // Email kontrolüne
-                                                                                                    // izin ver
-                                                .requestMatchers("/api/products/**").permitAll() // Ürünlere herkes
-                                                                                                 // bakabilsin
-                                                .requestMatchers("/api/ratings/**").permitAll() // Yorumları herkes
-                                                                                                // okuyabilsin
+                                                .permitAll()
+                                                .requestMatchers("/api/users/email/**").permitAll()
+                                                .requestMatchers("/api/products/**").permitAll()
+                                                .requestMatchers("/api/ratings/**").permitAll()
                                                 .requestMatchers("/", "/login").permitAll()
                                                 .anyRequest().authenticated())
                                 .addFilterBefore(firebaseTokenFilter, UsernamePasswordAuthenticationFilter.class)
-                                .httpBasic(Customizer.withDefaults()); // Basic Auth'u etkinleştir
+                                .httpBasic(Customizer.withDefaults());
                 return http.build();
         }
 
-        // 2. ADIM: İzin verilen originleri tanımla
         @Bean
         public CorsConfigurationSource corsConfigurationSource() {
                 CorsConfiguration configuration = new CorsConfiguration();
@@ -68,7 +62,7 @@ public class SecurityConfig {
                 configuration.setAllowCredentials(true);
 
                 UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-                // HATALI SATIRI BURAYLA DEĞİŞTİR:
+
                 source.registerCorsConfiguration("/**", configuration);
 
                 return source;

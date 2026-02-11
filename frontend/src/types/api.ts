@@ -122,7 +122,6 @@ const apiClient = axios.create({ baseURL: API_BASE_URL, headers: { 'Content-Type
 // Request Interceptor: Basic Auth header'ı ekle
 apiClient.interceptors.request.use(
   (config) => {
-    // Kayıt olma isteği (POST /api/users) için header EKLEME
     if (config.url === '/api/users' && config.method === 'post') {
       return config;
     }
@@ -140,7 +139,7 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   (error: any) => {
-    // error objesinin kendisine any diyerek TS'in tüm kontrollerini bu blokta kapatıyoruz
+
     const errorData = error.response?.data;
 
     let errorMessage = 'Bir hata oluştu';
@@ -163,17 +162,14 @@ apiClient.interceptors.response.use(
 export const userApi = {
   getCurrentUser: async () => (await apiClient.get<UserResponseDTO>('/api/users/me')).data,
   login: async (credentials: { email: string; password?: string }) => {
-    // Basic Auth için 'username:password' string'ini base64'e çevir
     const authHeader = 'Basic ' + btoa(credentials.email + ':' + credentials.password);
 
-    // İsteği yap (Header'ı manuel ekle, henüz storage'a kaydetme)
     const response = await apiClient.get<UserResponseDTO>('/api/users/me', {
       headers: {
         'Authorization': authHeader
       }
     });
 
-    // Başarılı olursa header'ı sakla
     localStorage.setItem('authHeader', authHeader);
     return response.data;
   },
