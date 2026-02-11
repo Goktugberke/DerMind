@@ -43,7 +43,7 @@ export interface UserResponseDTO {
   skinType?: string;
   picture?: string;
 }
-export interface UserDetailDTO extends UserResponseDTO { }
+export type UserDetailDTO = UserResponseDTO;
 export interface UserCreateDto {
   id: string;
   email: string;
@@ -72,7 +72,7 @@ export interface ProductDetailDTO extends ProductResponseDTO {
   averageUserRating?: number;
 }
 export interface ProductCreateDTO { name: string; brand: string; price: number; }
-export interface ProductUpdateDTO extends Partial<ProductCreateDTO> { }
+export type ProductUpdateDTO = Partial<ProductCreateDTO>;
 export interface ProductRecommendationDTO { products: ProductResponseDTO[]; reason: string; }
 
 // --- STREAK & ROUTINE TYPES ---
@@ -108,7 +108,7 @@ export interface ProductRatingStatsDTO { averageRating: number; totalRatings: nu
 export interface PurchaseResponseDTO { id: number; purchaseDate: string; totalAmount: number; }
 export interface PurchaseCreateDTO { productIds: string[]; totalAmount: number; }
 export interface PurchaseUpdateDTO { status: string; }
-export interface PurchaseDetailDTO extends PurchaseResponseDTO { items: any[]; }
+export interface PurchaseDetailDTO extends PurchaseResponseDTO { items: unknown[]; }
 export interface PurchaseStatsDTO { totalPurchases: number; totalSpent: number; }
 
 export interface NotificationResponseDTO { id: number; message: string; isRead: boolean; createdAt: string; }
@@ -138,9 +138,10 @@ apiClient.interceptors.request.use(
 // Response Interceptor: Hata yönetimi
 apiClient.interceptors.response.use(
   (response) => response,
-  (error: any) => {
+  (error: unknown) => {
 
-    const errorData = error.response?.data;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const errorData = (error as any).response?.data;
 
     let errorMessage = 'Bir hata oluştu';
 
@@ -150,11 +151,14 @@ apiClient.interceptors.response.use(
       errorMessage = errorData.errorMessages[0].message;
     } else if (errorData?.message) {
       errorMessage = errorData.message;
-    } else if (error.message) {
-      errorMessage = error.message;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } else if ((error as any).message) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      errorMessage = (error as any).message;
     }
 
-    return Promise.reject(new ApiError(errorMessage, error.response?.status));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return Promise.reject(new ApiError(errorMessage, (error as any).response?.status));
   }
 );
 

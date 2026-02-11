@@ -1,10 +1,10 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { addToCart } from '../store/slices/cartSlice';
 import type { Product } from '../store/slices/cartSlice';
 import { productApi, ratingApi, streakApi, UsageFrequency, UsageTime } from '../types/api';
-import type { ProductDetailDTO, RatingResponseDTO, ProductRatingStatsDTO } from '../types/api';
+import type { ProductDetailDTO, RatingResponseDTO } from '../types/api';
 
 const convertToProduct = (dto: ProductDetailDTO): Product => {
   const mockPrice = dto.price || (100 + (parseInt(dto.id, 10) * 12345 % 400));
@@ -47,7 +47,7 @@ const ProductDetail = () => {
   const [usageTime, setUsageTime] = useState<UsageTime>('MORNING');
   const [routineLoading, setRoutineLoading] = useState(false);
 
-  const calculateMLScore = (productData: ProductDetailDTO) => {
+  const calculateMLScore = useCallback((productData: ProductDetailDTO) => {
     const baseScore = productData.averageUserRating || productData.qualityScore || 4.0;
     const skinTypeMatch = user?.skinType ? Math.random() * 0.3 + 0.7 : 0.5;
     const allergySafe = user?.allergies && user.allergies.length > 0 ? Math.random() * 0.2 + 0.8 : 1.0;
@@ -62,7 +62,7 @@ const ProductDetail = () => {
       userRating: baseScore * 20,
       mlScore: mlScore,
     });
-  };
+  }, [user]);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -85,14 +85,14 @@ const ProductDetail = () => {
         } catch (e) { console.error("Rating fetch error", e); }
 
         calculateMLScore(productData);
-      } catch (err) {
+      } catch {
         setError('Ürün yüklenirken bir hata oluştu');
       } finally {
         setLoading(false);
       }
     };
     fetchProduct();
-  }, [id, user]);
+  }, [id, user, calculateMLScore]);
 
   const handleAddToRoutine = async () => {
     if (!isAuthenticated) {
@@ -111,9 +111,10 @@ const ProductDetail = () => {
         });
         alert('Ürün rutine eklendi!');
         setShowRoutineModal(false);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(err);
-        if (err.response?.status === 409) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((err as any).response?.status === 409) {
           alert('Bu ürün zaten rutininizde var.');
         } else {
           alert('Rutin eklenirken bir hata oluştu.');

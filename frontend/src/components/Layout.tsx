@@ -7,7 +7,7 @@ import { fetchCurrentUser } from '../store/slices/authSlice';
 const Layout = () => {
   const dispatch = useAppDispatch();
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
-  const user = useAppSelector((state) => state.auth.user);
+
 
   useEffect(() => {
     // Sadece kullanıcı daha önce giriş yapmışsa (isLoggedIn varsa) sor

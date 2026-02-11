@@ -48,6 +48,7 @@ export const parseApiError = (error: unknown): ErrorInfo => {
 
 const handleApiError = (error: ApiError): ErrorInfo => {
     // ApiError sınıfında errorData tanımlı olmadığı için tip zorlaması (casting) yapıyoruz
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const errorAsAny = error as any;
 
     if (errorAsAny.errorData && typeof errorAsAny.errorData === 'object' && 'errorMessages' in errorAsAny.errorData) {

@@ -45,8 +45,9 @@ export const fetchCurrentUser = createAsyncThunk(
     try {
       const response = await userApi.getCurrentUser();
       return convertToUser(response);
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Kullanıcı bilgisi alınamadı');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Kullanıcı bilgisi alınamadı';
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -75,8 +76,9 @@ export const registerUser = createAsyncThunk(
         picture: firebaseUser.photoURL || ""
       });
       return convertToUser(response);
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Kayıt başarısız');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Kayıt başarısız';
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -120,8 +122,9 @@ export const loginUser = createAsyncThunk(
         throw new Error('Bilgi eksik');
       }
       return convertToUser(response);
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Giriş başarısız');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Giriş başarısız';
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -136,8 +139,9 @@ export const updateUserProfile = createAsyncThunk(
         allergens: userData.allergies?.join(', '),
       });
       return convertToUser(response);
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Güncelleme başarısız');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Güncelleme başarısız';
+      return rejectWithValue(errorMessage);
     }
   }
 );

@@ -29,7 +29,7 @@ const Login = () => {
         uid: user.uid
       })).unwrap();
       navigate('/');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Google Auth error:', err);
     }
   };
