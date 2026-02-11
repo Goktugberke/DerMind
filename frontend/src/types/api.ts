@@ -49,7 +49,6 @@ export interface UserCreateDto {
   email: string;
   name: string;
   picture?: string;
-  password?: string;
 }
 export interface UserUpdateDto {
   name?: string;

@@ -15,7 +15,6 @@ import java.util.stream.Collectors;
 public class UserService implements org.springframework.security.core.userdetails.UserDetailsService {
 
     private final UserRepository userRepository;
-    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     @Override
     public org.springframework.security.core.userdetails.UserDetails loadUserByUsername(String email)
@@ -26,7 +25,7 @@ public class UserService implements org.springframework.security.core.userdetail
 
         return org.springframework.security.core.userdetails.User
                 .withUsername(user.getEmail())
-                .password(user.getPassword())
+                .password("") // Token tabanlı sistemde şifre boş bırakılır
                 .authorities("USER")
                 .build();
     }
@@ -69,9 +68,6 @@ public class UserService implements org.springframework.security.core.userdetail
         User user = new User();
         user.setId(dto.getId());
         user.setEmail(dto.getEmail());
-        if (dto.getPassword() != null) {
-            user.setPassword(passwordEncoder.encode(dto.getPassword()));
-        }
         user.setName(dto.getName());
         user.setAllergens(dto.getAllergens());
         user.setSkinType(dto.getSkinType());

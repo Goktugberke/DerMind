@@ -2,6 +2,8 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { userApi } from '../../types/api';
 import type { UserResponseDTO } from '../../types/api';
+import { auth } from '../../firebase';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 
 export interface User {
   id: string;
@@ -53,12 +55,24 @@ export const registerUser = createAsyncThunk(
   'auth/register',
   async (userData: { email: string; name: string; password?: string }, { rejectWithValue }) => {
     try {
-      const id = `user_${Date.now()}`;
+      // 1. Firebase'de kullanıcı oluştur
+      if (!userData.password) throw new Error("Şifre gereklidir");
+      const userCredential = await createUserWithEmailAndPassword(auth, userData.email, userData.password);
+      const firebaseUser = userCredential.user;
+
+      // 2. Firebase profilini güncelle (isim ekle)
+      await updateProfile(firebaseUser, { displayName: userData.name });
+
+      // Token al (Backend doğrulaması için gerekirse)
+      // const token = await firebaseUser.getIdToken();
+
+      // 3. Backend'e kaydet (Firebase UID ile)
+      // Password backend'de null olabilir veya boş string gönderilebilir
       const response = await userApi.createUser({
-        id,
+        id: firebaseUser.uid,
         email: userData.email,
         name: userData.name,
-        password: userData.password
+        picture: firebaseUser.photoURL || ""
       });
       return convertToUser(response);
     } catch (error: any) {
@@ -73,7 +87,7 @@ export const loginUser = createAsyncThunk(
     try {
       let response;
       if (credentials.token && credentials.email && credentials.name && credentials.uid) {
-        // Google Login
+        // Google Login (Zaten token var)
         response = await userApi.verifyFirebaseToken({
           token: credentials.token,
           email: credentials.email,
@@ -82,7 +96,26 @@ export const loginUser = createAsyncThunk(
           uid: credentials.uid
         });
       } else if (credentials.email && credentials.password) {
-        response = await userApi.login({ email: credentials.email, password: credentials.password });
+        // Email/Password Login -> Önce Firebase'e giriş yap
+        const userCredential = await signInWithEmailAndPassword(auth, credentials.email, credentials.password);
+        const user = userCredential.user;
+        const token = await user.getIdToken();
+
+        // Sonra Backend'e doğrulat (verifyFirebaseToken endpointini kullanarak)
+        response = await userApi.verifyFirebaseToken({
+          token,
+          email: user.email || credentials.email,
+          name: user.displayName || 'User', // İsim yoksa varsayılan
+          picture: user.photoURL || '',
+          uid: user.uid
+        });
+
+        // Token'ı localStorage'a kaydet ki sonraki isteklerde header olarak gitsin
+        localStorage.setItem('authHeader', `Bearer ${token}`);
+
+
+        // Eski yöntem: Backend'in kendi login endpointi (artık kullanılmıyor çünkü şifreler null)
+        // response = await userApi.login({ email: credentials.email, password: credentials.password });
       } else {
         throw new Error('Bilgi eksik');
       }

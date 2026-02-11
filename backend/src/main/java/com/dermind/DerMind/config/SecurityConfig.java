@@ -15,15 +15,20 @@ import org.springframework.web.cors.CorsConfigurationSource; // Bunu ekle
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.dermind.DerMind.security.CustomOAuth2UserService;
+import com.dermind.DerMind.security.FirebaseTokenFilter;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
         private final CustomOAuth2UserService customOAuth2UserService;
+        private final FirebaseTokenFilter firebaseTokenFilter;
 
-        public SecurityConfig(CustomOAuth2UserService customOAuth2UserService) {
+        public SecurityConfig(CustomOAuth2UserService customOAuth2UserService,
+                        FirebaseTokenFilter firebaseTokenFilter) {
                 this.customOAuth2UserService = customOAuth2UserService;
+                this.firebaseTokenFilter = firebaseTokenFilter;
         }
 
         @Bean
@@ -47,6 +52,7 @@ public class SecurityConfig {
                                                                                                 // okuyabilsin
                                                 .requestMatchers("/", "/login").permitAll()
                                                 .anyRequest().authenticated())
+                                .addFilterBefore(firebaseTokenFilter, UsernamePasswordAuthenticationFilter.class)
                                 .httpBasic(Customizer.withDefaults()); // Basic Auth'u etkinleştir
                 return http.build();
         }
