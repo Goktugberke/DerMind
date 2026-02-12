@@ -55,7 +55,6 @@ build/
 
 # firebase
 firebase-service-account.json
-/frontend/src/firebase.ts
 
 # endpoints
 all_api_endpoints.txt
