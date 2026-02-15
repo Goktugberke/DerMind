@@ -21,7 +21,9 @@ public class StreakResponseDTO {
     private Integer longestStreak;
     private LocalDate lastUsedDate;
     private UsageFrequency usageFrequency;
-    private UsageTime usageTime;
+    private java.util.List<java.time.LocalTime> customTimes;
+    private java.util.Set<java.time.DayOfWeek> daysOfWeek;
+    private Integer dailyUsageCounter;
     private Integer totalUses;
     private Boolean isActive;
     private LocalDateTime createdAt;

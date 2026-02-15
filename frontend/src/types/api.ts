@@ -18,21 +18,13 @@ export interface GeneralErrorResponse {
 }
 
 // --- ENUMS ---
-export type UsageFrequency = 'DAILY' | 'TWICE_DAILY' | 'WEEKLY' | 'AS_NEEDED';
 export const UsageFrequency = {
-  DAILY: 'DAILY' as UsageFrequency,
-  TWICE_DAILY: 'TWICE_DAILY' as UsageFrequency,
-  WEEKLY: 'WEEKLY' as UsageFrequency,
-  AS_NEEDED: 'AS_NEEDED' as UsageFrequency,
-};
+  DAILY: 'DAILY',
+  TWICE_DAILY: 'TWICE_DAILY',
+} as const;
+export type UsageFrequency = (typeof UsageFrequency)[keyof typeof UsageFrequency];
 
-export type UsageTime = 'MORNING' | 'EVENING' | 'MORNING_AND_EVENING' | 'ANYTIME';
-export const UsageTime = {
-  MORNING: 'MORNING' as UsageTime,
-  EVENING: 'EVENING' as UsageTime,
-  MORNING_AND_EVENING: 'MORNING_AND_EVENING' as UsageTime,
-  ANYTIME: 'ANYTIME' as UsageTime,
-};
+// UsageTime removed
 
 // --- USER TYPES ---
 export interface UserResponseDTO {
@@ -86,10 +78,16 @@ export interface StreakResponseDTO {
   isActive: boolean;
   lastUsedDate?: string;
   usageFrequency: UsageFrequency;
-  usageTime: UsageTime;
+  customTimes?: string[]; // LocalTime strings: "09:00", etc.
+  dailyUsageCounter?: number;
 }
-export interface StreakCreateDTO { productId: number; usageFrequency: UsageFrequency; usageTime: UsageTime; }
-export interface StreakUpdateDTO { usageFrequency?: UsageFrequency; usageTime?: UsageTime; }
+export interface StreakCreateDTO {
+  productId: number;
+  usageFrequency: UsageFrequency;
+  customTimes?: string[];
+  daysOfWeek?: string[];
+}
+export interface StreakUpdateDTO { usageFrequency?: UsageFrequency; }
 
 // --- RATING & PURCHASE & NOTIFICATION ---
 export interface RatingResponseDTO {
@@ -118,17 +116,30 @@ export interface NotificationUnreadCountDTO { count: number; }
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 const apiClient = axios.create({ baseURL: API_BASE_URL, headers: { 'Content-Type': 'application/json' } });
 
+import { auth } from '../firebase';
+
 // --- INTERCEPTORS ---
-// Request Interceptor: Basic Auth header'ı ekle
+// Request Interceptor: Auth header'ı ekle
 apiClient.interceptors.request.use(
-  (config) => {
+  async (config) => {
     if (config.url === '/api/users' && config.method === 'post') {
       return config;
     }
 
-    const authHeader = localStorage.getItem('authHeader');
-    if (authHeader) {
-      config.headers['Authorization'] = authHeader;
+    let token = localStorage.getItem('authHeader');
+
+    // Firebase kullanıcısı varsa güncel token al
+    if (auth.currentUser) {
+      try {
+        const firebaseToken = await auth.currentUser.getIdToken();
+        token = `Bearer ${firebaseToken}`;
+      } catch (error) {
+        console.error("Token refresh error:", error);
+      }
+    }
+
+    if (token) {
+      config.headers['Authorization'] = token;
     }
     return config;
   },
@@ -196,7 +207,7 @@ export const productApi = {
 export const streakApi = {
   getMyStreaks: async () => (await apiClient.get<StreakResponseDTO[]>('/api/streaks/my-streaks')).data,
   createStreak: async (data: StreakCreateDTO) => (await apiClient.post<StreakResponseDTO>('/api/streaks', data)).data,
-  recordUsage: async (id: number) => (await apiClient.post(`/api/streaks/${id}/usage`)).data,
+  recordUsage: async (id: number) => (await apiClient.post(`/api/streaks/${id}/use`)).data,
   deleteStreak: async (id: number) => (await apiClient.delete(`/api/streaks/${id}`)).data,
 };
 
