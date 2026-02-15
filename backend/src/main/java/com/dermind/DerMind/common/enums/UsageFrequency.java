@@ -5,9 +5,7 @@ package com.dermind.DerMind.common.enums;
  */
 public enum UsageFrequency {
     DAILY("Günde 1 Kez"),
-    TWICE_DAILY("Günde 2 Kez"),
-    WEEKLY("Haftada 1 Kez"),
-    AS_NEEDED("İhtiyaca Göre");
+    TWICE_DAILY("Günde 2 Kez");
 
     private final String displayName;
 

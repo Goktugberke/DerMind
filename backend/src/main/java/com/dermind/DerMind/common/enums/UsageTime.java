@@ -5,8 +5,8 @@ package com.dermind.DerMind.common.enums;
  */
 public enum UsageTime {
     MORNING("Sabah"),
+    NOON("Öğle"),
     EVENING("Akşam"),
-    MORNING_AND_EVENING("Sabah ve Akşam"),
     ANYTIME("Herhangi Bir Zaman");
 
     private final String displayName;

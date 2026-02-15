@@ -1,116 +1,153 @@
 import { useState, useEffect } from 'react';
-import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { selectCartItems } from '../store/slices/cartSlice';
-import { 
-  selectStreak,
-  addTask,
-} from '../store/slices/routineSlice';
-import { streakApi } from '../types/api';
-import { UsageFrequency, UsageTime } from '../types/api';
-import type { StreakResponseDTO } from '../types/api';
+import { useAppSelector } from '../store/hooks';
+import { streakApi, productApi } from '../types/api';
+import { UsageFrequency } from '../types/api';
+import type { StreakResponseDTO, ProductResponseDTO } from '../types/api';
 import { Link } from 'react-router-dom';
+import { auth } from '../firebase'; // Import auth directly
+
+// Helper for days
+const DAYS = [
+  { label: 'Pzt', value: 'MONDAY' },
+  { label: 'Sal', value: 'TUESDAY' },
+  { label: 'Çar', value: 'WEDNESDAY' },
+  { label: 'Per', value: 'THURSDAY' },
+  { label: 'Cum', value: 'FRIDAY' },
+  { label: 'Cmt', value: 'SATURDAY' },
+  { label: 'Paz', value: 'SUNDAY' },
+];
 
 const Routine = () => {
-  const dispatch = useAppDispatch();
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
-  const user = useAppSelector((state) => state.auth.user);
-  const streak = useAppSelector(selectStreak);
-  const cart = useAppSelector(selectCartItems);
+
+  // State
   const [showAddTask, setShowAddTask] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState('');
+  const [allProducts, setAllProducts] = useState<ProductResponseDTO[]>([]);
   const [backendStreaks, setBackendStreaks] = useState<StreakResponseDTO[]>([]);
   const [loading, setLoading] = useState(false);
-  const [usageFrequency, setUsageFrequency] = useState<UsageFrequency>('DAILY');
-  const [usageTime, setUsageTime] = useState<UsageTime>('MORNING');
+  const [productsLoading, setProductsLoading] = useState(false);
 
-  // Fetch streaks from backend
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      const fetchStreaks = async () => {
-        try {
-          setLoading(true);
-          const streaks = await streakApi.getMyStreaks();
-          setBackendStreaks(streaks);
-        } catch (err) {
-          console.error('Error fetching streaks:', err);
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchStreaks();
+  // Form State
+  const [selectedProduct, setSelectedProduct] = useState('');
+  const [dailyFrequency, setDailyFrequency] = useState<1 | 2>(1); // 1 or 2 times daily
+  const [customTimes, setCustomTimes] = useState<string[]>(['08:00']); // Default 1 time
+
+  // Fetch streaks function - simplified to separate loading state
+  const fetchStreaks = async (silent = false) => {
+    // Only fetch if we have a current user in Firebase to avoid 401
+    if (auth.currentUser) {
+      try {
+        if (!silent) setLoading(true);
+        const streaks = await streakApi.getMyStreaks();
+        setBackendStreaks(streaks);
+      } catch (err) {
+        console.error('Error fetching streaks:', err);
+      } finally {
+        if (!silent) setLoading(false);
+      }
     }
-  }, [isAuthenticated, user]);
+  };
 
-  // Sepetteki ürünlerden rutin oluştur
-  const cartProducts = cart.map((item) => ({
-    id: item.id,
-    name: item.name,
-  }));
+  // Auth listener for reliable fetching
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        fetchStreaks();
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Fetch all products
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setProductsLoading(true);
+        const data = await productApi.getAllProducts();
+        setAllProducts(data);
+      } catch (err) {
+        console.error('Error fetching products:', err);
+      } finally {
+        setProductsLoading(false);
+      }
+    };
+    fetchProducts();
+  }, []);
+
+  // Handlers
+  const handleFrequencyChange = (freq: 1 | 2) => {
+    setDailyFrequency(freq);
+    // Adjust time inputs count
+    if (freq === 1) {
+      setCustomTimes([customTimes[0] || '08:00']);
+    } else {
+      setCustomTimes([customTimes[0] || '08:00', customTimes[1] || '20:00']);
+    }
+  };
+
+  const handleTimeChange = (index: number, value: string) => {
+    const newTimes = [...customTimes];
+    newTimes[index] = value;
+    setCustomTimes(newTimes);
+  };
 
   const handleAddTask = async () => {
     if (!selectedProduct) {
-      alert('Lütfen ürün seçin');
+      alert('Lütfen bir ürün seçin');
       return;
     }
 
-    const product = cart.find((item) => item.id === selectedProduct);
-    if (product) {
-      try {
-        // Create streak in backend
-        const productId = parseInt(product.id, 10);
-        if (!isNaN(productId)) {
-          await streakApi.createStreak({
-            productId,
-            usageFrequency,
-            usageTime,
-          });
-          
-          // Refresh streaks
-          const streaks = await streakApi.getMyStreaks();
-          setBackendStreaks(streaks);
-        }
+    // Map logic to DTO
+    let finalFrequency: UsageFrequency = UsageFrequency.DAILY;
+    if (dailyFrequency === 2) finalFrequency = UsageFrequency.TWICE_DAILY;
 
-        // Also add to local state (for backward compatibility)
-        dispatch(addTask({
-          productId: product.id,
-          productName: product.name,
-          time: '09:00',
-          days: [],
-        }));
-        
-        setShowAddTask(false);
-        setSelectedProduct('');
-      } catch (err) {
-        console.error('Error creating streak:', err);
-        alert('Rutin oluşturulurken bir hata oluştu');
-      }
+    try {
+      await streakApi.createStreak({
+        productId: parseInt(selectedProduct),
+        usageFrequency: finalFrequency,
+        customTimes: customTimes, // Send specific times (HH:mm)
+      });
+
+      // Reset form
+      setShowAddTask(false);
+      setSelectedProduct('');
+      setDailyFrequency(1);
+      setCustomTimes(['08:00']);
+
+      // Refresh
+      fetchStreaks();
+    } catch (err) {
+      console.error('Error creating routin:', err);
+      alert('Rutin oluşturulurken bir hata oluştu.');
     }
   };
 
   const handleRecordUsage = async (streakId: number) => {
     try {
       await streakApi.recordUsage(streakId);
-      // Refresh streaks
-      const streaks = await streakApi.getMyStreaks();
-      setBackendStreaks(streaks);
+      // Silent refresh to avoid page flicker or scroll jump
+      fetchStreaks(true);
     } catch (err) {
       console.error('Error recording usage:', err);
-      alert('Kullanım kaydedilirken bir hata oluştu');
     }
   };
 
   const handleDeleteStreak = async (streakId: number) => {
+    if (!confirm("Bu rutini silmek istediğinize emin misiniz?")) return;
     try {
       await streakApi.deleteStreak(streakId);
-      // Refresh streaks
-      const streaks = await streakApi.getMyStreaks();
-      setBackendStreaks(streaks);
+      fetchStreaks();
     } catch (err) {
       console.error('Error deleting streak:', err);
-      alert('Rutin silinirken bir hata oluştu');
     }
   };
 
+  // Helper to check if used today
+  const isUsedToday = (streak: StreakResponseDTO) => {
+    if (!streak.lastUsedDate) return false;
+    const today = new Date().toISOString().split('T')[0];
+    return streak.lastUsedDate === today;
+  };
 
   if (!isAuthenticated) {
     return (
@@ -118,10 +155,7 @@ const Routine = () => {
         <div className="container">
           <div className="auth-required">
             <h2>Rutin Takibi İçin Giriş Yapın</h2>
-            <p>Rutinlerinizi takip etmek için lütfen giriş yapın.</p>
-            <Link to="/login" className="btn btn-primary">
-              Giriş Yap
-            </Link>
+            <Link to="/login" className="btn btn-primary">Giriş Yap</Link>
           </div>
         </div>
       </div>
@@ -134,223 +168,214 @@ const Routine = () => {
         <div className="routine-header">
           <div>
             <h1>Rutin Takibi</h1>
-            <p className="routine-subtitle">
-              Cilt bakım rutinlerinizi takip edin ve düzenli kullanım alışkanlığı kazanın
-            </p>
+            <p className="routine-subtitle">Düzenli cilt bakım alışkanlıkları edinin.</p>
           </div>
-          <div className="streak-display">
-            <div className="streak-icon">🔥</div>
-            <div>
-              <div className="streak-number">
-                {backendStreaks.length > 0 
-                  ? Math.max(...backendStreaks.map(s => s.currentStreak))
-                  : streak}
-              </div>
-              <div className="streak-label">Günlük Seri</div>
-            </div>
-          </div>
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowAddTask(!showAddTask)}
+          >
+            {showAddTask ? 'İptal' : '+ Yeni Rutin'}
+          </button>
         </div>
 
-        {cartProducts.length === 0 ? (
-          <div className="no-products-routine">
-            <p>Rutin oluşturmak için önce ürünleri sepete ekleyin.</p>
-            <Link to="/products" className="btn btn-primary">
-              Ürünlere Git
-            </Link>
-          </div>
-        ) : (
-          <>
-            <div className="routine-actions">
-              <button
-                className="btn btn-primary"
-                onClick={() => setShowAddTask(!showAddTask)}
+        {showAddTask && (
+          <div className="add-task-card">
+            <h3>Yeni Rutin Oluştur</h3>
+
+            {/* 1. Ürün Seçimi */}
+            <div className="form-group">
+              <label>Ürün Seç</label>
+              <select
+                className="form-select"
+                value={selectedProduct}
+                onChange={(e) => setSelectedProduct(e.target.value)}
               >
-                {showAddTask ? 'İptal' : '+ Yeni Rutin Ekle'}
-              </button>
+                <option value="">Bir ürün seçin...</option>
+                {allProducts.map(p => (
+                  <option key={p.id} value={p.id}>{p.name} - ({p.brand})</option>
+                ))}
+              </select>
             </div>
 
-            {showAddTask && (
-              <div className="add-task-card">
-                <h3>Yeni Rutin Ekle</h3>
-                <div className="form-group">
-                  <label>Ürün Seç</label>
-                  <select
-                    value={selectedProduct}
-                    onChange={(e) => setSelectedProduct(e.target.value)}
-                    className="form-select"
-                  >
-                    <option value="">Ürün seçin</option>
-                    {cartProducts.map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>Kullanım Sıklığı</label>
-                  <select
-                    value={usageFrequency}
-                    onChange={(e) => setUsageFrequency(e.target.value as UsageFrequency)}
-                    className="form-select"
-                  >
-                    <option value="DAILY">Günde 1 Kez</option>
-                    <option value="TWICE_DAILY">Günde 2 Kez</option>
-                    <option value="WEEKLY">Haftada 1 Kez</option>
-                    <option value="AS_NEEDED">İhtiyaca Göre</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>Kullanım Zamanı</label>
-                  <select
-                    value={usageTime}
-                    onChange={(e) => setUsageTime(e.target.value as UsageTime)}
-                    className="form-select"
-                  >
-                    <option value="MORNING">Sabah</option>
-                    <option value="EVENING">Akşam</option>
-                    <option value="MORNING_AND_EVENING">Sabah ve Akşam</option>
-                    <option value="ANYTIME">Herhangi Bir Zaman</option>
-                  </select>
-                </div>
-
-                <button className="btn btn-primary" onClick={handleAddTask}>
-                  Rutin Ekle
+            {/* 2. Sıklık Seçimi */}
+            <div className="form-group">
+              <label>Günde Kaç Kez?</label>
+              <div className="frequency-tabs">
+                <button
+                  className={`freq-btn ${dailyFrequency === 1 ? 'active' : ''}`}
+                  onClick={() => handleFrequencyChange(1)}
+                >
+                  Günde 1 Kez
+                </button>
+                <button
+                  className={`freq-btn ${dailyFrequency === 2 ? 'active' : ''}`}
+                  onClick={() => handleFrequencyChange(2)}
+                >
+                  Günde 2 Kez
                 </button>
               </div>
-            )}
+            </div>
 
-            <div className="routine-content">
-              <div className="today-tasks">
-                <h2>Aktif Serilerim</h2>
-                {loading ? (
-                  <div className="no-tasks">
-                    <p>Yükleniyor...</p>
+            {/* 3. Zaman Seçimi */}
+            <div className="form-group">
+              <label>Kullanım Saatleri</label>
+              <div className="time-selector-list">
+                {customTimes.map((time, index) => (
+                  <div key={index} className="time-input-group">
+                    <label>{index + 1}. Kullanım:</label>
+                    <input
+                      type="time"
+                      className="form-control"
+                      value={time}
+                      onChange={(e) => handleTimeChange(index, e.target.value)}
+                    />
                   </div>
-                ) : backendStreaks.filter(s => s.isActive).length === 0 ? (
-                  <div className="no-tasks">
-                    <p>Henüz aktif seri yok.</p>
-                  </div>
-                ) : (
-                  <div className="tasks-list">
-                    {backendStreaks
-                      .filter(s => s.isActive)
-                      .map((streak) => (
-                        <div key={streak.id} className="task-card">
-                          <div className="task-info">
-                            <h3>{streak.productName || `Ürün #${streak.productId}`}</h3>
-                            <p className="task-time">
-                              🔥 Seri: {streak.currentStreak} gün
-                            </p>
-                            <p className="task-time">
-                              📅 En Uzun: {streak.longestStreak} gün
-                            </p>
-                            <p className="task-time">
-                              {streak.usageFrequency === 'DAILY' && 'Günde 1 Kez'}
-                              {streak.usageFrequency === 'TWICE_DAILY' && 'Günde 2 Kez'}
-                              {streak.usageFrequency === 'WEEKLY' && 'Haftada 1 Kez'}
-                              {streak.usageFrequency === 'AS_NEEDED' && 'İhtiyaca Göre'}
-                              {' - '}
-                              {streak.usageTime === 'MORNING' && 'Sabah'}
-                              {streak.usageTime === 'EVENING' && 'Akşam'}
-                              {streak.usageTime === 'MORNING_AND_EVENING' && 'Sabah ve Akşam'}
-                              {streak.usageTime === 'ANYTIME' && 'Herhangi Bir Zaman'}
-                            </p>
-                            {streak.lastUsedDate && (
-                              <p className="task-time">
-                                Son Kullanım: {new Date(streak.lastUsedDate).toLocaleDateString('tr-TR')}
-                              </p>
-                            )}
-                          </div>
-                          <div className="task-actions">
-                            <button
-                              className="btn btn-success"
-                              onClick={() => handleRecordUsage(streak.id)}
-                            >
-                              Bugün Kullandım ✓
-                            </button>
-                            <button
-                              className="btn btn-danger btn-sm"
-                              onClick={() => handleDeleteStreak(streak.id)}
-                            >
-                              Sil
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="all-tasks">
-                <h2>Tüm Serilerim</h2>
-                {loading ? (
-                  <div className="no-tasks">
-                    <p>Yükleniyor...</p>
-                  </div>
-                ) : backendStreaks.length === 0 ? (
-                  <div className="no-tasks">
-                    <p>Henüz seri eklenmemiş.</p>
-                  </div>
-                ) : (
-                  <div className="tasks-list">
-                    {backendStreaks.map((streak) => (
-                      <div key={streak.id} className="task-card">
-                        <div className="task-info">
-                          <h3>{streak.productName || `Ürün #${streak.productId}`}</h3>
-                          <p className="task-time">
-                            🔥 Mevcut Seri: {streak.currentStreak} gün
-                          </p>
-                          <p className="task-time">
-                            🏆 En Uzun Seri: {streak.longestStreak} gün
-                          </p>
-                          <p className="task-time">
-                            📊 Toplam Kullanım: {streak.totalUses} kez
-                          </p>
-                          <p className="task-time">
-                            {streak.usageFrequency === 'DAILY' && 'Günde 1 Kez'}
-                            {streak.usageFrequency === 'TWICE_DAILY' && 'Günde 2 Kez'}
-                            {streak.usageFrequency === 'WEEKLY' && 'Haftada 1 Kez'}
-                            {streak.usageFrequency === 'AS_NEEDED' && 'İhtiyaca Göre'}
-                            {' - '}
-                            {streak.usageTime === 'MORNING' && 'Sabah'}
-                            {streak.usageTime === 'EVENING' && 'Akşam'}
-                            {streak.usageTime === 'MORNING_AND_EVENING' && 'Sabah ve Akşam'}
-                            {streak.usageTime === 'ANYTIME' && 'Herhangi Bir Zaman'}
-                          </p>
-                          {streak.lastUsedDate && (
-                            <p className="task-time">
-                              Son Kullanım: {new Date(streak.lastUsedDate).toLocaleDateString('tr-TR')}
-                            </p>
-                          )}
-                        </div>
-                        <div className="task-actions">
-                          {streak.isActive && (
-                            <button
-                              className="btn btn-success"
-                              onClick={() => handleRecordUsage(streak.id)}
-                            >
-                              Bugün Kullandım ✓
-                            </button>
-                          )}
-                          <button
-                            className="btn btn-danger btn-sm"
-                            onClick={() => handleDeleteStreak(streak.id)}
-                          >
-                            Sil
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                ))}
               </div>
             </div>
-          </>
+
+            <button className="btn btn-success full-width" onClick={handleAddTask}>
+              Rutin Ekle
+            </button>
+          </div>
         )}
+
+        <div className="routine-list">
+          {loading ? <p>Yükleniyor...</p> : backendStreaks.length === 0 ? (
+            <div className="empty-state">
+              <p>Henüz bir rutin eklemediniz.</p>
+            </div>
+          ) : (
+            backendStreaks.map(streak => {
+              const used = isUsedToday(streak);
+              return (
+                <div key={streak.id} className="task-card">
+                  <div className="task-header">
+                    <h3>{streak.productName || 'Ürün'}</h3>
+                    {streak.isActive ? (
+                      <span className="badge success">Aktif</span>
+                    ) : <span className="badge">Pasif</span>}
+                  </div>
+
+                  <div className="task-details">
+                    <div className="streak-stats">
+                      <div className="stat">
+                        <span className="value">🔥 {streak.currentStreak}</span>
+                        <span className="label">Gün Seri</span>
+                      </div>
+                      <div className="stat">
+                        <span className="value">🏆 {streak.longestStreak}</span>
+                        <span className="label">Rekor</span>
+                      </div>
+                    </div>
+
+                    <div className="schedule-info">
+                      <p>
+                        <strong>Sıklık:</strong> {
+                          streak.usageFrequency === 'TWICE_DAILY' ? 'Günde 2 Kez' : 'Günde 1 Kez'
+                        }
+                      </p>
+                      {streak.customTimes && streak.customTimes.length > 0 && (
+                        <p><strong>Saatler:</strong> {streak.customTimes.join(', ')}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="task-actions" style={{ display: 'flex', gap: '10px' }}>
+                    {/* Usage Button 1 */}
+                    <button
+                      className={`btn ${used ? 'btn-secondary' : 'btn-outline-success'}`}
+                      onClick={() => !used && handleRecordUsage(streak.id)}
+                      disabled={used}
+                      style={{ flex: 1 }}
+                    >
+                      {streak.dailyUsageCounter && streak.dailyUsageCounter >= 1 ? (streak.customTimes && streak.customTimes[0] ? `${streak.customTimes[0]} - Kullanıldı` : '1 kez kullanıldı') : (streak.customTimes && streak.customTimes[0] ? `${streak.customTimes[0]} - Kullan` : '1 kez kullan')}
+                    </button>
+
+                    {/* Usage Button 2 (Only for TWICE_DAILY) */}
+                    {streak.usageFrequency === 'TWICE_DAILY' && (
+                      <button
+                        className={`btn ${streak.dailyUsageCounter && streak.dailyUsageCounter >= 2 ? 'btn-secondary' : 'btn-outline-success'}`}
+                        onClick={() => !((streak.dailyUsageCounter || 0) >= 2) && handleRecordUsage(streak.id)}
+                        disabled={(streak.dailyUsageCounter || 0) >= 2}
+                        style={{ flex: 1 }}
+                      >
+                        {streak.dailyUsageCounter && streak.dailyUsageCounter >= 2 ? (streak.customTimes && streak.customTimes[1] ? `${streak.customTimes[1]} - Kullanıldı` : '2 kez kullanıldı') : (streak.customTimes && streak.customTimes[1] ? `${streak.customTimes[1]} - Kullan` : '2 kez kullan')}
+                      </button>
+                    )}
+                  </div>
+                  {/* Separate Delete Button */}
+                  <div style={{ marginTop: '10px', textAlign: 'right' }}>
+                    <button
+                      className="btn btn-text-danger"
+                      onClick={() => handleDeleteStreak(streak.id)}
+                    >
+                      Sil
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
+
+      <style>{`
+        .frequency-tabs, .count-selector, .day-selector {
+          display: flex;
+          gap: 10px;
+          margin-bottom: 15px;
+        }
+        .freq-btn, .count-btn, .day-btn {
+          padding: 8px 16px;
+          border: 1px solid #ddd;
+          background: white;
+          border-radius: 20px;
+          cursor: pointer;
+        }
+        .freq-btn.active, .count-btn.active, .day-btn.active {
+          background: #0d6efd;
+          color: white;
+          border-color: #0d6efd;
+        }
+        .time-selector {
+          display: flex;
+          gap: 15px;
+        }
+        .time-checkbox {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          padding: 8px 12px;
+          border: 1px solid #ddd;
+          border-radius: 8px;
+          cursor: pointer;
+        }
+        .time-checkbox.active {
+          border-color: #0d6efd;
+          background-color: #e7f1ff;
+        }
+        .full-width { width: 100%; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.8em; background: #eee; }
+        .badge.success { background: #d1e7dd; color: #0f5132; }
+        .streak-stats { display: flex; gap: 20px; margin: 15px 0; }
+        .stat { display: flex; flex-direction: column; align-items: center; }
+        .stat .value { font-size: 1.2em; font-weight: bold; }
+        .stat .label { font-size: 0.8em; color: #666; }
+        .btn-text-danger { background: none; border: none; color: #dc3545; cursor: pointer; }
+        .btn-outline-success { 
+          background: white; border: 1px solid #198754; color: #198754; padding: 8px 16px; border-radius: 6px; cursor: pointer;
+        }
+        .btn-outline-success:hover { background: #198754; color: white; }
+        .btn-secondary {
+            background-color: #6c757d;
+            border-color: #6c757d;
+            color: white;
+            cursor: not-allowed;
+            padding: 8px 16px; 
+            border-radius: 6px; 
+        }
+      `}</style>
     </div>
   );
 };

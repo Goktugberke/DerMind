@@ -35,7 +35,6 @@ public class StreakService {
         Product product = productRepository.findById(dto.getProductId())
                 .orElseThrow(() -> new RuntimeException("Product not found with id: " + dto.getProductId()));
 
-        // Aynı kullanıcı ve ürün için seri zaten var mı kontrol et
         if (streakRepository.findByUserIdAndProductId(userId, dto.getProductId()).isPresent()) {
             throw new BusinessException("Bu ürün için seri zaten mevcut");
         }
@@ -44,7 +43,7 @@ public class StreakService {
                 .user(user)
                 .product(product)
                 .usageFrequency(dto.getUsageFrequency())
-                .usageTime(dto.getUsageTime())
+                .customTimes(dto.getCustomTimes())
                 .currentStreak(0)
                 .longestStreak(0)
                 .totalUses(0)
@@ -63,31 +62,44 @@ public class StreakService {
         return mapToResponseDTO(streak);
     }
 
-    @Transactional(readOnly = true)
-    public List<StreakResponseDTO> getAllStreaks() {
-        return streakRepository.findAll().stream()
-                .map(this::mapToResponseDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
+    @Transactional
     public List<StreakResponseDTO> getStreaksByUserId(String userId) {
-        return streakRepository.findByUserId(userId).stream()
-                .map(this::mapToResponseDTO)
-                .collect(Collectors.toList());
+        // Fetch streaks
+        List<Streak> streaks = streakRepository.findByUserId(userId);
+        return processAndMapStreaks(streaks);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<StreakResponseDTO> getActiveStreaksByUserId(String userId) {
-        return streakRepository.findByUserIdAndIsActive(userId, true).stream()
-                .map(this::mapToResponseDTO)
-                .collect(Collectors.toList());
+        List<Streak> streaks = streakRepository.findActiveStreaksByUser(userId);
+        return processAndMapStreaks(streaks);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<StreakResponseDTO> getTopStreaksByUserId(String userId) {
-        return streakRepository.findTopStreaksByUserId(userId).stream()
-                .limit(10)
+        List<Streak> streaks = streakRepository.findTopStreaksByUserId(userId);
+        return processAndMapStreaks(streaks);
+    }
+
+    @Transactional
+    public List<StreakResponseDTO> getAllStreaks() {
+        List<Streak> streaks = streakRepository.findAll();
+        return processAndMapStreaks(streaks);
+    }
+
+    private List<StreakResponseDTO> processAndMapStreaks(List<Streak> streaks) {
+        // Lazy Reset: Check and reset streaks if missed
+        boolean needsSave = false;
+        for (Streak streak : streaks) {
+            if (checkAndResetStreak(streak)) {
+                needsSave = true;
+            }
+        }
+        if (needsSave) {
+            streakRepository.saveAll(streaks);
+        }
+
+        return streaks.stream()
                 .map(this::mapToResponseDTO)
                 .collect(Collectors.toList());
     }
@@ -100,12 +112,9 @@ public class StreakService {
         if (dto.getUsageFrequency() != null) {
             streak.setUsageFrequency(dto.getUsageFrequency());
         }
-        if (dto.getUsageTime() != null) {
-            streak.setUsageTime(dto.getUsageTime());
-        }
-        if (dto.getIsActive() != null) {
-            streak.setIsActive(dto.getIsActive());
-        }
+
+        // Check reset on update too
+        checkAndResetStreak(streak);
 
         Streak updatedStreak = streakRepository.save(streak);
         return mapToResponseDTO(updatedStreak);
@@ -117,45 +126,36 @@ public class StreakService {
                 .orElseThrow(() -> new RuntimeException("Streak not found with id: " + streakId));
 
         LocalDate today = LocalDate.now();
-        LocalDate lastUsed = streak.getLastUsedDate();
 
-        // 1. GÜN KONTROLÜ VE SAYAÇ SIFIRLAMA
-        if (lastUsed == null || !lastUsed.equals(today)) {
-            streak.setDailyUsageCounter(0);
-        }
+        // 1. Check/Reset broken streaks first
+        checkAndResetStreak(streak);
 
-        // 2. GÜNLÜK KULLANIM LİMİTİ KONTROLÜ (ENUM kullanarak)
-        int maxDailyUsage = getMaxDailyUsage(streak.getUsageFrequency());
-
-        if (streak.getDailyUsageCounter() >= maxDailyUsage) {
-            throw new BusinessException("Bugünkü kullanım hedefinizi zaten tamamladınız!");
-        }
-
-        // 3. SERİ (STREAK) HESAPLAMA MANTIĞI
-        if (lastUsed != null && !lastUsed.equals(today)) {
-            long daysBetween = ChronoUnit.DAYS.between(lastUsed, today);
-
-            if (daysBetween == 1) {
-                streak.setCurrentStreak(streak.getCurrentStreak() + 1);
-            } else if (daysBetween > 1) {
-                streak.setCurrentStreak(1);
-            }
-        } else if (lastUsed == null) {
-            streak.setCurrentStreak(1);
-        }
-
-        // 4. VERİLERİ GÜNCELLE
+        // 2. Increment Usage Counter
         streak.setDailyUsageCounter(streak.getDailyUsageCounter() + 1);
+
+        // 3. Check if target reached for Streak Increment
+        // DAILY -> 1, TWICE_DAILY -> 2
+        int targetUses = (streak.getUsageFrequency() == UsageFrequency.TWICE_DAILY) ? 2 : 1;
+
+        if (streak.getDailyUsageCounter() >= targetUses) {
+            boolean isFirstCompletionToday = (streak.getLastCompletedDate() == null
+                    || !streak.getLastCompletedDate().isEqual(today));
+
+            if (isFirstCompletionToday) {
+                // Target reached and first time completing today -> Increment Streak
+                streak.setCurrentStreak(streak.getCurrentStreak() + 1);
+                if (streak.getCurrentStreak() > streak.getLongestStreak()) {
+                    streak.setLongestStreak(streak.getCurrentStreak());
+                }
+                streak.setLastCompletedDate(today);
+            }
+        }
+
         streak.setLastUsedDate(today);
         streak.setTotalUses(streak.getTotalUses() + 1);
 
-        // Rekor kontrolü
-        if (streak.getCurrentStreak() > streak.getLongestStreak()) {
-            streak.setLongestStreak(streak.getCurrentStreak());
-        }
-
-        Streak updatedStreak = streakRepository.save(streak);
-        return mapToResponseDTO(updatedStreak);
+        Streak savedStreak = streakRepository.save(streak);
+        return mapToResponseDTO(savedStreak);
     }
 
     @Transactional
@@ -166,34 +166,40 @@ public class StreakService {
         streakRepository.deleteById(id);
     }
 
-    // ============== YARDIMCI METODLAR ==============
+    // ============== HELPER METHODS ==============
 
     /**
-     * UsageFrequency Enum'una göre günlük maksimum kullanım sayısını döner
-     * ⭐ İŞTE BU METOD!
+     * Checks if the streak is broken based on frequency and resets if necessary.
+     * Returns true if a reset occurred.
      */
-    private int getMaxDailyUsage(UsageFrequency frequency) {
-        if (frequency == null) {
-            return 1; // Default
+    private boolean checkAndResetStreak(Streak streak) {
+        if (streak.getLastCompletedDate() == null) {
+            // Never completed, if streak > 0, reset it
+            if (streak.getCurrentStreak() > 0) {
+                streak.setCurrentStreak(0);
+                return true;
+            }
+            return false;
         }
 
-        switch (frequency) {
-            case TWICE_DAILY:
-                return 2;
-            case DAILY:
-                return 1;
-            case WEEKLY:
-                return 1; // Haftalık kullanımda da günde 1 kez sayılır
-            case AS_NEEDED:
-                return 1; // İhtiyaca göre de varsayılan 1
-            default:
-                return 1;
+        LocalDate today = LocalDate.now();
+        LocalDate lastCompleted = streak.getLastCompletedDate();
+
+        if (lastCompleted.isEqual(today)) {
+            return false; // Already done today
         }
+
+        // Logic for DAILY / TWICE_DAILY
+        // Must have completed YESTERDAY (or Today if already done)
+        // If lastCompletedDate < yesterday, then streak is broken.
+        if (lastCompleted.isBefore(today.minusDays(1))) {
+            streak.setCurrentStreak(0);
+            return true;
+        }
+
+        return false;
     }
 
-    /**
-     * Streak entity'sini DTO'ya dönüştürür
-     */
     private StreakResponseDTO mapToResponseDTO(Streak streak) {
         return StreakResponseDTO.builder()
                 .id(streak.getId())
@@ -206,7 +212,9 @@ public class StreakService {
                 .longestStreak(streak.getLongestStreak())
                 .lastUsedDate(streak.getLastUsedDate())
                 .usageFrequency(streak.getUsageFrequency())
-                .usageTime(streak.getUsageTime())
+                .daysOfWeek(streak.getDaysOfWeek())
+                .customTimes(streak.getCustomTimes())
+                .dailyUsageCounter(streak.getDailyUsageCounter())
                 .totalUses(streak.getTotalUses())
                 .isActive(streak.getIsActive())
                 .createdAt(streak.getCreatedAt())

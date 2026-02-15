@@ -12,7 +12,5 @@ public class StreakUpdateDTO {
 
     private UsageFrequency usageFrequency;
 
-    private UsageTime usageTime;
-
     private Boolean isActive;
 }

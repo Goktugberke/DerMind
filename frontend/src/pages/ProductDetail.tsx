@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { addToCart } from '../store/slices/cartSlice';
 import type { Product } from '../store/slices/cartSlice';
-import { productApi, ratingApi, streakApi, UsageFrequency, UsageTime } from '../types/api';
+import { productApi, ratingApi, streakApi, UsageFrequency } from '../types/api';
 import type { ProductDetailDTO, RatingResponseDTO } from '../types/api';
 
 const convertToProduct = (dto: ProductDetailDTO): Product => {
@@ -43,8 +43,8 @@ const ProductDetail = () => {
 
   // Routine Modal State
   const [showRoutineModal, setShowRoutineModal] = useState(false);
-  const [usageFrequency, setUsageFrequency] = useState<UsageFrequency>('DAILY');
-  const [usageTime, setUsageTime] = useState<UsageTime>('MORNING');
+  const [usageFrequency, setUsageFrequency] = useState<UsageFrequency>(UsageFrequency.DAILY);
+  const [usageTime, setUsageTime] = useState<string>('08:00');
   const [routineLoading, setRoutineLoading] = useState(false);
 
   const calculateMLScore = useCallback((productData: ProductDetailDTO) => {
@@ -107,7 +107,7 @@ const ProductDetail = () => {
         await streakApi.createStreak({
           productId: parseInt(id),
           usageFrequency,
-          usageTime
+          customTimes: [usageTime]
         });
         alert('Ürün rutine eklendi!');
         setShowRoutineModal(false);
@@ -187,24 +187,18 @@ const ProductDetail = () => {
                     >
                       <option value="DAILY">Günde 1 Kez</option>
                       <option value="TWICE_DAILY">Günde 2 Kez</option>
-                      <option value="WEEKLY">Haftada 1 Kez</option>
-                      <option value="AS_NEEDED">İhtiyaca Göre</option>
                     </select>
                   </div>
 
                   <div className="form-group" style={{ marginBottom: '15px' }}>
                     <label style={{ display: 'block', marginBottom: '5px' }}>Kullanım Zamanı</label>
-                    <select
-                      className="form-select"
+                    <input
+                      type="time"
+                      className="form-control"
                       style={{ width: '100%', padding: '8px' }}
                       value={usageTime}
-                      onChange={(e) => setUsageTime(e.target.value as UsageTime)}
-                    >
-                      <option value="MORNING">Sabah</option>
-                      <option value="EVENING">Akşam</option>
-                      <option value="MORNING_AND_EVENING">Sabah ve Akşam</option>
-                      <option value="ANYTIME">Herhangi Bir Zaman</option>
-                    </select>
+                      onChange={(e) => setUsageTime(e.target.value)}
+                    />
                   </div>
 
                   <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
