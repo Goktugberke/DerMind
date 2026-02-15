@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
-import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
+import { getApp } from '@react-native-firebase/app';
+import { getAuth, onAuthStateChanged, FirebaseAuthTypes } from '@react-native-firebase/auth';
 
 // Pages
 import { LoginScreen } from '@features/auth/LoginScreen';
@@ -17,17 +18,22 @@ export const RootNavigator = () => {
   const [initializing, setInitializing] = useState(true);
   const [user, setUser] = useState<FirebaseAuthTypes.User | null>(null);
 
-  function onAuthStateChanged(userState: FirebaseAuthTypes.User | null) {
+  function handleAuthStateChanged(userState: FirebaseAuthTypes.User | null) {
     setUser(userState);
     if (initializing) setInitializing(false);
   }
 
   useEffect(() => {
-    const unsubscribe = auth().onAuthStateChanged(onAuthStateChanged);
-    return unsubscribe;
-  }, []);
 
-  if (initializing) return null;
+    const authInstance = getAuth(getApp());
+    const unsubscribe = onAuthStateChanged(authInstance, (userState) => {
+      setUser(userState);
+      if (initializing) setInitializing(false);
+    });
+
+    // Cleanup: Dinleyiciyi temizliyoruz
+    return () => unsubscribe();
+  }, [initializing]);
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -39,9 +45,9 @@ export const RootNavigator = () => {
         <>
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Register" component={RegisterScreen} />
-          <Stack.Screen 
-            name="ForgotPassword" 
-            component={ForgotPasswordScreen} 
+          <Stack.Screen
+            name="ForgotPassword"
+            component={ForgotPasswordScreen}
             options={{ headerShown: true, title: 'Şifremi Unuttum' }}
           />
         </>

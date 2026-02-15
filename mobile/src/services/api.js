@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { Platform } from 'react-native';
+import { getAuth } from '@react-native-firebase/auth';
+
 
 // Emulator tipine göre IP'yi otomatik seçelim
 const BASE_URL = Platform.OS === 'android' 
@@ -9,6 +11,17 @@ const BASE_URL = Platform.OS === 'android'
 const api = axios.create({
   baseURL: BASE_URL,
   timeout: 5000,
+});
+
+api.interceptors.request.use(async (config) => {
+  const user = getAuth().currentUser;
+
+  if (user) {
+    const idToken = await user.getIdToken();
+    config.headers.Authorization = `Bearer ${idToken}`;
+  }
+
+  return config;
 });
 
 export const authService = {
