@@ -5,14 +5,13 @@ import { theme } from '@constants/theme';
 
 //Tabs
 import { HomeScreen } from '@features/home/HomeScreen';
+import { ProfileScreen } from '@features/profile/ProfileScreen';
 
 // Ekranlar (Şimdilik geçici olarak buraya tanımlayalım, sonra dosyalarına taşırsın)
 
 const ProductsScreen = () => null;
 const CartScreen = () => null;
 const FavoritesScreen = () => null;
-const ProfileScreen = () => null;
-
 const Tab = createBottomTabNavigator();
 
 export const TabNavigator = () => {
