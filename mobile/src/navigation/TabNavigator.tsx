@@ -6,10 +6,10 @@ import { theme } from '@constants/theme';
 //Tabs
 import { HomeScreen } from '@features/home/HomeScreen';
 import { ProfileScreen } from '@features/profile/ProfileScreen';
+import { ProductsScreen } from '@features/products/ProductsScreen';
 
 // Ekranlar (Şimdilik geçici olarak buraya tanımlayalım, sonra dosyalarına taşırsın)
 
-const ProductsScreen = () => null;
 const CartScreen = () => null;
 const FavoritesScreen = () => null;
 const Tab = createBottomTabNavigator();

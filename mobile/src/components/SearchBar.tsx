@@ -1,7 +1,6 @@
 import React from 'react';
 import { StyleSheet, TextInput, View, TouchableOpacity } from 'react-native';
 import { Search, SlidersHorizontal } from 'lucide-react-native';
-
 import { theme } from '@constants/theme';
 
 interface SearchBarProps {
@@ -29,8 +28,7 @@ export const SearchBar = ({ placeholder, value, onChangeText }: any) => {
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 20,
-    marginTop: 18,
+    paddingHorizontal: 0
   },
   searchSection: {
     flexDirection: 'row',

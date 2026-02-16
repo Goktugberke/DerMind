@@ -5,8 +5,8 @@ import { Star } from 'lucide-react-native';
 
 export const ProductCard = ({ item, onPress }: any) => { // onPress prop'u eklendi
   return (
-    <TouchableOpacity 
-      style={styles.card} 
+    <TouchableOpacity
+      style={styles.card}
       onPress={onPress} // Tıklama olayı bağlandı
       activeOpacity={0.7} // Tıklandığındaki şeffaflık efekti (0 ile 1 arası)
     >
@@ -17,7 +17,7 @@ export const ProductCard = ({ item, onPress }: any) => { // onPress prop'u eklen
       <View style={styles.infoContainer}>
         <Text style={styles.brand}>{item.brand}</Text>
         <Text style={styles.productName}>{item.name} {item.volume}ml</Text>
-        
+
         <View style={styles.starRow}>
           {[1, 2, 3, 4, 5].map((s) => (
             <Star key={s} size={14} color={theme.colors.secondary} fill={theme.colors.secondary} />
@@ -45,15 +45,16 @@ export const ProductCard = ({ item, onPress }: any) => { // onPress prop'u eklen
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 15,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: theme.colors.gray,
+    borderColor: '#F1F5F9',
     flexDirection: 'row',
     padding: 15,
     marginHorizontal: 20,
     marginBottom: 15,
     alignItems: 'center',
     height: 110,
+    elevation: 2,
   },
   imagePlaceholder: {
     width: 70,
@@ -65,15 +66,8 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 15,
   },
-  brand: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  productName: {
-    fontSize: 15,
-    color: '#334155',
-  },
+  brand: { fontSize: 16, fontWeight: 'bold', color: theme.colors.text },
+  productName: { fontSize: 16, fontWeight: '700', color: theme.colors.gray },
   starRow: {
     flexDirection: 'row',
     marginTop: 5,

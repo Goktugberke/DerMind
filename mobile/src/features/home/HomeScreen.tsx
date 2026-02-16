@@ -1,5 +1,6 @@
 import React from 'react';
 import { SafeAreaView, ScrollView, Text, StyleSheet, View, TouchableOpacity, FlatList } from 'react-native';
+import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate } from 'react-native-reanimated';
 import { SearchBar } from '@components/SearchBar';
 import { ProductCard } from '@components/ProductCard';
 import { CategoryItem } from '@components/CategoryItem';
@@ -46,11 +47,14 @@ export const HomeScreen = () => {
 
   //   fetchUser();
   // }, []);
+  const scrollY = useSharedValue(0);
+
+const onScroll = useAnimatedScrollHandler((event) => {
+  scrollY.value = event.contentOffset.y;
+});
 
   const renderHeader = () => (
     <>
-      <SearchBar value={searchQuery} />
-
       <Text style={styles.welcomeText}>
         {userName ? `Welcome ${userName}` : 'Welcome Guest'}
       </Text>
@@ -71,9 +75,58 @@ export const HomeScreen = () => {
     </>
   );
 
+// const animatedSearchStyle = useAnimatedStyle(() => {
+//     return {
+//       // Yüksekliği daha net düşürelim (90'dan 50'ye)
+//       height: interpolate(scrollY.value, [0, 50], [50, 28], {
+//         extrapolateLeft: 'clamp',
+//         extrapolateRight: 'clamp',
+//       }),
+//       // Opaklığı da biraz azaltarak "küçülme" hissini pekiştirebilirsin
+//       opacity: interpolate(scrollY.value, [0, 50], [1, 0.9], 'clamp'),
+//       transform: [
+//         {
+//           // Daha fazla yukarı çekelim (-20 birim)
+//           translateY: interpolate(scrollY.value, [0, 50], [0, -25], {
+//             extrapolateLeft: 'clamp',
+//             extrapolateRight: 'clamp',
+//           }),
+//         },
+//         {
+//           // Hafifçe ölçekleyerek küçültelim
+//           scale: interpolate(scrollY.value, [0, 80], [1, 0.95], 'clamp'),
+//         }
+//       ],
+//     };
+//   });
+
+const animatedSearchStyle = useAnimatedStyle(() => {
+    return {
+      height: interpolate(scrollY.value, [0, 50], [90, 55], 'clamp'),
+      transform: [
+        {
+          // -20 yerine -8 veya -10 dene, tepeyi kurtaracaktır
+          translateY: interpolate(scrollY.value, [0, 50], [0, -10], 'clamp'),
+        },
+        {
+          scale: interpolate(scrollY.value, [0, 50], [1, 0.9], 'clamp'),
+        }
+      ],
+    };
+  });
+
+
   return (
     <SafeAreaView style={styles.container}>
-      <FlatList
+
+      <Animated.View style={[styles.searchRow, animatedSearchStyle]}>
+        <SearchBar value={searchQuery} />
+      </Animated.View>
+
+
+      <Animated.FlatList
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         data={products}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
@@ -96,8 +149,16 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'regular',
     paddingHorizontal: 20,
-    marginTop: 15,
+    marginTop: 10,
     color: theme.colors.text,
+  },
+  searchRow: {
+    paddingHorizontal: 15,
+    backgroundColor: 'transparent',
+    justifyContent: 'center', // İÇERİĞİ DİKEYDE MERKEZLE
+    paddingTop: 5,
+    zIndex: 10,
+    // overflow: 'visible',     // KESİLMEYİ ENGELLEMEK İÇİN ÖNEMLİ
   },
   categoryGrid: {
     flexDirection: 'row',
