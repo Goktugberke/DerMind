@@ -20,7 +20,7 @@ export const ProductCard = ({ item, onPress }: any) => { // onPress prop'u eklen
 
         <View style={styles.starRow}>
           {[1, 2, 3, 4, 5].map((s) => (
-            <Star key={s} size={14} color={theme.colors.secondary} fill={theme.colors.secondary} />
+            <Star key={s} size={14} color={theme.colors.secondary} fill="#ffed4b" />
           ))}
         </View>
       </View>
@@ -47,11 +47,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: '#ffffff',
     flexDirection: 'row',
-    padding: 15,
-    marginHorizontal: 20,
-    marginBottom: 15,
+    padding: 20,
+    marginHorizontal: 15,
+    marginBottom: 7,
     alignItems: 'center',
     height: 110,
     elevation: 2,
@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
   imagePlaceholder: {
     width: 70,
     height: 70,
-    backgroundColor: '#D1D5DB',
+    backgroundColor: '#a0c6ff',
     borderRadius: 10,
   },
   infoContainer: {

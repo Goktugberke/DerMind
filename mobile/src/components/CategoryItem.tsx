@@ -17,13 +17,13 @@ export const CategoryItem = ({ name, onPress }: CategoryItemProps) => {
 
 const styles = StyleSheet.create({
   categoryItem: {
-    width: '31%',
+    width: '32%',
     backgroundColor: '#FFFFFF',
     borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 18,
-    marginBottom: 10,
+    paddingVertical: 25,
+    marginBottom: 5,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -31,8 +31,8 @@ const styles = StyleSheet.create({
   },
   categoryLabel: {
     textAlign: 'center',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '400',
     color: theme.colors.text,
   },
 });
