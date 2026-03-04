@@ -50,7 +50,6 @@ export const LoginScreen = ({ navigation }: any) => {
       const { uid } = userCredential.user;
 
       Alert.alert("Success", "User UID: " + userCredential.user.uid);
-      navigation.navigate('Home');
 
     } catch (error: any) {
       console.error("Login Error:", error);
@@ -85,8 +84,7 @@ export const LoginScreen = ({ navigation }: any) => {
           uid: userCredential.user.uid
         });
 
-        console.log('Google login successful, navigating to Home');
-        navigation.navigate('Home');
+        console.log('Google login successful, state will update automatically');
       } catch (backendError) {
         await auth.signOut();
         Alert.alert("Login Failed", "Database sync failed. Please try again.");
