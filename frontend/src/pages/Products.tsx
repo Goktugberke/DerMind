@@ -5,8 +5,9 @@ import { addToCart } from '../store/slices/cartSlice';
 import type { Product } from '../store/slices/cartSlice';
 import SearchBar from '../components/SearchBar';
 import ProductFilters from '../components/ProductFilters';
-import { productApi } from '../types/api';
+import { productApi, favoriteApi } from '../types/api';
 import type { ProductResponseDTO } from '../types/api';
+import { useAppSelector } from '../store/hooks';
 
 // Convert ProductResponseDTO to Product (for cart)
 const convertToProduct = (dto: ProductResponseDTO): Product => {
@@ -46,6 +47,8 @@ const Products = () => {
     skinType: '',
   });
   const dispatch = useAppDispatch();
+  const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
 
   // Fetch products from API
   useEffect(() => {
@@ -73,6 +76,51 @@ const Products = () => {
 
     fetchProducts();
   }, [searchQuery]);
+
+  // Fetch Favorites
+  useEffect(() => {
+    const fetchFavorites = async () => {
+      if (isAuthenticated) {
+        try {
+          const favs = await favoriteApi.getMyFavorites();
+          setFavoriteIds(new Set(favs.map(f => f.product.id.toString())));
+        } catch (err) {
+          console.error('Error fetching favorites:', err);
+        }
+      } else {
+        setFavoriteIds(new Set());
+      }
+    };
+    fetchFavorites();
+  }, [isAuthenticated]);
+
+  const toggleFavorite = async (productId: string) => {
+    if (!isAuthenticated) {
+      alert('Favorilere eklemek için giriş yapmalısınız');
+      return;
+    }
+
+    const isFav = favoriteIds.has(productId);
+    try {
+      if (isFav) {
+        await favoriteApi.removeFavorite(productId);
+        setFavoriteIds(prev => {
+          const next = new Set(prev);
+          next.delete(productId);
+          return next;
+        });
+      } else {
+        await favoriteApi.addFavorite(productId);
+        setFavoriteIds(prev => {
+          const next = new Set(prev);
+          next.add(productId);
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error('Error toggling favorite:', err);
+    }
+  };
 
   // Apply filters
   useEffect(() => {
@@ -168,6 +216,18 @@ const Products = () => {
                       <img src={product.image} alt={product.name} />
                     ) : (
                       <div className="product-placeholder">📦</div>
+                    )}
+                    {isAuthenticated && (
+                      <button 
+                        className={`add-favorite-btn ${favoriteIds.has(product.id) ? 'active' : ''}`}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          toggleFavorite(product.id);
+                        }}
+                      >
+                        {favoriteIds.has(product.id) ? '❤️' : '🤍'}
+                      </button>
                     )}
                   </div>
                   <div className="product-info">

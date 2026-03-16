@@ -11,6 +11,7 @@ import Checkout from './pages/Checkout';
 import Login from './pages/Login';
 import Routine from './pages/Routine';
 import Profile from './pages/Profile';
+import Favorites from './pages/Favorites';
 import ForgotPassword from './pages/ForgotPassword';
 import './App.css';
 
@@ -35,6 +36,7 @@ function App() {
           <Route path="login" element={<Login />} />
           <Route path="routine" element={<Routine />} />
           <Route path="profile" element={<Profile />} />
+          <Route path="favorites" element={<Favorites />} />
           <Route path="forgot-password" element={<ForgotPassword />} />
         </Route>
       </Routes>
