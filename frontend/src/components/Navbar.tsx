@@ -1,19 +1,21 @@
 import { Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { selectTotalItems } from '../store/slices/cartSlice';
-import { logout } from '../store/slices/authSlice';
+import { logoutUser } from '../store/slices/authSlice';
+import { useNavigate } from 'react-router-dom';
 import { selectTheme, toggleTheme } from '../store/slices/themeSlice';
 
 const Navbar = () => {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const totalItems = useAppSelector(selectTotalItems);
   const user = useAppSelector((state) => state.auth.user);
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const theme = useAppSelector(selectTheme);
 
-  const handleLogout = () => {
-
-    dispatch(logout());
+  const handleLogout = async () => {
+    await dispatch(logoutUser() as any);
+    navigate('/');
   };
 
   const handleToggleTheme = () => {
