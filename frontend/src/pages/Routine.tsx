@@ -6,16 +6,7 @@ import type { StreakResponseDTO, ProductResponseDTO } from '../types/api';
 import { Link } from 'react-router-dom';
 import { auth } from '../firebase'; // Import auth directly
 
-// Helper for days
-const DAYS = [
-  { label: 'Pzt', value: 'MONDAY' },
-  { label: 'Sal', value: 'TUESDAY' },
-  { label: 'Çar', value: 'WEDNESDAY' },
-  { label: 'Per', value: 'THURSDAY' },
-  { label: 'Cum', value: 'FRIDAY' },
-  { label: 'Cmt', value: 'SATURDAY' },
-  { label: 'Paz', value: 'SUNDAY' },
-];
+// Helper for days removed as it was unused
 
 const Routine = () => {
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
@@ -25,8 +16,6 @@ const Routine = () => {
   const [allProducts, setAllProducts] = useState<ProductResponseDTO[]>([]);
   const [backendStreaks, setBackendStreaks] = useState<StreakResponseDTO[]>([]);
   const [loading, setLoading] = useState(false);
-  const [productsLoading, setProductsLoading] = useState(false);
-
   // Form State
   const [selectedProduct, setSelectedProduct] = useState('');
   const [dailyFrequency, setDailyFrequency] = useState<1 | 2>(1); // 1 or 2 times daily
@@ -62,13 +51,10 @@ const Routine = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        setProductsLoading(true);
         const data = await productApi.getAllProducts();
         setAllProducts(data);
       } catch (err) {
         console.error('Error fetching products:', err);
-      } finally {
-        setProductsLoading(false);
       }
     };
     fetchProducts();

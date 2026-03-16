@@ -3,7 +3,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { userApi } from '../../types/api';
 import type { UserResponseDTO } from '../../types/api';
 import { auth } from '../../firebase';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, signOut } from 'firebase/auth';
 
 export interface User {
   id: string;
@@ -142,6 +142,19 @@ export const updateUserProfile = createAsyncThunk(
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Güncelleme başarısız';
       return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+export const logoutUser = createAsyncThunk(
+  'auth/logoutUser',
+  async (_, { dispatch }) => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error('Firebase signout error:', error);
+    } finally {
+      dispatch(logout());
     }
   }
 );

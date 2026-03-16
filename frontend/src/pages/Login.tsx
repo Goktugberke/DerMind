@@ -141,6 +141,13 @@ const Login = () => {
                 required
                 minLength={isRegister ? 8 : 6}
               />
+              {!isRegister && (
+                <div style={{ textAlign: 'right', marginTop: '0.5rem' }}>
+                  <Link to="/forgot-password" style={{ fontSize: '0.875rem', color: 'var(--text-light)', textDecoration: 'none' }} className="forgot-password-link">
+                    Şifremi unuttum
+                  </Link>
+                </div>
+              )}
             </div>
 
             <button

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { updateUserProfile, logout, fetchCurrentUser } from '../store/slices/authSlice';
+import { updateUserProfile, logoutUser, fetchCurrentUser } from '../store/slices/authSlice';
 import { Link, useNavigate } from 'react-router-dom';
 
 const Profile = () => {
@@ -65,8 +65,8 @@ const Profile = () => {
     }
   };
 
-  const handleLogout = () => {
-    dispatch(logout());
+  const handleLogout = async () => {
+    await dispatch(logoutUser());
     navigate('/');
   };
 
