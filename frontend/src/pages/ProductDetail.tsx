@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { addToCart } from '../store/slices/cartSlice';
 import type { Product } from '../store/slices/cartSlice';
-import { productApi, ratingApi, streakApi, UsageFrequency } from '../types/api';
+import { productApi, ratingApi, streakApi, favoriteApi, UsageFrequency } from '../types/api';
 import type { ProductDetailDTO, RatingResponseDTO } from '../types/api';
 
 const convertToProduct = (dto: ProductDetailDTO): Product => {
@@ -40,6 +40,8 @@ const ProductDetail = () => {
   const [score, setScore] = useState<ProductScore | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [favLoading, setFavLoading] = useState(false);
 
   // Routine Modal State
   const [showRoutineModal, setShowRoutineModal] = useState(false);
@@ -84,6 +86,13 @@ const ProductDetail = () => {
           setRatings(ratingsData);
         } catch (e) { console.error("Rating fetch error", e); }
 
+        if (isAuthenticated) {
+          try {
+            const isFav = await favoriteApi.checkIsFavorite(productId);
+            setIsFavorite(isFav);
+          } catch (e) { console.error("Favorite check error", e); }
+        }
+
         calculateMLScore(productData);
       } catch {
         setError('Ürün yüklenirken bir hata oluştu');
@@ -92,7 +101,7 @@ const ProductDetail = () => {
       }
     };
     fetchProduct();
-  }, [id, user, calculateMLScore]);
+  }, [id, user, calculateMLScore, isAuthenticated]);
 
   const handleAddToRoutine = async () => {
     if (!isAuthenticated) {
@@ -122,6 +131,32 @@ const ProductDetail = () => {
       } finally {
         setRoutineLoading(false);
       }
+    }
+  };
+
+  const toggleFavorite = async () => {
+    if (!isAuthenticated) {
+      alert('Favorilere eklemek için giriş yapmalısınız.');
+      navigate('/login');
+      return;
+    }
+
+    if (!id) return;
+
+    try {
+      setFavLoading(true);
+      if (isFavorite) {
+        await favoriteApi.removeFavorite(id);
+        setIsFavorite(false);
+      } else {
+        await favoriteApi.addFavorite(id);
+        setIsFavorite(true);
+      }
+    } catch (err) {
+      console.error('Error toggling favorite:', err);
+      alert('Favori işlemi sırasında bir hata oluştu.');
+    } finally {
+      setFavLoading(false);
     }
   };
 
@@ -157,6 +192,21 @@ const ProductDetail = () => {
                 style={{ backgroundColor: '#6c757d', color: 'white' }}
               >
                 📅 Rutine Ekle
+              </button>
+              <button
+                className={`btn ${isFavorite ? 'btn-danger' : 'btn-outline'}`}
+                onClick={toggleFavorite}
+                disabled={favLoading}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px',
+                  backgroundColor: isFavorite ? '#ef4444' : 'transparent',
+                  color: isFavorite ? 'white' : '#1f2937',
+                  border: '1px solid #d1d5db'
+                }}
+              >
+                {isFavorite ? '❤️ Favorilerde' : '🤍 Favorilere Ekle'}
               </button>
             </div>
 

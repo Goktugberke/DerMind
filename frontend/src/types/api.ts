@@ -67,6 +67,13 @@ export interface ProductCreateDTO { name: string; brand: string; price: number; 
 export type ProductUpdateDTO = Partial<ProductCreateDTO>;
 export interface ProductRecommendationDTO { products: ProductResponseDTO[]; reason: string; }
 
+// --- FAVORITE TYPES ---
+export interface FavoriteResponseDTO {
+  id: number;
+  product: ProductResponseDTO;
+  createdAt: string;
+}
+
 // --- STREAK & ROUTINE TYPES ---
 export interface StreakResponseDTO {
   id: number;
@@ -214,4 +221,11 @@ export const streakApi = {
 export const ratingApi = {
   getRatingsByProductId: async (id: number) => (await apiClient.get<RatingResponseDTO[]>(`/api/ratings/product/${id}`)).data,
   getProductRatingStats: async (id: number) => (await apiClient.get<ProductRatingStatsDTO>(`/api/ratings/product/${id}/stats`)).data,
+};
+
+export const favoriteApi = {
+  addFavorite: async (productId: number | string) => (await apiClient.post<FavoriteResponseDTO>(`/api/favorites/${productId}`)).data,
+  removeFavorite: async (productId: number | string) => await apiClient.delete(`/api/favorites/${productId}`),
+  getMyFavorites: async () => (await apiClient.get<FavoriteResponseDTO[]>('/api/favorites/my-favorites')).data,
+  checkIsFavorite: async (productId: number | string) => (await apiClient.get<boolean>(`/api/favorites/check/${productId}`)).data,
 };
