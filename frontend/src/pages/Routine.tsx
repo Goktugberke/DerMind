@@ -338,6 +338,16 @@ const Routine = () => {
           color: white;
           border-color: #0d6efd;
         }
+        [data-theme='dark'] .freq-btn,
+        [data-theme='dark'] .count-btn,
+        [data-theme='dark'] .day-btn {
+          color: #1f2937;
+        }
+        [data-theme='dark'] .form-select,
+        [data-theme='dark'] .form-control {
+          background-color: #ffffff;
+          color: #1f2937;
+        }
         .time-selector {
           display: flex;
           gap: 15px;

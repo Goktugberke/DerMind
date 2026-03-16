@@ -8,6 +8,7 @@ import { signInWithPopup } from 'firebase/auth';
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState('');
   const dispatch = useAppDispatch();
@@ -37,12 +38,31 @@ const Login = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     dispatch(clearError());
+    setPasswordError('');
 
     try {
       if (isRegister) {
-        if (!name.trim() || !password || password.length < 6) {
+        if (!name.trim() || !password) {
           return;
         }
+
+        if (password.length < 8) {
+          setPasswordError('Şifre en az 8 karakter olmalıdır.');
+          return;
+        }
+        if (!/[A-Z]/.test(password)) {
+          setPasswordError('Şifre en az 1 büyük harf içermelidir.');
+          return;
+        }
+        if (!/[a-z]/.test(password)) {
+          setPasswordError('Şifre en az 1 küçük harf içermelidir.');
+          return;
+        }
+        if (!/[0-9]/.test(password)) {
+          setPasswordError('Şifre en az 1 rakam içermelidir.');
+          return;
+        }
+
         await dispatch(registerUser({ email, name, password })).unwrap();
         navigate('/');
       } else {
@@ -66,6 +86,7 @@ const Login = () => {
           </p>
 
           {error && <div className="error-message">{error}</div>}
+          {passwordError && <div className="error-message">{passwordError}</div>}
 
           <div className="social-auth">
             <button
@@ -118,7 +139,7 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                minLength={6}
+                minLength={isRegister ? 8 : 6}
               />
             </div>
 
@@ -140,6 +161,7 @@ const Login = () => {
                 onClick={() => {
                   setIsRegister(!isRegister);
                   dispatch(clearError());
+                  setPasswordError('');
                 }}
               >
                 {isRegister ? 'Giriş yap' : 'Kayıt ol'}
