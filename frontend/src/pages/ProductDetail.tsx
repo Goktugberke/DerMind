@@ -101,7 +101,7 @@ const ProductDetail = () => {
       }
     };
     fetchProduct();
-  }, [id, user, calculateMLScore]);
+  }, [id, user, calculateMLScore, isAuthenticated]);
 
   const handleAddToRoutine = async () => {
     if (!isAuthenticated) {

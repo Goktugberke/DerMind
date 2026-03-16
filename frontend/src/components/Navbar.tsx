@@ -14,7 +14,7 @@ const Navbar = () => {
   const theme = useAppSelector(selectTheme);
 
   const handleLogout = async () => {
-    await dispatch(logoutUser() as any);
+    await dispatch(logoutUser());
     navigate('/');
   };
 
