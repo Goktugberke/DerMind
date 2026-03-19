@@ -53,6 +53,15 @@ build/
 # macOS
 .DS_Store
 
+# AI Server - Large datasets & model files
+ai-server/datasets/
+ai-server/dermind_ai_training_dataset.csv
+ai-server/dermind_knn_product_vectors.csv
+ai-server/incibeauty_products_onehot.csv
+ai-server/models/*.pkl
+ai-server/allChat.txt
+ai-server/bitirme fikir.txt
+ai-server/*.pdf
 # firebase
 firebase-service-account.json
 
