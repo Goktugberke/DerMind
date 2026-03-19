@@ -1,7 +1,6 @@
 package com.dermind.DerMind.streak.dto;
 
 import com.dermind.DerMind.common.enums.UsageFrequency;
-import com.dermind.DerMind.common.enums.UsageTime;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
@@ -17,6 +16,7 @@ public class StreakCreateDTO {
     @NotNull(message = "Kullanım sıklığı boş olamaz")
     private UsageFrequency usageFrequency;
 
-    @NotNull(message = "Kullanım zamanı boş olamaz")
-    private UsageTime usageTime;
+    private java.util.Set<java.time.DayOfWeek> daysOfWeek;
+
+    private java.util.List<java.time.LocalTime> customTimes;
 }

@@ -62,3 +62,11 @@ ai-server/models/*.pkl
 ai-server/allChat.txt
 ai-server/bitirme fikir.txt
 ai-server/*.pdf
+# firebase
+firebase-service-account.json
+
+# endpoints
+all_api_endpoints.txt
+
+# mock data
+mock_data.sql

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { updateProfile, logout } from '../store/slices/authSlice';
+import { updateUserProfile, logoutUser, fetchCurrentUser } from '../store/slices/authSlice';
 import { Link, useNavigate } from 'react-router-dom';
 
 const Profile = () => {
@@ -33,23 +33,40 @@ const Profile = () => {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Fetch current user on mount
+  useEffect(() => {
+    if (user) {
+      // User already loaded from Redux persist
+      return;
+    }
+    // Try to fetch from API (for OAuth users)
+    dispatch(fetchCurrentUser());
+  }, [dispatch, user]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
+
     const allergies = formData.allergies
       .split(',')
       .map((a) => a.trim())
       .filter((a) => a.length > 0);
 
-    dispatch(updateProfile({
-      name: formData.name,
-      skinType: formData.skinType,
-      allergies,
-    }));
-    setIsEditing(false);
+    try {
+      await dispatch(updateUserProfile({
+        id: user.id,
+        name: formData.name,
+        skinType: formData.skinType,
+        allergies,
+      })).unwrap();
+      setIsEditing(false);
+    } catch (err) {
+      console.error('Error updating profile:', err);
+    }
   };
 
-  const handleLogout = () => {
-    dispatch(logout());
+  const handleLogout = async () => {
+    await dispatch(logoutUser());
     navigate('/');
   };
 
@@ -188,12 +205,14 @@ const Profile = () => {
                     className="btn btn-secondary"
                     onClick={() => {
                       setIsEditing(false);
-                      setFormData({
-                        name: user.name,
-                        email: user.email,
-                        skinType: user.skinType || '',
-                        allergies: user.allergies?.join(', ') || '',
-                      });
+                      if (user) {
+                        setFormData({
+                          name: user.name,
+                          email: user.email,
+                          skinType: user.skinType || '',
+                          allergies: user.allergies?.join(', ') || '',
+                        });
+                      }
                     }}
                   >
                     İptal
@@ -216,7 +235,9 @@ const Profile = () => {
             </div>
             <div className="stat-card">
               <h3>Favorilerim</h3>
-              <p className="stat-placeholder">Yakında eklenecek</p>
+              <Link to="/favorites" className="stat-link">
+                Favorilerimi Görüntüle →
+              </Link>
             </div>
           </div>
         </div>

@@ -11,6 +11,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.bind.annotation.*;
 
+import com.dermind.DerMind.user.service.UserService; // Import added
 import java.util.List;
 
 @RestController
@@ -20,6 +21,7 @@ import java.util.List;
 public class StreakController {
 
     private final StreakService streakService;
+    private final com.dermind.DerMind.user.service.UserService userService;
 
     /**
      * Create new streak (Güvenli Versiyon)
@@ -28,11 +30,10 @@ public class StreakController {
      */
     @PostMapping
     public ResponseEntity<StreakResponseDTO> createStreak(
-            @AuthenticationPrincipal OidcUser principal,
+            @AuthenticationPrincipal Object principal,
             @Valid @RequestBody StreakCreateDTO dto) {
 
         String userId = getUserIdFromPrincipal(principal);
-        // Service metodunu (userId, dto) alacak şekilde güncellediğini varsayıyoruz
         StreakResponseDTO createdStreak = streakService.createStreak(userId, dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdStreak);
     }
@@ -43,7 +44,7 @@ public class StreakController {
      * GET /api/streaks/my-streaks
      */
     @GetMapping("/my-streaks")
-    public ResponseEntity<List<StreakResponseDTO>> getMyStreaks(@AuthenticationPrincipal OidcUser principal) {
+    public ResponseEntity<List<StreakResponseDTO>> getMyStreaks(@AuthenticationPrincipal Object principal) {
         String userId = getUserIdFromPrincipal(principal);
         List<StreakResponseDTO> streaks = streakService.getStreaksByUserId(userId);
         return ResponseEntity.ok(streaks);
@@ -54,7 +55,7 @@ public class StreakController {
      * GET /api/streaks/my-streaks/active
      */
     @GetMapping("/my-streaks/active")
-    public ResponseEntity<List<StreakResponseDTO>> getMyActiveStreaks(@AuthenticationPrincipal OidcUser principal) {
+    public ResponseEntity<List<StreakResponseDTO>> getMyActiveStreaks(@AuthenticationPrincipal Object principal) {
         String userId = getUserIdFromPrincipal(principal);
         List<StreakResponseDTO> streaks = streakService.getActiveStreaksByUserId(userId);
         return ResponseEntity.ok(streaks);
@@ -65,7 +66,7 @@ public class StreakController {
      * GET /api/streaks/my-streaks/top
      */
     @GetMapping("/my-streaks/top")
-    public ResponseEntity<List<StreakResponseDTO>> getMyTopStreaks(@AuthenticationPrincipal OidcUser principal) {
+    public ResponseEntity<List<StreakResponseDTO>> getMyTopStreaks(@AuthenticationPrincipal Object principal) {
         String userId = getUserIdFromPrincipal(principal);
         List<StreakResponseDTO> streaks = streakService.getTopStreaksByUserId(userId);
         return ResponseEntity.ok(streaks);
@@ -128,15 +129,33 @@ public class StreakController {
     // --- HELPER METHOD ---
 
     /**
-     * Token'dan kullanıcı ID'sini (Google 'sub') çıkarır.
-     * Kullanıcı giriş yapmamışsa Exception fırlatır.
+     * Token'dan kullanıcı ID'sini çıkarır.
+     * Destekler:
+     * 1. Basic Auth (UserDetails) -> Email ile ID bul
+     * 2. OAuth2 (OidcUser) -> Google Subject ile ID bul
      */
-    private String getUserIdFromPrincipal(OidcUser principal) {
+    private String getUserIdFromPrincipal(Object principal) {
         if (principal == null) {
             throw new UserNotAuthenticatedException("Bu işlemi gerçekleştirmek için giriş yapmalısınız.");
         }
-        // Google 'sub' claim'i genellikle unique user ID olarak kullanılır.
-        // Eğer veritabanında providerId yerine email kullanıyorsan principal.getEmail() yapmalısın.
-        return principal.getSubject();
+
+        // 1. Basic Auth (Email/Password)
+        if (principal instanceof org.springframework.security.core.userdetails.UserDetails) {
+            String email = ((org.springframework.security.core.userdetails.UserDetails) principal).getUsername();
+            // Email'den User ID'yi bulmak için UserService kullan
+            return userService.getUserByEmail(email).getId();
+        }
+
+        // 2. OAuth2 (Google Login)
+        if (principal instanceof OidcUser) {
+            // Google Subject ID'sini al ve "google_" prefix'i ile döndür
+            // Çünkü UserService.handleGoogleLogin metodunda ID böyle oluşturuluyor:
+            // "google_" + providerId
+            String providerId = ((OidcUser) principal).getSubject();
+            return "google_" + providerId;
+        }
+
+        throw new UserNotAuthenticatedException(
+                "Desteklenmeyen kimlik doğrulama türü: " + principal.getClass().getName());
     }
 }

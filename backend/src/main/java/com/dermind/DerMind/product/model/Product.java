@@ -3,6 +3,7 @@ package com.dermind.DerMind.product.model;
 import com.dermind.DerMind.purchase.model.Purchase;
 import com.dermind.DerMind.streak.model.Streak;
 import com.dermind.DerMind.user_product_rating.model.UserProductRating;
+import com.dermind.DerMind.favorite.model.Favorite;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -32,6 +33,9 @@ public class Product {
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL)
     private List<Streak> streaks = new ArrayList<>();
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL)
+    private List<Favorite> favorites = new ArrayList<>();
 
     // getter-setter
 }

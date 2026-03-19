@@ -1,4 +1,4 @@
-import { ApiError } from './api';
+import { ApiError } from '../types/api.ts';
 import type { GeneralErrorResponse } from "../types/api.ts";
 
 export interface ErrorInfo {
@@ -47,19 +47,24 @@ export const parseApiError = (error: unknown): ErrorInfo => {
 };
 
 const handleApiError = (error: ApiError): ErrorInfo => {
-    if (error.errorData && 'errorMessages' in error.errorData) {
-        const generalError = error.errorData as GeneralErrorResponse;
+    // ApiError sınıfında errorData tanımlı olmadığı için tip zorlaması (casting) yapıyoruz
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const errorAsAny = error as any;
+
+    if (errorAsAny.errorData && typeof errorAsAny.errorData === 'object' && 'errorMessages' in errorAsAny.errorData) {
+        const generalError = errorAsAny.errorData as GeneralErrorResponse;
         const message = extractErrorMessages(generalError);
 
         return {
-            message: message || 'An error occurred',
-            isRetryable: isRetryableError(error.status, generalError.errorCode)
+            message: message || error.message || 'An error occurred',
+            isRetryable: isRetryableError(error.status || 0, generalError.errorCode)
         };
     }
 
+    // Eğer errorData yoksa direkt interceptor'dan gelen mesajı veya status mesajını kullan
     return {
-        message: getStatusMessage(error.status),
-        isRetryable: isRetryableStatus(error.status)
+        message: error.message || getStatusMessage(error.status || 0),
+        isRetryable: isRetryableStatus(error.status || 0)
     };
 };
 
