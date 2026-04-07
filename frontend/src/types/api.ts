@@ -110,6 +110,18 @@ export interface RatingCreateDTO { productId: number; rating: number; comment?: 
 export interface RatingUpdateDTO { rating: number; comment?: string; }
 export interface ProductRatingStatsDTO { averageRating: number; totalRatings: number; }
 
+// --- CART TYPES ---
+export interface CartItemResponseDTO {
+  id: number;
+  product: ProductResponseDTO;
+  quantity: number;
+}
+export interface CartItemAddDTO {
+  productId: string | number;
+  quantity: number;
+}
+
+
 export interface PurchaseResponseDTO { id: number; purchaseDate: string; totalAmount: number; }
 export interface PurchaseCreateDTO { productIds: string[]; totalAmount: number; }
 export interface PurchaseUpdateDTO { status: string; }
@@ -229,3 +241,13 @@ export const favoriteApi = {
   getMyFavorites: async () => (await apiClient.get<FavoriteResponseDTO[]>('/api/favorites/my-favorites')).data,
   checkIsFavorite: async (productId: number | string) => (await apiClient.get<boolean>(`/api/favorites/check/${productId}`)).data,
 };
+
+export const cartApi = {
+  getCart: async () => (await apiClient.get<CartItemResponseDTO[]>('/api/cart')).data,
+  addItem: async (data: CartItemAddDTO) => (await apiClient.post<CartItemResponseDTO>('/api/cart/add', data)).data,
+  updateQuantity: async (productId: string | number, quantity: number) =>
+    (await apiClient.put<CartItemResponseDTO>(`/api/cart/item/${productId}?quantity=${quantity}`)).data,
+  removeItem: async (productId: string | number) => await apiClient.delete(`/api/cart/item/${productId}`),
+  clearCart: async () => await apiClient.delete('/api/cart'),
+  mergeCart: async (localItems: CartItemAddDTO[]) => (await apiClient.post<CartItemResponseDTO[]>('/api/cart/merge', localItems)).data,
+};

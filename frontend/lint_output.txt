@@ -1,0 +1,16 @@
+
+> my-app@0.0.0 lint
+> eslint .
+
+
+C:\vsc_all\DerMind\frontend\src\store\slices\cartSlice.ts
+    4:15  error  'CartItemResponseDTO' is defined but never used  @typescript-eslint/no-unused-vars
+   47:21  error  Unexpected any. Specify a different type         @typescript-eslint/no-explicit-any
+   62:23  error  Unexpected any. Specify a different type         @typescript-eslint/no-explicit-any
+   78:23  error  Unexpected any. Specify a different type         @typescript-eslint/no-explicit-any
+   94:23  error  Unexpected any. Specify a different type         @typescript-eslint/no-explicit-any
+  110:23  error  Unexpected any. Specify a different type         @typescript-eslint/no-explicit-any
+  137:21  error  Unexpected any. Specify a different type         @typescript-eslint/no-explicit-any
+
+✖ 7 problems (7 errors, 0 warnings)
+

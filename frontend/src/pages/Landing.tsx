@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useAppDispatch } from '../store/hooks';
-import { addToCart } from '../store/slices/cartSlice';
+import { addToCartAsync } from '../store/slices/cartSlice';
 import type { Product } from '../store/slices/cartSlice';
 import SearchBar from '../components/SearchBar';
 
@@ -146,7 +146,7 @@ const Landing = () => {
                   <span className="product-price">{product.price.toFixed(2)} ₺</span>
                   <button
                     className="btn btn-primary btn-sm"
-                    onClick={() => dispatch(addToCart(product))}
+                    onClick={() => dispatch(addToCartAsync(product))}
                   >
                     Sepete Ekle
                   </button>
@@ -166,4 +166,3 @@ const Landing = () => {
 };
 
 export default Landing;
-

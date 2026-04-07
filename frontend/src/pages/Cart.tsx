@@ -1,6 +1,12 @@
 import { Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { removeFromCart, updateQuantity, clearCart, selectCartItems, selectTotalPrice } from '../store/slices/cartSlice';
+import { 
+  removeFromCartAsync, 
+  updateQuantityAsync, 
+  clearCartAsync, 
+  selectCartItems, 
+  selectTotalPrice 
+} from '../store/slices/cartSlice';
 
 const Cart = () => {
   const dispatch = useAppDispatch();
@@ -28,7 +34,7 @@ const Cart = () => {
       <div className="container">
         <div className="cart-header">
           <h1>Sepetim</h1>
-          <button className="btn btn-secondary" onClick={() => dispatch(clearCart())}>
+          <button className="btn btn-secondary" onClick={() => dispatch(clearCartAsync())}>
             Sepeti Temizle
           </button>
         </div>
@@ -48,27 +54,27 @@ const Cart = () => {
                   <h3>{item.name}</h3>
                   {item.description && <p>{item.description}</p>}
                   <div className="cart-item-price">
-                    {(item.price * item.quantity).toFixed(2)} ₺
+                    {((item.price || 0) * item.quantity).toFixed(2)} ₺
                   </div>
                 </div>
                 <div className="cart-item-controls">
                   <div className="quantity-controls">
                     <button
-                      onClick={() => dispatch(updateQuantity({ productId: item.id, quantity: item.quantity - 1 }))}
+                      onClick={() => dispatch(updateQuantityAsync({ productId: item.id, quantity: item.quantity - 1 }))}
                       className="quantity-btn"
                     >
                       -
                     </button>
                     <span className="quantity">{item.quantity}</span>
                     <button
-                      onClick={() => dispatch(updateQuantity({ productId: item.id, quantity: item.quantity + 1 }))}
+                      onClick={() => dispatch(updateQuantityAsync({ productId: item.id, quantity: item.quantity + 1 }))}
                       className="quantity-btn"
                     >
                       +
                     </button>
                   </div>
                   <button
-                    onClick={() => dispatch(removeFromCart(item.id))}
+                    onClick={() => dispatch(removeFromCartAsync(item.id))}
                     className="btn btn-danger btn-sm"
                   >
                     Kaldır
@@ -105,4 +111,5 @@ const Cart = () => {
 };
 
 export default Cart;
+
 

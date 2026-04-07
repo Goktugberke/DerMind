@@ -1,18 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { useAppDispatch } from '../store/hooks';
-import { addToCart } from '../store/slices/cartSlice';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { addToCartAsync } from '../store/slices/cartSlice';
 import type { Product } from '../store/slices/cartSlice';
 import SearchBar from '../components/SearchBar';
 import ProductFilters from '../components/ProductFilters';
 import { productApi, favoriteApi } from '../types/api';
 import type { ProductResponseDTO } from '../types/api';
-import { useAppSelector } from '../store/hooks';
 
 // Convert ProductResponseDTO to Product (for cart)
 const convertToProduct = (dto: ProductResponseDTO): Product => {
   // Mock price based on ID if missing (between 100 and 500)
-  const mockPrice = dto.price || (100 + (parseInt(dto.id, 10) * 12345 % 400));
+  const mockPrice = dto.price || (100 + (parseInt(dto.id.toString(), 10) * 12345 % 400));
 
   return {
     id: dto.id.toString(),
@@ -94,26 +93,27 @@ const Products = () => {
     fetchFavorites();
   }, [isAuthenticated]);
 
-  const toggleFavorite = async (productId: string) => {
+  const toggleFavorite = async (productId: string | number) => {
     if (!isAuthenticated) {
       alert('Favorilere eklemek için giriş yapmalısınız');
       return;
     }
 
-    const isFav = favoriteIds.has(productId);
+    const idStr = productId.toString();
+    const isFav = favoriteIds.has(idStr);
     try {
       if (isFav) {
         await favoriteApi.removeFavorite(productId);
         setFavoriteIds(prev => {
           const next = new Set(prev);
-          next.delete(productId);
+          next.delete(idStr);
           return next;
         });
       } else {
         await favoriteApi.addFavorite(productId);
         setFavoriteIds(prev => {
           const next = new Set(prev);
-          next.add(productId);
+          next.add(idStr);
           return next;
         });
       }
@@ -219,14 +219,14 @@ const Products = () => {
                     )}
                     {isAuthenticated && (
                       <button 
-                        className={`add-favorite-btn ${favoriteIds.has(product.id) ? 'active' : ''}`}
+                        className={`add-favorite-btn ${favoriteIds.has(product.id.toString()) ? 'active' : ''}`}
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                           toggleFavorite(product.id);
                         }}
                       >
-                        {favoriteIds.has(product.id) ? '❤️' : '🤍'}
+                        {favoriteIds.has(product.id.toString()) ? '❤️' : '🤍'}
                       </button>
                     )}
                   </div>
@@ -246,7 +246,7 @@ const Products = () => {
                   <span className="product-price">{product.price.toFixed(2)} ₺</span>
                   <button
                     className="btn btn-primary btn-sm"
-                    onClick={() => dispatch(addToCart(product))}
+                    onClick={() => dispatch(addToCartAsync(product))}
                   >
                     Sepete Ekle
                   </button>
@@ -261,4 +261,3 @@ const Products = () => {
 };
 
 export default Products;
-

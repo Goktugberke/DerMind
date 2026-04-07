@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppDispatch } from '../store/hooks';
-import { addToCart } from '../store/slices/cartSlice';
+import { addToCartAsync } from '../store/slices/cartSlice';
 import type { Product } from '../store/slices/cartSlice';
 import { favoriteApi } from '../types/api';
 import type { FavoriteResponseDTO, ProductResponseDTO } from '../types/api';
 
 const convertToProduct = (dto: ProductResponseDTO): Product => {
-  const mockPrice = dto.price || (100 + (parseInt(dto.id, 10) * 12345 % 400));
+  const mockPrice = dto.price || (100 + (parseInt(dto.id.toString(), 10) * 12345 % 400));
   return {
     id: dto.id.toString(),
     name: dto.name,
@@ -42,10 +42,10 @@ const Favorites = () => {
     fetchFavorites();
   }, []);
 
-  const handleRemoveFavorite = async (productId: string) => {
+  const handleRemoveFavorite = async (productId: string | number) => {
     try {
       await favoriteApi.removeFavorite(productId);
-      setFavorites(favorites.filter(f => f.product.id !== productId));
+      setFavorites(favorites.filter(f => f.product.id.toString() !== productId.toString()));
     } catch (err) {
       console.error('Error removing favorite:', err);
       alert('Favori silinirken bir hata oluştu');
@@ -126,7 +126,7 @@ const Favorites = () => {
                     <span className="product-price">{product.price.toFixed(2)} ₺</span>
                     <button
                       className="btn btn-primary btn-sm"
-                      onClick={() => dispatch(addToCart(product))}
+                      onClick={() => dispatch(addToCartAsync(product))}
                     >
                       Sepete Ekle
                     </button>
