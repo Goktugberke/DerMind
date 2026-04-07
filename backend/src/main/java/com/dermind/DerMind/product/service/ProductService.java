@@ -235,7 +235,10 @@ public class ProductService {
                 product.getName(),
                 product.getBrand(),
                 product.getIngredients(),
-                product.getQualityScore());
+                product.getQualityScore(),
+                product.getPrice()
+        );
+
     }
 
     private ProductDetailDTO convertToDetailDTO(Product product) {

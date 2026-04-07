@@ -71,8 +71,10 @@ public class FavoriteService {
                 favorite.getProduct().getName(),
                 favorite.getProduct().getBrand(),
                 favorite.getProduct().getIngredients(),
-                favorite.getProduct().getQualityScore()
+                favorite.getProduct().getQualityScore(),
+                favorite.getProduct().getPrice()
         );
+
 
         return FavoriteResponseDTO.builder()
                 .id(favorite.getId())

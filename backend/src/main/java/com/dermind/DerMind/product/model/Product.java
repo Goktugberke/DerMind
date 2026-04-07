@@ -24,6 +24,8 @@ public class Product {
     private String brand;
     private String ingredients;   // İçerik listesi (örn. "Aloe Vera, Glycerin, ...")
     private Double qualityScore;  // Malzeme kalitesine göre belirlenen puan
+    private Double price;
+
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL)
     private List<UserProductRating> ratings = new ArrayList<>();

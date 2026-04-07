@@ -1,13 +1,13 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { addToCart } from '../store/slices/cartSlice';
+import { addToCartAsync } from '../store/slices/cartSlice';
 import type { Product } from '../store/slices/cartSlice';
 import { productApi, ratingApi, streakApi, favoriteApi, UsageFrequency } from '../types/api';
 import type { ProductDetailDTO, RatingResponseDTO } from '../types/api';
 
 const convertToProduct = (dto: ProductDetailDTO): Product => {
-  const mockPrice = dto.price || (100 + (parseInt(dto.id, 10) * 12345 % 400));
+  const mockPrice = dto.price || (100 + (parseInt(dto.id.toString(), 10) * 12345 % 400));
   return {
     id: dto.id.toString(),
     name: dto.name,
@@ -185,7 +185,7 @@ const ProductDetail = () => {
             )}
 
             <div className="product-actions" style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-              <button className="btn btn-primary" onClick={() => dispatch(addToCart(product))}>Sepete Ekle</button>
+              <button className="btn btn-primary" onClick={() => dispatch(addToCartAsync(product))}>Sepete Ekle</button>
               <button
                 onClick={() => setShowRoutineModal(true)}
                 className="btn btn-secondary"

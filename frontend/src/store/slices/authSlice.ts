@@ -4,6 +4,8 @@ import { userApi } from '../../types/api';
 import type { UserResponseDTO } from '../../types/api';
 import { auth } from '../../firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, signOut } from 'firebase/auth';
+import { clearCart, fetchCart, mergeCartAsync } from './cartSlice';
+
 
 export interface User {
   id: string;
@@ -41,16 +43,19 @@ const convertToUser = (dto: UserResponseDTO): User => ({
 
 export const fetchCurrentUser = createAsyncThunk(
   'auth/fetchCurrentUser',
-  async (_, { rejectWithValue }) => {
+  async (_, { dispatch, rejectWithValue }) => {
     try {
       const response = await userApi.getCurrentUser();
-      return convertToUser(response);
+      const user = convertToUser(response);
+      dispatch(fetchCart()); // Kullanıcı bilgisi geldiyse sepetini getir
+      return user;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Kullanıcı bilgisi alınamadı';
       return rejectWithValue(errorMessage);
     }
   }
 );
+
 
 export const registerUser = createAsyncThunk(
   'auth/register',
@@ -85,7 +90,8 @@ export const registerUser = createAsyncThunk(
 
 export const loginUser = createAsyncThunk(
   'auth/login',
-  async (credentials: { email?: string; password?: string; token?: string; name?: string; picture?: string; uid?: string }, { rejectWithValue }) => {
+  async (credentials: { email?: string; password?: string; token?: string; name?: string; picture?: string; uid?: string }, { dispatch, rejectWithValue }) => {
+
     try {
       let response;
       if (credentials.token && credentials.email && credentials.name && credentials.uid) {
@@ -121,13 +127,16 @@ export const loginUser = createAsyncThunk(
       } else {
         throw new Error('Bilgi eksik');
       }
-      return convertToUser(response);
+      const user = convertToUser(response);
+      dispatch(mergeCartAsync()); // Giriş başarılıysa sepeti birleştir
+      return user;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Giriş başarısız';
       return rejectWithValue(errorMessage);
     }
   }
 );
+
 
 export const updateUserProfile = createAsyncThunk(
   'auth/updateProfile',
@@ -155,9 +164,11 @@ export const logoutUser = createAsyncThunk(
       console.error('Firebase signout error:', error);
     } finally {
       dispatch(logout());
+      dispatch(clearCart()); // Çıkışta sepeti temizle
     }
   }
 );
+
 
 // --- SLICE ---
 
