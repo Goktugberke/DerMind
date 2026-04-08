@@ -43,6 +43,11 @@ const ProductDetail = () => {
   const [isFavorite, setIsFavorite] = useState(false);
   const [favLoading, setFavLoading] = useState(false);
 
+  const [reviewText, setReviewText] = useState('');
+  const [reviewRating, setReviewRating] = useState(5);
+  const [editingRatingId, setEditingRatingId] = useState<number | null>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+
   // Routine Modal State
   const [showRoutineModal, setShowRoutineModal] = useState(false);
   const [usageFrequency, setUsageFrequency] = useState<UsageFrequency>(UsageFrequency.DAILY);
@@ -160,6 +165,69 @@ const ProductDetail = () => {
     }
   };
 
+  const handleReviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isAuthenticated || !user) {
+      alert('Yorum yapmak için giriş yapmalısınız.');
+      navigate('/login');
+      return;
+    }
+    if (!id) return;
+    
+    try {
+      setReviewLoading(true);
+      if (editingRatingId) {
+        const updated = await ratingApi.updateRating(editingRatingId, {
+          rating: reviewRating,
+          review: reviewText
+        });
+        setRatings(ratings.map(r => r.id === updated.id ? updated : r));
+        setEditingRatingId(null);
+      } else {
+        const created = await ratingApi.addRating({
+          userId: user.id,
+          productId: parseInt(id),
+          rating: reviewRating,
+          review: reviewText
+        });
+        setRatings([...ratings, created]);
+      }
+      setReviewText('');
+      setReviewRating(5);
+    } catch (err) {
+      console.error(err);
+      alert('Yorum kaydedilirken bir hata oluştu');
+    } finally {
+      setReviewLoading(false);
+    }
+  };
+
+  const handleDeleteReview = async (ratingId: number) => {
+    if (!window.confirm('Bu yorumu silmek istediğinize emin misiniz?')) return;
+    try {
+      setReviewLoading(true);
+      await ratingApi.deleteRating(ratingId);
+      setRatings(ratings.filter(r => r.id !== ratingId));
+    } catch (err) {
+      console.error(err);
+      alert('Yorum silinirken bir hata oluştu');
+    } finally {
+      setReviewLoading(false);
+    }
+  };
+  
+  const handleEditReview = (rating: RatingResponseDTO) => {
+    setEditingRatingId(rating.id);
+    setReviewText(rating.review || rating.comment || '');
+    setReviewRating(rating.rating);
+  };
+  
+  const handleCancelEdit = () => {
+    setEditingRatingId(null);
+    setReviewText('');
+    setReviewRating(5);
+  };
+
   if (loading) return <div className="container"><p>Ürün yükleniyor...</p></div>;
   if (error || !product) return <div className="container"><p>{error || 'Ürün bulunamadı.'}</p><Link to="/products">Dön</Link></div>;
 
@@ -272,18 +340,84 @@ const ProductDetail = () => {
               </div>
             )}
 
-            <div className="product-ratings">
+            <div className="product-ratings" style={{ marginTop: '30px', color: 'black' }}>
               <h3>Yorumlar</h3>
-              {ratings.length === 0 ? <p>Henüz yorum yapılmamış.</p> : (
-                ratings.map((rating) => (
-                  <div key={rating.id} className="rating-item" style={{ borderBottom: '1px solid #eee', padding: '10px 0' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <strong>{rating.userName || 'Kullanıcı'}</strong>
-                      <span>{rating.rating}/5</span>
-                    </div>
-                    <p>{rating.comment || rating.review}</p>
+              
+              {/* Add/Edit Review Form */}
+              {isAuthenticated ? (
+                <form onSubmit={handleReviewSubmit} style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
+                  <h4 style={{ margin: '0 0 10px 0', color: '#333' }}>{editingRatingId ? 'Yorumu Düzenle' : 'Yorum Yap'}</h4>
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ display: 'block', marginBottom: '5px', color: '#555' }}>Puan:</label>
+                    <select 
+                      value={reviewRating} 
+                      onChange={(e) => setReviewRating(Number(e.target.value))}
+                      style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', width: '100px', backgroundColor: '#fff', color: '#333' }}
+                    >
+                      {[5, 4, 3, 2, 1].map(num => (
+                        <option key={num} value={num}>{num} Yıldız</option>
+                      ))}
+                    </select>
                   </div>
-                ))
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ display: 'block', marginBottom: '5px', color: '#555' }}>Yorumunuz:</label>
+                    <textarea 
+                      value={reviewText} 
+                      onChange={(e) => setReviewText(e.target.value)}
+                      style={{ width: '100%', minHeight: '80px', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', backgroundColor: '#fff', color: '#333' }}
+                      placeholder="Ürün hakkındaki düşüncelerinizi paylaşın..."
+                      required
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button type="submit" className="btn btn-primary" disabled={reviewLoading}>
+                      {reviewLoading ? 'Kaydediliyor...' : 'Gönder'}
+                    </button>
+                    {editingRatingId && (
+                      <button type="button" onClick={handleCancelEdit} className="btn" style={{ backgroundColor: '#e0e0e0', color: '#333' }} disabled={reviewLoading}>
+                        İptal
+                      </button>
+                    )}
+                  </div>
+                </form>
+              ) : (
+                <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f0f0f0', borderRadius: '8px', color: '#333' }}>
+                  <p style={{ margin: 0 }}>Yorum yapmak için <Link to="/login" style={{ color: '#007bff' }}>giriş yapmalısınız</Link>.</p>
+                </div>
+              )}
+
+              {ratings.length === 0 ? <p style={{ color: 'black' }}>Henüz yorum yapılmamış.</p> : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                  {ratings.map((rating) => (
+                    <div key={rating.id} className="rating-item" style={{ border: '1px solid #eee', padding: '15px', borderRadius: '8px', backgroundColor: '#fff', color: 'black' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                        <div>
+                          <strong style={{ fontSize: '1.1em', color: '#333' }}>{rating.userName || 'Kullanıcı'}</strong>
+                          <span style={{ marginLeft: '10px', color: '#ffb400' }}>{'★'.repeat(rating.rating)}{'☆'.repeat(5 - rating.rating)}</span>
+                        </div>
+                        {user && rating.userId === user.id && (
+                          <div style={{ display: 'flex', gap: '10px' }}>
+                            <button 
+                              onClick={() => handleEditReview(rating)}
+                              style={{ border: 'none', background: 'none', color: '#007bff', cursor: 'pointer', padding: 0 }}
+                              disabled={reviewLoading}
+                            >
+                              Düzenle
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteReview(rating.id)}
+                              style={{ border: 'none', background: 'none', color: '#dc3545', cursor: 'pointer', padding: 0 }}
+                              disabled={reviewLoading}
+                            >
+                              Sil
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <p style={{ margin: 0, color: '#444', lineHeight: '1.5' }}>{rating.comment || rating.review}</p>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>
