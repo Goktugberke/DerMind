@@ -14,6 +14,7 @@ const auth = getAuth();
 export const LoginScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [errors, setErrors] = useState({
     fullName: '',
     email: '',
@@ -45,11 +46,13 @@ export const LoginScreen = ({ navigation }: any) => {
     }
 
     try {
-
+      setIsLoggingIn(true);
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const { uid } = userCredential.user;
 
-      Alert.alert("Success", "User UID: " + userCredential.user.uid);
+      console.log("Login successful! UID: ", uid);
+      // Removed blocking Alert.alert here so RootNavigator freely changes state
+
 
     } catch (error: any) {
       console.error("Login Error:", error);
@@ -60,12 +63,15 @@ export const LoginScreen = ({ navigation }: any) => {
       }
 
       Alert.alert("Login Failed", errorMessage);
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
   const onGoogleButtonPress = async () => {
 
     try {
+      setIsLoggingIn(true);
       const response = await GoogleSignin.signIn();
       const idToken = response.data?.idToken;
       const googleUser = response.data?.user;
@@ -91,6 +97,8 @@ export const LoginScreen = ({ navigation }: any) => {
       }
     } catch (error) {
       console.error('Google Giriş Hatası:', error);
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -151,7 +159,12 @@ export const LoginScreen = ({ navigation }: any) => {
           </TouchableOpacity>
 
           {/* Login Butonu */}
-          <CustomButton title="Login" onPress={handleLogin} />
+          <CustomButton
+            title="Login"
+            onPress={handleLogin}
+            isLoading={isLoggingIn}
+            disabled={isLoggingIn}
+          />
 
           <View style={styles.dividerContainer}>
             <View style={styles.dividerLine} />
@@ -160,8 +173,9 @@ export const LoginScreen = ({ navigation }: any) => {
           </View>
 
           <TouchableOpacity
-            style={styles.googleButton}
+            style={[styles.googleButton, isLoggingIn && { opacity: 0.7 }]}
             onPress={onGoogleButtonPress}
+            disabled={isLoggingIn}
           >
             <Image
               source={require('@assets/google_logo.png')}
