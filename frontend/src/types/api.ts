@@ -99,6 +99,7 @@ export interface StreakUpdateDTO { usageFrequency?: UsageFrequency; }
 // --- RATING & PURCHASE & NOTIFICATION ---
 export interface RatingResponseDTO {
   id: number;
+  userId: string;
   productId: number;
   rating: number;
   comment?: string;
@@ -106,8 +107,8 @@ export interface RatingResponseDTO {
   review?: string;
   verifiedPurchase?: boolean;
 }
-export interface RatingCreateDTO { productId: number; rating: number; comment?: string; }
-export interface RatingUpdateDTO { rating: number; comment?: string; }
+export interface RatingCreateDTO { userId: string; productId: number; rating: number; review?: string; }
+export interface RatingUpdateDTO { rating: number; review?: string; }
 export interface ProductRatingStatsDTO { averageRating: number; totalRatings: number; }
 
 // --- CART TYPES ---
@@ -233,6 +234,9 @@ export const streakApi = {
 export const ratingApi = {
   getRatingsByProductId: async (id: number) => (await apiClient.get<RatingResponseDTO[]>(`/api/ratings/product/${id}`)).data,
   getProductRatingStats: async (id: number) => (await apiClient.get<ProductRatingStatsDTO>(`/api/ratings/product/${id}/stats`)).data,
+  addRating: async (data: RatingCreateDTO) => (await apiClient.post<RatingResponseDTO>('/api/ratings', data)).data,
+  updateRating: async (id: number, data: RatingUpdateDTO) => (await apiClient.put<RatingResponseDTO>(`/api/ratings/${id}`, data)).data,
+  deleteRating: async (id: number) => await apiClient.delete(`/api/ratings/${id}`),
 };
 
 export const favoriteApi = {
