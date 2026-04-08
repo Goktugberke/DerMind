@@ -11,13 +11,13 @@ import { theme } from '@constants/theme';
 const initialProducts = [
   { id: '1', brand: 'Nivea', name: 'Sun Cream', volume: 40, generalScore: '7.3', aiScore: '8.5', price: '24.95' },
   { id: '2', brand: 'Bioderma', name: 'Sun Cream', volume: 50, generalScore: '9.1', aiScore: '8.9', price: '55.10' },
-  { id: '3', brand: 'La Roche', name: 'Moisturizer', volume: 75, generalScore: '8.2', aiScore: '9.0', price: '32.50' },
-  { id: '4', brand: 'Vichy', name: 'Tonic', volume: 200, generalScore: '7.8', aiScore: '8.4', price: '41.00' },
+  { id: '3', brand: 'La Roche', name: 'Moisturizer', volume: 75, generalScore: '8.2', aiScore: '2.0', price: '32.50' },
+  { id: '4', brand: 'Vichy', name: 'Tonic', volume: 200, generalScore: '3.8', aiScore: '7.4', price: '41.00' },
   { id: '5', brand: 'Garnier', name: 'Face Wash', volume: 150, generalScore: '7.0', aiScore: '7.9', price: '18.90' },
   { id: '6', brand: 'Cerave', name: 'Cleanser', volume: 236, generalScore: '9.3', aiScore: '9.5', price: '64.00' },
-  { id: '7', brand: 'Nivea', name: 'Sun Cream', volume: 40, generalScore: '7.3', aiScore: '8.5', price: '24.95' },
+  { id: '7', brand: 'Nivea', name: 'Sun Cream', volume: 40, generalScore: '4.3', aiScore: '8.5', price: '24.95' },
   { id: '8', brand: 'Bioderma', name: 'Sun Cream', volume: 50, generalScore: '9.1', aiScore: '8.9', price: '55.10' },
-  { id: '9', brand: 'La Roche', name: 'Moisturizer', volume: 75, generalScore: '8.2', aiScore: '9.0', price: '32.50' },
+  { id: '9', brand: 'La Roche', name: 'Moisturizer', volume: 75, generalScore: '8.2', aiScore: '2.0', price: '32.50' },
   { id: '10', brand: 'Vichy', name: 'Tonic', volume: 200, generalScore: '7.8', aiScore: '8.4', price: '41.00' },
   { id: '11', brand: 'Garnier', name: 'Face Wash', volume: 150, generalScore: '7.0', aiScore: '7.9', price: '18.90' },
   { id: '12', brand: 'Cerave', name: 'Cleanser', volume: 236, generalScore: '9.3', aiScore: '9.5', price: '64.00' },
@@ -25,7 +25,7 @@ const initialProducts = [
 
 const HEADER_SCROLL_DISTANCE = 110;
 
-export const HomeScreen = () => {
+export const HomeScreen = ({ navigation }: any) => {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [userName, setUserName] = React.useState('Ayşe');
   const [products, setProducts] = React.useState(initialProducts);
@@ -138,7 +138,31 @@ export const HomeScreen = () => {
         scrollEventThrottle={16}
         data={initialProducts}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <ProductCard item={item} />}
+        renderItem={({ item }) => <ProductCard item={item} onPress={() => navigation.navigate('ProductDetail', {
+          product: {
+            brand: item.brand,
+            name: item.name,
+            description: 'Advanced daily UV fluid with Antioxidant Vitamin C. High protection.', // Mock till actual data
+            rating: parseFloat(item.generalScore),
+            reviewsCount: Math.floor(Math.random() * 500) + 50,
+            price: item.price,
+            aiMatch: {
+              score: Math.floor(Math.random() * 20) + 80, // Random 80-99
+              explanation: 'Highly recommended for your skin profile. Contains no known allergens for you and provides excellent hydration.'
+            },
+            analysis: {
+              score: parseFloat(item.aiScore),
+              safeCount: 13,
+              mediumCount: 3,
+              riskyCount: 10,
+            },
+            ingredients: [
+              { name: 'AQUA / WATER', subName: 'Pure Water', tag: 'Solvent', severity: 'safe' },
+              { name: 'ALCOHOL DENAT.', subName: 'Denatured Alcohol', tag: 'Solvent', severity: 'medium' },
+              { name: 'PHENOXYETHANOL', subName: 'Preservative', tag: 'Antimicrobial', severity: 'risky' },
+            ]
+          }
+        })} />}
         contentContainerStyle={[styles.listPadding, { paddingTop: insets.top + HEADER_SCROLL_DISTANCE + 115 }]}
         showsVerticalScrollIndicator={false}
       />

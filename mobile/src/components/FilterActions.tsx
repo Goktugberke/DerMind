@@ -11,11 +11,11 @@ export const FilterActions = ({ onSort, onFilter }: FilterActionsProps) => {
   return (
     <View style={styles.filterRow}>
       <TouchableOpacity style={styles.filterButton} onPress={onSort} activeOpacity={0.7}>
-        <Text style={styles.filterButtonText}>Sırala</Text>
+        <Text style={styles.filterButtonText}>Sort</Text>
       </TouchableOpacity>
-      
+
       <TouchableOpacity style={styles.filterButton} onPress={onFilter} activeOpacity={0.7}>
-        <Text style={styles.filterButtonText}>Filtrele</Text>
+        <Text style={styles.filterButtonText}>Filter</Text>
       </TouchableOpacity>
     </View>
   );
