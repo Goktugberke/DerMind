@@ -1,9 +1,18 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { theme } from '@constants/theme';
-import { Star } from 'lucide-react-native';
+import { StarRating } from '@components/StarRating';
 
-export const ProductCard = ({ item, onPress }: any) => { // onPress prop'u eklendi
+export const ProductCard = ({ item, onPress }: any) => {
+
+  const getScoreColor = (score: string | number) => {
+    const numScore = parseFloat(score as string);
+    if (isNaN(numScore)) return '#E0E0E0'; // Gray fallback
+    if (numScore < 5) return '#FFA8A8'; // Light Red
+    if (numScore < 8.5) return '#FDE68A'; // Yellow
+    return '#86EFAC'; // Light Green
+  };
+
   return (
     <TouchableOpacity
       style={styles.card}
@@ -19,20 +28,18 @@ export const ProductCard = ({ item, onPress }: any) => { // onPress prop'u eklen
         <Text style={styles.productName}>{item.name} {item.volume}ml</Text>
 
         <View style={styles.starRow}>
-          {[1, 2, 3, 4, 5].map((s) => (
-            <Star key={s} size={14} color={theme.colors.secondary} fill="#ffed4b" />
-          ))}
+          <StarRating score={item.generalScore} outOf={10} size={14} />
         </View>
       </View>
 
       {/* Sağ taraf: Skorlar ve Fiyat */}
       <View style={styles.rightContainer}>
         <View style={styles.scoreRow}>
-          <View style={[styles.scoreBox, { backgroundColor: '#FDE68A' }]}>
+          <View style={[styles.scoreBox, { backgroundColor: getScoreColor(item.generalScore) }]}>
             <Text style={styles.scoreText}>{item.generalScore}</Text>
           </View>
           <Text style={styles.arrow}>→</Text>
-          <View style={[styles.scoreBox, { backgroundColor: '#86EFAC' }]}>
+          <View style={[styles.scoreBox, { backgroundColor: getScoreColor(item.aiScore) }]}>
             <Text style={styles.scoreText}>{item.aiScore}</Text>
           </View>
         </View>

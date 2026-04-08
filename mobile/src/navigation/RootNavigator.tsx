@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { View, ActivityIndicator } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { getApp } from '@react-native-firebase/app';
 import { getAuth, onAuthStateChanged, FirebaseAuthTypes } from '@react-native-firebase/auth';
@@ -7,6 +8,7 @@ import { getAuth, onAuthStateChanged, FirebaseAuthTypes } from '@react-native-fi
 import { LoginScreen } from '@features/auth/LoginScreen';
 import { ForgotPasswordScreen } from '@features/auth/ForgotPasswordScreen';
 import { RegisterScreen } from '@features/auth/RegisterScreen';
+import { ProductDetailScreen } from '@features/product_detail/ProductDetailScreen';
 
 // Tabs
 import { TabNavigator } from './TabNavigator';
@@ -24,22 +26,32 @@ export const RootNavigator = () => {
   }
 
   useEffect(() => {
-
     const authInstance = getAuth(getApp());
     const unsubscribe = onAuthStateChanged(authInstance, (userState) => {
       setUser(userState);
-      if (initializing) setInitializing(false);
+      setInitializing(false);
     });
 
     // Cleanup: Dinleyiciyi temizliyoruz
     return () => unsubscribe();
-  }, [initializing]);
+  }, []);
+
+  if (initializing) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
+        <ActivityIndicator size="large" color="#D81B60" />
+      </View>
+    );
+  }
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {user ? (
         /* KULLANICI GİRİŞ YAPMIŞSA: Sadece Ana Uygulamayı (Tabları) göster */
-        <Stack.Screen name="MainApp" component={TabNavigator} />
+        <>
+          <Stack.Screen name="MainApp" component={TabNavigator} />
+          <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
+        </>
       ) : (
         /* KULLANICI GİRİŞ YAPMAMIŞSA: Sadece Giriş Ekranlarını göster */
         <>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Home, Search, ShoppingBasket, Heart, User } from 'lucide-react-native';
+import { Home, FlaskConical, ShoppingBasket, Heart, User } from 'lucide-react-native';
 import { theme } from '@constants/theme';
 
 //Tabs
@@ -30,29 +30,29 @@ export const TabNavigator = () => {
         headerShown: false,
       }}
     >
-      <Tab.Screen 
-        name="Home" 
-        component={HomeScreen} 
+      <Tab.Screen
+        name="Home"
+        component={HomeScreen}
         options={{ tabBarIcon: ({ color, size }) => <Home color={color} size={size} /> }}
       />
-      <Tab.Screen 
-        name="Products" 
-        component={ProductsScreen} 
-        options={{ tabBarIcon: ({ color, size }) => <Search color={color} size={size} /> }}
+      <Tab.Screen
+        name="Products"
+        component={ProductsScreen}
+        options={{ tabBarIcon: ({ color, size }) => <FlaskConical color={color} size={size} /> }}
       />
-      <Tab.Screen 
-        name="Cart" 
-        component={CartScreen} 
+      <Tab.Screen
+        name="Cart"
+        component={CartScreen}
         options={{ tabBarIcon: ({ color, size }) => <ShoppingBasket color={color} size={size} /> }}
       />
-      <Tab.Screen 
-        name="Favorites" 
-        component={FavoritesScreen} 
+      <Tab.Screen
+        name="Favorites"
+        component={FavoritesScreen}
         options={{ tabBarIcon: ({ color, size }) => <Heart color={color} size={size} /> }}
       />
-      <Tab.Screen 
-        name="Profile" 
-        component={ProfileScreen} 
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
         options={{ tabBarIcon: ({ color, size }) => <User color={color} size={size} /> }}
       />
     </Tab.Navigator>
