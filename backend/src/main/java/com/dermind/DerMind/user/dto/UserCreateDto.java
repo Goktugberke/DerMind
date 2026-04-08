@@ -22,4 +22,3 @@ public class UserCreateDto {
     private String skinType;
     private String picture;
 }
-

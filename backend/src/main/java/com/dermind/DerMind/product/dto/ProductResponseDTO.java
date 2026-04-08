@@ -14,4 +14,6 @@ public class ProductResponseDTO {
     private String brand;
     private String ingredients;
     private Double qualityScore;
+    private Double price;
 }
+

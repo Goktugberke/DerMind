@@ -22,18 +22,10 @@ public class Product {
 
     private String name;
     private String brand;
-    private String ingredients;       // İçerik listesi (örn. "Aloe Vera, Glycerin, ...")
-    private Double qualityScore;      // Malzeme kalitesine göre belirlenen puan (= baseScore)
-    private Double price;             // Fiyat (TL/yerel para birimi)
+    private String ingredients;   // İçerik listesi (örn. "Aloe Vera, Glycerin, ...")
+    private Double qualityScore;  // Malzeme kalitesine göre belirlenen puan
+    private Double price;
 
-    // Sephora kaynaklı ek alanlar
-    @Column(unique = true)
-    private String sephoraProductId;  // Örn: "P476416"
-    private String category;          // Skincare, Makeup, Bath & Body
-    private String secondaryCategory; // Moisturizers, Sunscreen, Cleansers...
-    private Double priceUsd;
-    private Double sephoraRating;     // Sephora kullanıcı puanı (1-5)
-    private Double baseScore;         // AI hesaplamalı temel kalite puanı (1-10)
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL)
     private List<UserProductRating> ratings = new ArrayList<>();
