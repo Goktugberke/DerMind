@@ -50,7 +50,7 @@ export const ProfileScreen = () => {
           <ProfileMenuItem
             label="My orders"
             icon={<ShoppingBag size={22} color={theme.colors.text} />}
-            onPress={() => console.log("Siparişler")}
+            onPress={() => navigation.navigate('Orders')}
           />
           <ProfileMenuItem
             label="My coupons"
