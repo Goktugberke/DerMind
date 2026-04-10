@@ -12,7 +12,6 @@ export const PurchasedProductCard = ({ item, onRate, onStartStreak }: any) => {
         <View style={styles.textContainer}>
           <Text style={styles.brand}>{item.brand}</Text>
           <Text style={styles.productName}>{item.name}</Text>
-          <Text style={styles.statusText}>Durum: {item.orderStatus}</Text>
         </View>
       </View>
 
@@ -20,12 +19,12 @@ export const PurchasedProductCard = ({ item, onRate, onStartStreak }: any) => {
       <View style={styles.actionRow}>
         <TouchableOpacity style={styles.actionButton} onPress={onRate}>
           <MessageSquare size={18} color={theme.colors.primary} />
-          <Text style={styles.actionLabel}>Değerlendir</Text>
+          <Text style={styles.actionLabel}>Rate</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.actionButton, styles.streakButton]} onPress={onStartStreak}>
-          <Flame size={18} color="#FF5722" />
-          <Text style={styles.streakLabel}>Seriye Başla</Text>
+        <TouchableOpacity style={[styles.actionButton, styles.actionButton]} onPress={onStartStreak}>
+          <Flame size={18} color={theme.colors.primary} />
+          <Text style={styles.actionLabel}>Start Streak</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -37,28 +36,40 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 15,
-    marginHorizontal: 20,
-    marginBottom: 15,
+    marginHorizontal: 15,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: '#F1F5F9',
     elevation: 2,
   },
   mainInfo: { flexDirection: 'row', alignItems: 'center' },
-  imagePlaceholder: { width: 60, height: 60, backgroundColor: '#E2E8F0', borderRadius: 12 },
+  imagePlaceholder: { width: 60, height: 60, backgroundColor: '#f4f4f4ff', borderRadius: 12 },
   textContainer: { flex: 1, marginLeft: 15 },
-  brand: { fontSize: 14, fontWeight: 'bold', color: theme.colors.gray },
+  brand: { fontSize: 14, fontWeight: 'bold', color: theme.colors.primary },
   productName: { fontSize: 16, fontWeight: '700', color: theme.colors.text },
-  statusText: { fontSize: 12, color: '#64748B', marginTop: 4 },
   actionRow: {
     flexDirection: 'row',
     marginTop: 15,
     paddingTop: 15,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
   },
-  actionButton: { flexDirection: 'row', alignItems: 'center' },
+  actionButton: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    backgroundColor: '#f4f4f4ff',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 0.5,
+    borderColor: '#efefefff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 1,
+  },
   actionLabel: { marginLeft: 6, fontSize: 14, fontWeight: '600', color: theme.colors.text },
-  streakButton: { backgroundColor: '#FFF5F2', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
-  streakLabel: { marginLeft: 6, fontSize: 14, fontWeight: '600', color: '#FF5722' },
 });
