@@ -10,10 +10,6 @@ interface ProductHeroProps {
 export const ProductHeroCard = ({ name, brand, imageUrl }: ProductHeroProps) => {
     return (
         <View style={styles.container}>
-            {/* Tasarımdaki başlıklar */}
-            <Text style={styles.mainTitle}>New Plan</Text>
-            <Text style={styles.subTitle}>Customize your schedule</Text>
-
             {/* Görsel Kartı */}
             <ImageBackground
                 source={{ uri: 'https://images.unsplash.com/photo-1595295333158-4742f28fbd85?auto=format&fit=crop&q=80&w=200' }}
@@ -33,16 +29,6 @@ export const ProductHeroCard = ({ name, brand, imageUrl }: ProductHeroProps) => 
 const styles = StyleSheet.create({
     container: {
         marginTop: 10,
-    },
-    mainTitle: {
-        fontSize: 22,
-        fontWeight: '700',
-        color: '#1A1A1A',
-    },
-    subTitle: {
-        fontSize: 14,
-        color: '#7C7C7C',
-        marginBottom: 15,
     },
     cardContainer: {
         height: 160,
