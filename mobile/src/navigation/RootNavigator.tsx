@@ -10,6 +10,7 @@ import { ForgotPasswordScreen } from '@features/auth/ForgotPasswordScreen';
 import { RegisterScreen } from '@features/auth/RegisterScreen';
 import { ProductDetailScreen } from '@features/product_detail/ProductDetailScreen';
 import { StartRoutineScreen } from '@features/products/StartRoutineScreen';
+import { RateScreen } from '@features/products/RateScreen';
 
 // Tabs
 import { TabNavigator } from './TabNavigator';
@@ -53,6 +54,7 @@ export const RootNavigator = () => {
           <Stack.Screen name="MainApp" component={TabNavigator} />
           <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
           <Stack.Screen name="StartRoutine" component={StartRoutineScreen} />
+          <Stack.Screen name="RateScreen" component={RateScreen} />
         </>
       ) : (
         /* KULLANICI GİRİŞ YAPMAMIŞSA: Sadece Giriş Ekranlarını göster */

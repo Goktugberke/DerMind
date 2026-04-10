@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, ScrollView, View, SafeAreaView } from 'react-native';
+import { StyleSheet, ScrollView, View, SafeAreaView, Text } from 'react-native';
 import { PageHeader } from '@components/PageHeader';
 import { useRoute } from '@react-navigation/native';
 import { ProductHeroCard } from '@components/ProductHeroCard';
@@ -8,6 +8,7 @@ import { DateInfoCard } from '@components/DateInfoCard';
 import { CustomButton } from '@components/CustomButton';
 import { ExpertTipBox } from '@components/ExpertTipBox';
 import { ReminderRow } from '@components/ReminderRow';
+import { theme } from '@constants/theme';
 
 export const StartRoutineScreen = () => {
 
@@ -53,11 +54,15 @@ export const StartRoutineScreen = () => {
         showBackButton={true}
       />
 
+
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
+        {/* Tasarımdaki başlıklar */}
+        <Text style={styles.mainTitle}>New Plan</Text>
+        <Text style={styles.subTitle}>Customize your schedule</Text>
         {/* 2. New Plan & Product Card Bölümü buraya gelecek */}
         <View style={styles.section}>
           <ProductHeroCard
@@ -116,11 +121,20 @@ export const StartRoutineScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.deepbackground,
   },
   container: {
     flex: 1,
     backgroundColor: '#F8F9FA', // Sayfa arka planı hafif gri tonlu (mockup'taki gibi)
+  },
+  mainTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1A1A1A',
+  },
+  subTitle: {
+    fontSize: 14,
+    color: '#7C7C7C',
   },
   contentContainer: {
     paddingHorizontal: 20,
