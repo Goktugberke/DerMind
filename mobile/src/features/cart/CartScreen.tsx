@@ -1,21 +1,21 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
-  SafeAreaView, 
-  TouchableOpacity, 
-  Image, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  SafeAreaView,
+  TouchableOpacity,
+  Image,
   TextInput,
   StatusBar,
   LayoutAnimation,
   Platform,
   UIManager,
 } from 'react-native';
-import { 
-  ShoppingBag, Trash2, Plus, Minus, ChevronUp, ChevronDown, 
-  Ticket, X, MapPin, ChevronRight 
+import {
+  ShoppingBag, Trash2, Plus, Minus, ChevronUp, ChevronDown,
+  Ticket, X, MapPin, ChevronRight
 } from 'lucide-react-native';
 import { theme } from '@constants/theme';
 import { CustomButton } from '@components/CustomButton'; // İŞTE BURADA!
@@ -34,7 +34,7 @@ export const CartScreen = ({ navigation }: any) => {
     { id: '1', name: 'Effaclar Gel', brand: 'La Roche Posay', price: 250.00, quantity: 1, image: 'https://via.placeholder.com/100' },
     { id: '2', name: 'Moisturizing Cream', brand: 'CeraVe', price: 320.00, quantity: 1, image: 'https://via.placeholder.com/100' },
   ]);
-  
+
   const [selectedAddress, setSelectedAddress] = useState(dummyAddresses[0]);
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
@@ -75,13 +75,14 @@ export const CartScreen = ({ navigation }: any) => {
   };
 
   const handleCheckout = () => {
-    setIsProcessing(true);
-    // API SİMÜLASYONU: 2 saniye sonra ödeme başarılı mesajı
-    setTimeout(() => {
-      setIsProcessing(false);
-      console.log("Ödeme Başarılı!");
-      // navigation.navigate('SuccessScreen'); 
-    }, 2000);
+    navigation.navigate('Checkout', {
+      subtotal: subtotal,
+      shipping: shipping,
+      total: total,
+      items: cartItems,
+      appliedCoupon: appliedCoupon, // "HELLO50" gibi kupon ismi
+      discount: discount            // 50.00 gibi sayısal değer
+    });
   };
 
   // --- BİLEŞENLER ---
@@ -93,7 +94,7 @@ export const CartScreen = ({ navigation }: any) => {
           <Text style={styles.changeText}>Change</Text>
         </TouchableOpacity>
       </View>
-      
+
       <TouchableOpacity style={styles.addressCard} activeOpacity={0.7}>
         <View style={styles.addressIconWrapper}>
           <MapPin size={20} color={theme.colors.primary} />
@@ -110,7 +111,7 @@ export const CartScreen = ({ navigation }: any) => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      
+
       <View style={styles.headerContainer}>
         <View style={styles.titleSection}>
           <Text style={styles.headerTitle}>My Cart</Text>
@@ -151,7 +152,7 @@ export const CartScreen = ({ navigation }: any) => {
                 <Text style={styles.sectionTitle}>Promo Code</Text>
                 <View style={styles.couponInputWrapper}>
                   <Ticket size={20} color={theme.colors.gray} style={{ marginLeft: 10 }} />
-                  <TextInput 
+                  <TextInput
                     style={styles.couponInput}
                     placeholder="Enter code"
                     value={couponCode}
@@ -168,13 +169,13 @@ export const CartScreen = ({ navigation }: any) => {
           {/* GENİŞLEYEN FOOTER */}
           <View style={[styles.summaryFooter, isSummaryExpanded && styles.summaryExpanded]}>
             <TouchableOpacity onPress={toggleSummary} activeOpacity={0.9} style={styles.summaryHeader}>
-               <View style={styles.totalSummaryRow}>
-                 <Text style={styles.totalLabel}>Total Amount</Text>
-                 <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                    <Text style={styles.totalValue}>{total.toFixed(2)} TL</Text>
-                    {isSummaryExpanded ? <ChevronDown size={20} color={theme.colors.text} /> : <ChevronUp size={20} color={theme.colors.text} />}
-                 </View>
-               </View>
+              <View style={styles.totalSummaryRow}>
+                <Text style={styles.totalLabel}>Total Amount</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={styles.totalValue}>{total.toFixed(2)} TL</Text>
+                  {isSummaryExpanded ? <ChevronDown size={20} color={theme.colors.text} /> : <ChevronUp size={20} color={theme.colors.text} />}
+                </View>
+              </View>
             </TouchableOpacity>
 
             {isSummaryExpanded && (
@@ -182,14 +183,14 @@ export const CartScreen = ({ navigation }: any) => {
                 <View style={styles.detailRow}><Text style={styles.detailLabel}>Subtotal</Text><Text style={styles.detailValue}>{subtotal.toFixed(2)} TL</Text></View>
                 <View style={styles.detailRow}><Text style={styles.detailLabel}>Shipping</Text><Text style={styles.detailValue}>{shipping === 0 ? 'Free' : `${shipping} TL`}</Text></View>
                 {appliedCoupon && (
-                   <View style={styles.detailRow}><Text style={[styles.detailLabel, {color: '#22C55E'}]}>Discount</Text><Text style={[styles.detailValue, {color: '#22C55E'}]}>-50.00 TL</Text></View>
+                  <View style={styles.detailRow}><Text style={[styles.detailLabel, { color: '#22C55E' }]}>Discount</Text><Text style={[styles.detailValue, { color: '#22C55E' }]}>-50.00 TL</Text></View>
                 )}
                 <View style={styles.divider} />
-                
+
                 {/* CUSTOM BUTTON KULLANIMI 1: ÖDEME BUTONU */}
-                <CustomButton 
-                  title="Confirm and Pay" 
-                  onPress={handleCheckout} 
+                <CustomButton
+                  title="Confirm and Pay"
+                  onPress={handleCheckout}
                   isLoading={isProcessing}
                 />
               </View>
@@ -200,11 +201,11 @@ export const CartScreen = ({ navigation }: any) => {
         <View style={styles.emptyContainer}>
           <ShoppingBag size={80} color={theme.colors.gray} strokeWidth={1} />
           <Text style={styles.emptyTitle}>Your cart is empty</Text>
-          
+
           {/* CUSTOM BUTTON KULLANIMI 2: BOŞ SEPET BUTONU */}
-          <CustomButton 
-            title="Alışverişe Başla" 
-            onPress={() => navigation.navigate('Home')} 
+          <CustomButton
+            title="Alışverişe Başla"
+            onPress={() => navigation.navigate('Home')}
           />
         </View>
       )}
@@ -269,7 +270,7 @@ const styles = StyleSheet.create({
   detailLabel: { color: theme.colors.gray, fontSize: 14 },
   detailValue: { fontWeight: '500', fontSize: 14 },
   divider: { height: 1, backgroundColor: '#F1F5F9', marginVertical: 12 },
-  summaryExpanded: { },
+  summaryExpanded: {},
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   emptyTitle: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text, marginTop: 15, marginBottom: 20 },
 });

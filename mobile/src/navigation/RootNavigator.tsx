@@ -11,6 +11,7 @@ import { RegisterScreen } from '@features/auth/RegisterScreen';
 import { ProductDetailScreen } from '@features/product_detail/ProductDetailScreen';
 import { StartRoutineScreen } from '@features/products/StartRoutineScreen';
 import { RateScreen } from '@features/products/RateScreen';
+import { CheckoutScreen } from '@features/cart/CheckoutScreen';
 
 // Tabs
 import { TabNavigator } from './TabNavigator';
@@ -55,6 +56,7 @@ export const RootNavigator = () => {
           <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
           <Stack.Screen name="StartRoutine" component={StartRoutineScreen} />
           <Stack.Screen name="RateScreen" component={RateScreen} />
+          <Stack.Screen name="Checkout" component={CheckoutScreen} />
         </>
       ) : (
         /* KULLANICI GİRİŞ YAPMAMIŞSA: Sadece Giriş Ekranlarını göster */
