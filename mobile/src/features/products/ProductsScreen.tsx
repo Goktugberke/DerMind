@@ -132,7 +132,9 @@ export const ProductsScreen = () => {
         renderItem={({ item }) => (
           <PurchasedProductCard
             item={item}
-            onRate={() => console.log("Yorum yap: POST /api/ratings")} //
+            onRate={() => {
+              navigation.navigate('RateScreen', { product: item });
+            }}
             onStartStreak={() => {
               navigation.navigate('StartRoutine', { product: item });
             }}
