@@ -4,9 +4,11 @@ import { getAuth } from '@react-native-firebase/auth';
 import { Bell, MessageCircle, Settings, ShoppingBag, CreditCard, LogOut, Sparkles } from 'lucide-react-native';
 import { ProfileMenuItem } from '@components/ProfileMenuItem';
 import { theme } from '@constants/theme';
+import { useNavigation } from '@react-navigation/native';
 
 export const ProfileScreen = () => {
   const authInstance = getAuth();
+  const navigation = useNavigation<any>();
 
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [
@@ -40,31 +42,31 @@ export const ProfileScreen = () => {
 
         {/* Menü Listesi */}
         <View style={styles.menuSection}>
-          <ProfileMenuItem 
-            label="My skin type" 
-            icon={<Sparkles size={22} color={theme.colors.primary} />} 
-            onPress={() => console.log("Cilt Tipi")} 
+          <ProfileMenuItem
+            label="My skin type"
+            icon={<Sparkles size={22} color={theme.colors.primary} />}
+            onPress={() => navigation.navigate('SkinProfile')}
           />
-          <ProfileMenuItem 
-            label="My orders" 
-            icon={<ShoppingBag size={22} color={theme.colors.text} />} 
-            onPress={() => console.log("Siparişler")} 
+          <ProfileMenuItem
+            label="My orders"
+            icon={<ShoppingBag size={22} color={theme.colors.text} />}
+            onPress={() => console.log("Siparişler")}
           />
-          <ProfileMenuItem 
-            label="My coupons" 
-            icon={<CreditCard size={22} color={theme.colors.text} />} 
-            onPress={() => console.log("Kuponlar")} 
+          <ProfileMenuItem
+            label="My coupons"
+            icon={<CreditCard size={22} color={theme.colors.text} />}
+            onPress={() => console.log("Kuponlar")}
           />
-          <ProfileMenuItem 
-            label="Settings" 
-            icon={<Settings size={22} color={theme.colors.text} />} 
-            onPress={() => console.log("Ayarlar")} 
+          <ProfileMenuItem
+            label="Settings"
+            icon={<Settings size={22} color={theme.colors.text} />}
+            onPress={() => console.log("Ayarlar")}
           />
-          <ProfileMenuItem 
-            label="Logout" 
-            isLogout 
-            icon={<LogOut size={22} color={theme.colors.text} />} 
-            onPress={handleLogout} 
+          <ProfileMenuItem
+            label="Logout"
+            isLogout
+            icon={<LogOut size={22} color={theme.colors.text} />}
+            onPress={handleLogout}
           />
         </View>
       </ScrollView>
@@ -73,9 +75,9 @@ export const ProfileScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#FFFFFF' 
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF'
   },
   header: {
     flexDirection: 'row',
