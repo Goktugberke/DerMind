@@ -51,13 +51,13 @@ export const OrdersScreen = () => {
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#FFFFFF' },
+    container: { flex: 1, backgroundColor: theme.colors.deepbackground },
     scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
     listHeader: { marginTop: 10, marginBottom: 20 },
     title: { fontSize: 24, fontWeight: 'bold', color: '#1E293B' },
     subtitle: { fontSize: 14, color: '#64748B', marginTop: 4 },
     filterScroll: { flexDirection: 'row', marginTop: 20 },
-    filterChip: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F8F9FA', marginRight: 10, borderWidth: 1, borderColor: '#F1F5F9' },
+    filterChip: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20, backgroundColor: '#FFF', marginRight: 10, borderWidth: 1, borderColor: '#F1F5F9' },
     filterText: { fontSize: 14, fontWeight: '600', color: '#64748B' },
     endText: { textAlign: 'center', color: '#94A3B8', fontSize: 10, letterSpacing: 1, fontWeight: '700' }
 });
