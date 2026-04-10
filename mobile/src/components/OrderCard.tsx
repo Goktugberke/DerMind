@@ -3,9 +3,22 @@ import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { Box } from 'lucide-react-native';
 import { StatusBadge } from './StatusBadge';
 import { theme } from '@constants/theme';
+import { useNavigation } from '@react-navigation/native';
 
 export const OrderCard = ({ item }: any) => {
     const isDelivered = item.status === 'Delivered';
+    const navigation = useNavigation<any>();
+
+
+    const handleActionPress = () => {
+        if (!isDelivered) {
+            // Eğer teslim edilmemişse 'TrackOrder' sayfasına git ve ürün bilgisini taşı
+            navigation.navigate('TrackOrder', { order: item });
+        } else {
+            // Eğer teslim edilmişse 'Buy Again' (Sepete ekleme mantığı vb.)
+            console.log("Tekrar satın al:", item.id);
+        }
+    };
 
     return (
         <View style={styles.card}>
@@ -29,7 +42,8 @@ export const OrderCard = ({ item }: any) => {
             <View style={styles.buttonRow}>
 
                 <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: isDelivered ? theme.colors.secondary : theme.colors.primary }]}
+                    style={[styles.actionBtn, { backgroundColor: isDelivered ? theme.colors.primary : theme.colors.secondary }]}
+                    onPress={handleActionPress}
                 >
                     {isDelivered ? null : <Box size={18} color="#FFF" style={{ marginRight: 6 }} />}
                     <Text style={styles.actionBtnText}>{isDelivered ? 'Buy Again' : 'Track Order'}</Text>
