@@ -15,6 +15,7 @@ import { CheckoutScreen } from '@features/cart/CheckoutScreen';
 import { SkinProfileScreen } from '@features/profile/SkinProfileScreen';
 import { OrdersScreen } from '@features/profile/OrdersScreen';
 import { TrackOrderScreen } from '@features/profile/TrackOrderScreen';
+import { CouponsScreen } from '@features/profile/CouponsScreen';
 
 // Tabs
 import { TabNavigator } from './TabNavigator';
@@ -63,6 +64,7 @@ export const RootNavigator = () => {
           <Stack.Screen name="SkinProfile" component={SkinProfileScreen} />
           <Stack.Screen name="Orders" component={OrdersScreen} />
           <Stack.Screen name="TrackOrder" component={TrackOrderScreen} />
+          <Stack.Screen name="Coupons" component={CouponsScreen} />
         </>
       ) : (
         /* KULLANICI GİRİŞ YAPMAMIŞSA: Sadece Giriş Ekranlarını göster */

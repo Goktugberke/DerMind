@@ -18,6 +18,7 @@ import {
   Ticket, X, MapPin, ChevronRight
 } from 'lucide-react-native';
 import { theme } from '@constants/theme';
+import { PageHeader } from '@components/PageHeader';
 import { CustomButton } from '@components/CustomButton'; // İŞTE BURADA!
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -112,11 +113,12 @@ export const CartScreen = ({ navigation }: any) => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
 
-      <View style={styles.headerContainer}>
-        <View style={styles.titleSection}>
-          <Text style={styles.headerTitle}>My Cart</Text>
-        </View>
-      </View>
+      <PageHeader
+        title="Cart"
+        fontSize={24}
+        fontWeight="400"
+        align="center"
+      />
 
       {cartItems.length > 0 ? (
         <>
