@@ -119,6 +119,21 @@ public class ProductController {
     }
 
     /**
+     * Filter products with multiple criteria
+     * GET /api/products/filter?query={q}&minPrice={min}&maxPrice={max}&minQuality={quality}
+     */
+    @GetMapping("/filter")
+    public ResponseEntity<Page<ProductResponseDTO>> filterProducts(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) Double minPrice,
+            @RequestParam(required = false) Double maxPrice,
+            @RequestParam(required = false) Double minQuality,
+            Pageable pageable) {
+        Page<ProductResponseDTO> products = productService.filterProducts(query, minPrice, maxPrice, minQuality, pageable);
+        return ResponseEntity.ok(products);
+    }
+
+    /**
      * Get products by minimum quality score
      * GET /api/products/quality?min={minScore}
      */

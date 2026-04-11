@@ -71,10 +71,19 @@ export interface ProductDetailDTO extends ProductResponseDTO {
   averageUserRating?: number;
   totalRatings?: number;
   totalPurchases?: number;
+  personalScore?: number;
 }
 export interface ProductCreateDTO { name: string; brand: string; price: number; }
 export type ProductUpdateDTO = Partial<ProductCreateDTO>;
-export interface ProductRecommendationDTO { products: ProductResponseDTO[]; reason: string; }
+export interface ProductRecommendationDTO {
+  id: number;
+  name: string;
+  brand: string;
+  qualityScore: number;
+  matchScore: number;
+  recommendation: string;
+  reason: string;
+}
 
 // --- FAVORITE TYPES ---
 export interface FavoriteResponseDTO {
@@ -229,10 +238,21 @@ export const userApi = {
 
 export const productApi = {
   getProductById: async (id: number) => (await apiClient.get<ProductDetailDTO>(`/api/products/${id}`)).data,
-  getAllProducts: async () => (await apiClient.get<ProductResponseDTO[]>('/api/products')).data,
-  searchProducts: async (query: string) =>
-    (await apiClient.get<ProductResponseDTO[]>(`/api/products/search?q=${query}`)).data,
+  getAllProducts: async (page = 0, size = 12, sort = 'qualityScore,desc') =>
+    (await apiClient.get<PageResponse<ProductResponseDTO>>(`/api/products?page=${page}&size=${size}&sort=${sort}`)).data,
+  searchProducts: async (query: string, page = 0, size = 12) =>
+    (await apiClient.get<PageResponse<ProductResponseDTO>>(`/api/products/search?query=${query}&page=${page}&size=${size}`)).data,
+  filterProducts: async (params: { query?: string; minPrice?: number; maxPrice?: number; minQuality?: number; page?: number; size?: number; sort?: string }) => {
+    const { query, minPrice, maxPrice, minQuality, page = 0, size = 12, sort = 'qualityScore,desc' } = params;
+    let url = `/api/products/filter?page=${page}&size=${size}&sort=${sort}`;
+    if (query) url += `&query=${encodeURIComponent(query)}`;
+    if (minPrice !== undefined) url += `&minPrice=${minPrice}`;
+    if (maxPrice !== undefined) url += `&maxPrice=${maxPrice}`;
+    if (minQuality !== undefined) url += `&minQuality=${minQuality}`;
+    return (await apiClient.get<PageResponse<ProductResponseDTO>>(url)).data;
+  },
   getTopQualityProducts: async (limit = 10) => (await apiClient.get<ProductDetailDTO[]>(`/api/products/top/quality?limit=${limit}`)).data,
+  getRecommendationsForUser: async (userId: string) => (await apiClient.get<ProductRecommendationDTO[]>(`/api/products/recommendations/${userId}`)).data,
 };
 
 export const streakApi = {

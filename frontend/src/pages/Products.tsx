@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { addToCartAsync } from '../store/slices/cartSlice';
@@ -6,7 +6,7 @@ import type { Product } from '../store/slices/cartSlice';
 import SearchBar from '../components/SearchBar';
 import ProductFilters from '../components/ProductFilters';
 import { productApi, favoriteApi } from '../types/api';
-import type { ProductResponseDTO } from '../types/api';
+import type { ProductResponseDTO, PageResponse } from '../types/api';
 
 // Convert ProductResponseDTO to Product (for cart)
 const convertToProduct = (dto: ProductResponseDTO): Product => {
@@ -49,53 +49,105 @@ const Products = () => {
     skinType: '',
     sortBy: 'rating-desc',
   });
+  
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const pageRef = useRef(0);
+  const loader = useRef<HTMLDivElement>(null);
+  
   const dispatch = useAppDispatch();
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
 
-  // Reset when sort or search changes
+  // Map sortBy to backend sort string
+  const getSortString = (sortBy: string) => {
+    switch (sortBy) {
+      case 'rating-desc': return 'qualityScore,desc';
+      case 'rating-asc': return 'qualityScore,asc';
+      case 'price-desc': return 'price,desc';
+      case 'price-asc': return 'price,asc';
+      default: return 'qualityScore,desc';
+    }
+  };
+
+  // Reset when sort or search or filters change
   useEffect(() => {
     setProducts([]);
+    pageRef.current = 0;
+    setHasMore(true);
     const query = searchParams.get('search') || '';
     setSearchQuery(query);
-  }, [searchParams, filters.sortBy]);
+  }, [searchParams, filters.sortBy, filters.minPrice, filters.maxPrice, filters.minRating]);
 
   // Fetch products from API
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
+  const fetchProducts = useCallback(async (pageNum: number, isInitial = false) => {
+    if (!hasMore && !isInitial) return;
+
+    try {
+      if (isInitial) {
         setLoading(true);
-        setError(null);
-        let data: ProductResponseDTO[];
-
-        if (searchQuery) {
-          data = await productApi.searchProducts(searchQuery);
-        } else {
-          data = await productApi.getAllProducts();
-        }
-
-        const convertedProducts = data.map(convertToProduct);
-        
-        // Apply client-side sorting based on filters.sortBy
-        const sorted = [...convertedProducts].sort((a, b) => {
-          if (filters.sortBy === 'rating-desc') return (b.rating || 0) - (a.rating || 0);
-          if (filters.sortBy === 'rating-asc') return (a.rating || 0) - (b.rating || 0);
-          if (filters.sortBy === 'price-desc') return (b.price || 0) - (a.price || 0);
-          if (filters.sortBy === 'price-asc') return (a.price || 0) - (b.price || 0);
-          return 0;
-        });
-
-        setProducts(sorted);
-      } catch (err) {
-        setError('Ürünler yüklenirken bir hata oluştu');
-        console.error('Error fetching products:', err);
-      } finally {
-        setLoading(false);
+      } else {
+        setLoadingMore(true);
       }
-    };
+      
+      setError(null);
+      
+      const response: PageResponse<ProductResponseDTO> = await productApi.filterProducts({
+        query: searchQuery,
+        minPrice: filters.minPrice > 0 ? filters.minPrice : undefined,
+        maxPrice: filters.maxPrice < 1000 ? filters.maxPrice : undefined,
+        minQuality: filters.minRating > 0 ? filters.minRating * 2 : undefined, // Convert 5-star back to 0-10
+        page: pageNum,
+        size: 12,
+        sort: getSortString(filters.sortBy)
+      });
 
-    fetchProducts();
-  }, [searchQuery, filters.sortBy]);
+      const convertedProducts = response.content.map(convertToProduct);
+      
+      if (isInitial) {
+        setProducts(convertedProducts);
+      } else {
+        setProducts(prev => [...prev, ...convertedProducts]);
+      }
+      
+      setHasMore(response.number + 1 < response.totalPages);
+    } catch (err) {
+      setError('Ürünler yüklenirken bir hata oluştu');
+      console.error('Error fetching products:', err);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [searchQuery, filters, hasMore]);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchProducts(0, true);
+  }, [fetchProducts, searchQuery, filters.sortBy, filters.minPrice, filters.maxPrice, filters.minRating]);
+
+  // Loader Intersection Observer
+  const handleObserver = useCallback((entries: IntersectionObserverEntry[]) => {
+    const target = entries[0];
+    if (target.isIntersecting && hasMore && !loading && !loadingMore) {
+      pageRef.current += 1;
+      fetchProducts(pageRef.current);
+    }
+  }, [hasMore, loading, loadingMore, fetchProducts]);
+
+  useEffect(() => {
+    const loadingRef = loader.current;
+    const option = {
+      root: null,
+      rootMargin: '20px',
+      threshold: 0
+    };
+    const observer = new IntersectionObserver(handleObserver, option);
+    if (loadingRef) observer.observe(loadingRef);
+    
+    return () => {
+      if (loadingRef) observer.unobserve(loadingRef);
+    };
+  }, [handleObserver]);
 
   // Fetch Favorites
   useEffect(() => {
@@ -143,27 +195,10 @@ const Products = () => {
     }
   };
 
-  // Apply basic client-side filtering (Rating & Price)
+  // Server-side filtering is used now, client-side filtering removed
   useEffect(() => {
-    let result = [...products];
-
-    // Filter by Price
-    if (filters.minPrice > 0) {
-      result = result.filter((product) => product.price >= filters.minPrice);
-    }
-    if (filters.maxPrice < 1000) {
-      result = result.filter((product) => product.price <= filters.maxPrice);
-    }
-
-    // Filter by Rating (5-star scale)
-    if (filters.minRating > 0) {
-      result = result.filter(
-        (product) => ((product.rating || 0) / 2) >= filters.minRating
-      );
-    }
-
-    setFilteredProducts(result);
-  }, [products, filters.minPrice, filters.maxPrice, filters.minRating]);
+    setFilteredProducts(products);
+  }, [products]);
 
   const handleSearch = (query: string) => {
     if (query.trim()) {
@@ -300,6 +335,12 @@ const Products = () => {
             ))}
           </div>
         )}
+        
+        {/* Infinite Scroll Loader */}
+        <div ref={loader} className="scroll-loader" style={{ height: '50px', display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '20px' }}>
+          {loadingMore && <p>Daha fazla ürün yükleniyor...</p>}
+          {!hasMore && products.length > 0 && <p>Tüm ürünler yüklendi.</p>}
+        </div>
       </div>
     </div>
   );

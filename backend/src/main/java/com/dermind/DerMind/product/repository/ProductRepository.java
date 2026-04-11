@@ -41,4 +41,19 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query("SELECT p FROM Product p LEFT JOIN p.purchases pur " +
             "GROUP BY p.id ORDER BY COUNT(pur.id) DESC")
     Page<Product> findMostPurchasedProducts(Pageable pageable);
+
+    // ⭐ GELİŞMİŞ FİLTRELEME: Arama, Fiyat ve Kalite filtrelerini tek seferde yapar
+    @Query("SELECT p FROM Product p WHERE " +
+           "(:searchTerm IS NULL OR :searchTerm = '' OR " +
+           "LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+           "OR LOWER(p.brand) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) AND " +
+           "(:minPrice IS NULL OR p.price >= :minPrice) AND " +
+           "(:maxPrice IS NULL OR p.price <= :maxPrice) AND " +
+           "(:minQuality IS NULL OR p.qualityScore >= :minQuality)")
+    Page<Product> filterProducts(
+        @Param("searchTerm") String searchTerm,
+        @Param("minPrice") Double minPrice,
+        @Param("maxPrice") Double maxPrice,
+        @Param("minQuality") Double minQuality,
+        Pageable pageable);
 }

@@ -10,11 +10,11 @@ export interface Product {
   id: string | number;
   name: string;
   brand?: string;
-  category?: string;
   price: number;
   image?: string;
   description?: string;
   rating?: number;
+  category?: string;
 }
 
 export interface CartItem extends Product {

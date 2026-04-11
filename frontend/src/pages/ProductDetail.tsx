@@ -56,16 +56,20 @@ const ProductDetail = () => {
   const [routineLoading, setRoutineLoading] = useState(false);
 
   const calculateMLScore = useCallback((productData: ProductDetailDTO) => {
-    // Quality score mapping to 0-100
-    const mlScore = productData.qualityScore ?? 0;
+    // Quality score mapping to 0-100 baseline
+    const qualityBase = (productData.qualityScore ?? 0) * 10;
+    
+    // AI Personalized score (0-100)
+    // Backend/AI returns 1-10, so we scale it.
+    const personalScore = productData.personalScore ? (productData.personalScore * 10) : qualityBase;
 
     setScore({
-      overallScore: mlScore * 10,
-      skinTypeMatch: mlScore > 7 ? 90 : 60,
-      allergySafe: 100,
-      ingredientQuality: (productData.qualityScore || 0) * 10,
+      overallScore: personalScore,
+      skinTypeMatch: productData.personalScore ? (productData.personalScore > 7 ? 95 : 75) : (productData.qualityScore && productData.qualityScore > 7 ? 90 : 60),
+      allergySafe: 100, // This is calculated by backend usually but for now placeholder
+      ingredientQuality: qualityBase,
       userRating: (productData.averageUserRating || 5.0) * 20,
-      mlScore: mlScore * 10,
+      mlScore: personalScore,
     });
   }, []);
 
