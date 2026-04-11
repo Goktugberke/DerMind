@@ -11,10 +11,11 @@ const convertToProduct = (dto: ProductDetailDTO): Product => {
   return {
     id: dto.id.toString(),
     name: dto.name,
+    brand: dto.brand,
     price: mockPrice,
     description: dto.ingredients || '',
     rating: dto.averageUserRating || dto.qualityScore || 0,
-    image: undefined
+    image: dto.imageUrl
   };
 };
 
@@ -33,7 +34,6 @@ const ProductDetail = () => {
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
-  const authLoading = useAppSelector((state) => state.auth.loading);
 
   const [product, setProduct] = useState<Product | null>(null);
   const [productDetail, setProductDetail] = useState<ProductDetailDTO | null>(null);
@@ -55,9 +55,9 @@ const ProductDetail = () => {
   const [usageTimes, setUsageTimes] = useState<string[]>(['08:00']);
   const [routineLoading, setRoutineLoading] = useState(false);
 
-  const calculateScoreFromDTO = useCallback((productData: ProductDetailDTO) => {
-    // The backend now guarantees personalScore is populated (defaults to qualityScore)
-    const mlScore = productData.personalScore ?? 0;
+  const calculateMLScore = useCallback((productData: ProductDetailDTO) => {
+    // Quality score mapping to 0-100
+    const mlScore = productData.qualityScore ?? 0;
 
     setScore({
       overallScore: mlScore * 10,
@@ -106,8 +106,7 @@ const ProductDetail = () => {
           } catch (e) { console.error("Favorite check error", e); }
         }
 
-        calculateScoreFromDTO(productData);
-        console.log(`[ProductDetail] Score details - Personal: ${productData.personalScore}, Quality: ${productData.qualityScore}`);
+        calculateMLScore(productData);
       } catch (err) {
         console.error("Fetch product error", err);
         setError('Ürün yüklenirken bir hata oluştu');
@@ -118,14 +117,14 @@ const ProductDetail = () => {
 
     // Strict Auth Sync: Wait if we suspect the user is logged in but profile hasn't loaded yet
     const hasLoginHint = localStorage.getItem('isLoggedIn') === 'true';
-    const shouldWait = authLoading || (hasLoginHint && !user);
+    const shouldWait = (hasLoginHint && !user);
 
     if (shouldWait) {
       return;
     }
 
     fetchProduct();
-  }, [id, user, calculateScoreFromDTO, isAuthenticated, authLoading]);
+  }, [id, user, calculateMLScore, isAuthenticated]);
 
   const handleAddToRoutine = async () => {
     if (!isAuthenticated) {
@@ -269,9 +268,6 @@ const ProductDetail = () => {
               <div className="product-scoring" style={{ marginTop: '15px', padding: '15px', backgroundColor: '#f3f4f6', borderRadius: '12px' }}>
                 <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1em', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   ML Analizi
-                  {productDetail?.personalScore !== productDetail?.qualityScore && (
-                    <small style={{ fontWeight: 'normal', color: '#6b7280' }}>(Sana Özel)</small>
-                  )}
                 </h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                   <div className="score-main" style={{

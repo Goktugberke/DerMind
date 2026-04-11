@@ -9,6 +9,8 @@ import type { RootState } from '../store';
 export interface Product {
   id: string | number;
   name: string;
+  brand?: string;
+  category?: string;
   price: number;
   image?: string;
   description?: string;

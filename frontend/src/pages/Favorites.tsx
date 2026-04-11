@@ -11,6 +11,7 @@ const convertToProduct = (dto: ProductResponseDTO): Product => {
   return {
     id: dto.id.toString(),
     name: dto.name,
+    brand: dto.brand,
     price: mockPrice,
     description: dto.ingredients || 'Cilt dostu içerik',
     rating: dto.qualityScore || 0,
