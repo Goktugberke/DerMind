@@ -6,8 +6,7 @@ import type { Product } from '../store/slices/cartSlice';
 import SearchBar from '../components/SearchBar';
 import ProductFilters from '../components/ProductFilters';
 import { productApi, favoriteApi } from '../types/api';
-import type { ProductResponseDTO, PageResponse } from '../types/api';
-import { useRef, useCallback } from 'react';
+import type { ProductResponseDTO } from '../types/api';
 
 // Convert ProductResponseDTO to Product (for cart)
 const convertToProduct = (dto: ProductResponseDTO): Product => {
@@ -21,8 +20,7 @@ const convertToProduct = (dto: ProductResponseDTO): Product => {
     description: dto.ingredients || '',
     rating: dto.qualityScore || 0,
     category: dto.category,
-    secondaryCategory: dto.secondaryCategory,
-    image: undefined,
+    image: dto.imageUrl,
   };
 };
 
@@ -41,21 +39,7 @@ const Products = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  const observer = useRef<IntersectionObserver | null>(null);
-  const lastProductElementRef = useCallback((node: HTMLDivElement) => {
-    if (loading) return;
-    if (observer.current) observer.current.disconnect();
-    observer.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && hasMore) {
-        setPage(prevPage => prevPage + 1);
-      }
-    });
-    if (node) observer.current.observe(node);
-  }, [loading, hasMore]);
 
   const [filters, setFilters] = useState<FilterOptions>({
     minPrice: 0,
@@ -72,22 +56,9 @@ const Products = () => {
   // Reset when sort or search changes
   useEffect(() => {
     setProducts([]);
-    setPage(0);
-    setHasMore(true);
     const query = searchParams.get('search') || '';
     setSearchQuery(query);
   }, [searchParams, filters.sortBy]);
-
-  // Map sortBy to backend sort string
-  const getSortString = (sortBy: string) => {
-    switch (sortBy) {
-      case 'rating-desc': return 'qualityScore,desc';
-      case 'rating-asc': return 'qualityScore,asc';
-      case 'price-desc': return 'price,desc';
-      case 'price-asc': return 'price,asc';
-      default: return 'qualityScore,desc';
-    }
-  };
 
   // Fetch products from API
   useEffect(() => {
@@ -95,22 +66,26 @@ const Products = () => {
       try {
         setLoading(true);
         setError(null);
-        let productsPage: PageResponse<ProductResponseDTO>;
-        const sortString = getSortString(filters.sortBy);
+        let data: ProductResponseDTO[];
 
         if (searchQuery) {
-          productsPage = await productApi.searchProducts(searchQuery, page, 20, sortString);
+          data = await productApi.searchProducts(searchQuery);
         } else {
-          productsPage = await productApi.getAllProducts(page, 20, sortString);
+          data = await productApi.getAllProducts();
         }
 
-        const convertedProducts = productsPage.content.map(convertToProduct);
-        setProducts(prev => {
-          // If it's first page, replace. Otherwise append.
-          if (page === 0) return convertedProducts;
-          return [...prev, ...convertedProducts];
+        const convertedProducts = data.map(convertToProduct);
+        
+        // Apply client-side sorting based on filters.sortBy
+        const sorted = [...convertedProducts].sort((a, b) => {
+          if (filters.sortBy === 'rating-desc') return (b.rating || 0) - (a.rating || 0);
+          if (filters.sortBy === 'rating-asc') return (a.rating || 0) - (b.rating || 0);
+          if (filters.sortBy === 'price-desc') return (b.price || 0) - (a.price || 0);
+          if (filters.sortBy === 'price-asc') return (a.price || 0) - (b.price || 0);
+          return 0;
         });
-        setHasMore(page < productsPage.totalPages - 1);
+
+        setProducts(sorted);
       } catch (err) {
         setError('Ürünler yüklenirken bir hata oluştu');
         console.error('Error fetching products:', err);
@@ -120,7 +95,7 @@ const Products = () => {
     };
 
     fetchProducts();
-  }, [searchQuery, page, filters.sortBy]);
+  }, [searchQuery, filters.sortBy]);
 
   // Fetch Favorites
   useEffect(() => {
@@ -183,7 +158,7 @@ const Products = () => {
     // Filter by Rating (5-star scale)
     if (filters.minRating > 0) {
       result = result.filter(
-        (product) => (product.rating / 2) >= filters.minRating
+        (product) => ((product.rating || 0) / 2) >= filters.minRating
       );
     }
 
@@ -247,7 +222,7 @@ const Products = () => {
                 className="filter-select"
                 style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
                 value={filters.sortBy}
-                onChange={(e) => handleFilterChange({...filters, sortBy: e.target.value as any})}
+                onChange={(e) => handleFilterChange({...filters, sortBy: e.target.value as FilterOptions['sortBy']})}
               >
                 <option value="rating-desc">Puan (Yüksekten Düşüğe)</option>
                 <option value="rating-asc">Puan (Düşükten Yükseğe)</option>
@@ -260,7 +235,7 @@ const Products = () => {
 
         <ProductFilters
           filters={filters}
-          onFilterChange={handleFilterChange}
+          onFilterChange={(newFilters) => handleFilterChange(newFilters as FilterOptions)}
           onReset={handleFilterReset}
         />
 
@@ -270,64 +245,59 @@ const Products = () => {
           </div>
         ) : (
           <div className="products-grid">
-            {filteredProducts.map((product, index) => {
-              const isLastElement = filteredProducts.length === index + 1;
-              return (
-                <div 
-                  key={`${product.id}-${index}`} 
-                  ref={isLastElement ? lastProductElementRef : null} 
-                  className="product-card"
-                >
-                  <Link to={`/products/${product.id}`} className="product-link">
-                    <div className="product-image">
-                      {product.image ? (
-                        <img 
-                          src={product.image} 
-                          alt={product.name} 
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="product-placeholder">📦</div>
-                      )}
-                      {isAuthenticated && (
-                        <button 
-                          className={`add-favorite-btn ${favoriteIds.has(product.id.toString()) ? 'active' : ''}`}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            toggleFavorite(product.id);
-                          }}
-                        >
-                          {favoriteIds.has(product.id.toString()) ? '❤️' : '🤍'}
-                        </button>
-                      )}
-                    </div>
-                    <div className="product-info">
-                      <h3 className="product-name">{product.name}</h3>
-                      {product.brand && <p className="product-brand" style={{ fontSize: '0.85em', color: '#666' }}>{product.brand}</p>}
-                      {product.description && (
-                        <p className="product-description" style={{ maxHeight: '40px', overflow: 'hidden' }}>{product.description}</p>
-                      )}
-                      {product.rating && (
-                        <div className="product-rating">
-                          {'⭐'.repeat(Math.round(product.rating / 2))} {(product.rating / 2).toFixed(1)}
-                        </div>
-                      )}
-                    </div>
-                  </Link>
-                  <div className="product-footer">
-                    <span className="product-price">{product.price.toFixed(2)} ₺</span>
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={() => dispatch(addToCartAsync(product))}
-                    >
-                      Sepete Ekle
-                    </button>
+            {filteredProducts.map((product) => (
+              <div 
+                key={product.id} 
+                className="product-card"
+              >
+                <Link to={`/products/${product.id}`} className="product-link">
+                  <div className="product-image">
+                    {product.image ? (
+                      <img 
+                        src={product.image} 
+                        alt={product.name} 
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="product-placeholder">📦</div>
+                    )}
+                    {isAuthenticated && (
+                      <button 
+                        className={`add-favorite-btn ${favoriteIds.has(String(product.id)) ? 'active' : ''}`}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          toggleFavorite(product.id);
+                        }}
+                      >
+                        {favoriteIds.has(String(product.id)) ? '❤️' : '🤍'}
+                      </button>
+                    )}
                   </div>
+                  <div className="product-info">
+                    <h3 className="product-name">{product.name}</h3>
+                    {product.brand && <p className="product-brand" style={{ fontSize: '0.85em', color: '#666' }}>{product.brand}</p>}
+                    {product.description && (
+                      <p className="product-description" style={{ maxHeight: '40px', overflow: 'hidden' }}>{product.description}</p>
+                    )}
+                    {product.rating !== undefined && (
+                      <div className="product-rating">
+                        {'⭐'.repeat(Math.round(product.rating / 2))} {(product.rating / 2).toFixed(1)}
+                      </div>
+                    )}
+                  </div>
+                </Link>
+                <div className="product-footer">
+                  <span className="product-price">{product.price.toFixed(2)} ₺</span>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => dispatch(addToCartAsync(product))}
+                  >
+                    Sepete Ekle
+                  </button>
                 </div>
-              );
-            })}
-            {loading && <div className="loading-more">Daha fazla ürün yükleniyor...</div>}
+              </div>
+            ))}
           </div>
         )}
       </div>
