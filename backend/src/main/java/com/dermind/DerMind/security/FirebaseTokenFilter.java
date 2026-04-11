@@ -33,7 +33,6 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
       try {
         FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(token);
         String email = decodedToken.getEmail();
-        // String uid = decodedToken.getUid();
 
         if (email != null) {
           UserDetails userDetails = User.withUsername(email)
@@ -47,10 +46,18 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
           authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
           SecurityContextHolder.getContext().setAuthentication(authentication);
+          logger.info("Successfully authenticated user from Firebase token: " + email);
+        } else {
+          logger.warn("Firebase token decoded successfully but email was null");
         }
       } catch (FirebaseAuthException e) {
-        logger.error("Firebase Token Verification Failed", e);
+        logger.error("Firebase Token Verification Failed: " + e.getMessage());
       }
+    } else if (header != null) {
+      logger.warn("Authorization header present but does not start with 'Bearer ' or is invalid");
+    } else {
+        // No header is fine for public endpoints, but we should log for debugging if we expect one
+        // logger.debug("No Authorization header found in request");
     }
 
     filterChain.doFilter(request, response);

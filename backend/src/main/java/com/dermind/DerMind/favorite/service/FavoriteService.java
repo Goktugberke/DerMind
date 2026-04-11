@@ -72,7 +72,13 @@ public class FavoriteService {
                 favorite.getProduct().getBrand(),
                 favorite.getProduct().getIngredients(),
                 favorite.getProduct().getQualityScore(),
-                favorite.getProduct().getPrice()
+                favorite.getProduct().getBaseScore(),
+                favorite.getProduct().getPrice(),
+                favorite.getProduct().getSephoraProductId(),
+                favorite.getProduct().getCategory(),
+                favorite.getProduct().getSecondaryCategory(),
+                favorite.getProduct().getSephoraRating(),
+                null // personalScore
         );
 
 

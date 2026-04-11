@@ -1,62 +1,44 @@
 import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { useAppDispatch } from '../store/hooks';
 import { addToCartAsync } from '../store/slices/cartSlice';
 import type { Product } from '../store/slices/cartSlice';
 import SearchBar from '../components/SearchBar';
-
-// Mock data - gerçek projede API'den gelecek
-const mockProducts: Product[] = [
-  {
-    id: '1',
-    name: 'Yüz Temizleme Jeli',
-    price: 149.99,
-    description: 'Hassas ciltler için özel formül',
-    rating: 4.5,
-  },
-  {
-    id: '2',
-    name: 'Nemlendirici Krem',
-    price: 199.99,
-    description: '24 saat nemlendirme garantisi',
-    rating: 4.8,
-  },
-  {
-    id: '3',
-    name: 'Güneş Koruyucu SPF 50',
-    price: 179.99,
-    description: 'UVA/UVB koruması',
-    rating: 4.7,
-  },
-  {
-    id: '4',
-    name: 'Göz Çevresi Kremi',
-    price: 249.99,
-    description: 'Kırışıklık önleyici',
-    rating: 4.6,
-  },
-  {
-    id: '5',
-    name: 'Tonik',
-    price: 129.99,
-    description: 'Gözenek sıkılaştırıcı',
-    rating: 4.4,
-  },
-  {
-    id: '6',
-    name: 'Serum C Vitamini',
-    price: 299.99,
-    description: 'Parlaklık ve canlılık',
-    rating: 4.9,
-  },
-];
+import { productApi } from '../types/api';
 
 const Landing = () => {
   const dispatch = useAppDispatch();
-  
-  // En yüksek puanlı ürünleri sırala (en fazla 6 ürün göster)
-  const topRatedProducts = [...mockProducts]
-    .sort((a, b) => (b.rating || 0) - (a.rating || 0))
-    .slice(0, 6);
+  const [topProducts, setTopProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTopProducts = async () => {
+      try {
+        setLoading(true);
+        const data = await productApi.getTopQualityProducts(6);
+        
+        // Convert DTO to UI Product type
+        const converted = data.map(dto => ({
+          id: dto.id.toString(),
+          name: dto.name,
+          price: dto.price || (100 + (parseInt(dto.id.toString(), 10) * 12345 % 400)),
+          description: dto.ingredients 
+            ? (dto.ingredients.length > 60 ? dto.ingredients.substring(0, 57) + '...' : dto.ingredients)
+            : '',
+          rating: dto.qualityScore || 0,
+          image: undefined
+        }));
+        
+        setTopProducts(converted);
+      } catch (error) {
+        console.error('Anasayfa ürünleri yüklenirken hata:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTopProducts();
+  }, []);
 
   return (
     <div className="landing">
@@ -116,44 +98,52 @@ const Landing = () => {
           <p className="section-subtitle">
             Kullanıcılarımızın en çok beğendiği ve ML modelimizin en yüksek puan verdiği ürünler
           </p>
-          <div className="products-grid">
-            {topRatedProducts.map((product) => (
-              <div key={product.id} className="product-card">
-                <Link to={`/products/${product.id}`} className="product-link">
-                  <div className="product-image">
-                    {product.image ? (
-                      <img src={product.image} alt={product.name} />
-                    ) : (
-                      <div className="product-placeholder">📦</div>
-                    )}
-                    {product.rating && product.rating >= 4.5 && (
-                      <div className="product-badge">Top Rated</div>
-                    )}
+          
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '40px' }}>
+              <p>Ürünler yükleniyor...</p>
+            </div>
+          ) : (
+            <div className="products-grid">
+              {topProducts.map((product) => (
+                <div key={product.id} className="product-card">
+                  <Link to={`/products/${product.id}`} className="product-link">
+                    <div className="product-image">
+                      {product.image ? (
+                        <img src={product.image} alt={product.name} />
+                      ) : (
+                        <div className="product-placeholder">📦</div>
+                      )}
+                      {product.rating && product.rating >= 8.0 && (
+                        <div className="product-badge">Top Rated</div>
+                      )}
+                    </div>
+                    <div className="product-info">
+                      <h3 className="product-name">{product.name}</h3>
+                      {product.description && (
+                        <p className="product-description">{product.description}</p>
+                      )}
+                      {product.rating && (
+                        <div className="product-rating">
+                          {'⭐'.repeat(Math.round(product.rating / 2))} {(product.rating / 2).toFixed(1)}
+                        </div>
+                      )}
+                    </div>
+                  </Link>
+                  <div className="product-footer">
+                    <span className="product-price">{product.price.toFixed(2)} ₺</span>
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={() => dispatch(addToCartAsync(product))}
+                    >
+                      Sepete Ekle
+                    </button>
                   </div>
-                  <div className="product-info">
-                    <h3 className="product-name">{product.name}</h3>
-                    {product.description && (
-                      <p className="product-description">{product.description}</p>
-                    )}
-                    {product.rating && (
-                      <div className="product-rating">
-                        {'⭐'.repeat(Math.floor(product.rating))} {product.rating}
-                      </div>
-                    )}
-                  </div>
-                </Link>
-                <div className="product-footer">
-                  <span className="product-price">{product.price.toFixed(2)} ₺</span>
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={() => dispatch(addToCartAsync(product))}
-                  >
-                    Sepete Ekle
-                  </button>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
+
           <div className="section-actions">
             <Link to="/products" className="btn btn-secondary">
               Tüm Ürünleri Gör

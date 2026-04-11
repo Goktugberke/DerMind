@@ -95,7 +95,13 @@ public class CartService {
                 p.getBrand(),
                 p.getIngredients(),
                 p.getQualityScore(),
-                p.getPrice()
+                p.getBaseScore(),
+                p.getPrice(),
+                p.getSephoraProductId(),
+                p.getCategory(),
+                p.getSecondaryCategory(),
+                p.getSephoraRating(),
+                null // personalScore
         );
 
         return new CartItemResponseDTO(cartItem.getId(), productDTO, cartItem.getQuantity());

@@ -24,7 +24,13 @@ public class Product {
     private String brand;
     private String ingredients;   // İçerik listesi (örn. "Aloe Vera, Glycerin, ...")
     private Double qualityScore;  // Malzeme kalitesine göre belirlenen puan
+    private Double baseScore;     // AI tarafından hesaplanan temel puan
     private Double price;
+    @Column(unique = true)
+    private String sephoraProductId;
+    private String category;
+    private String secondaryCategory;
+    private Double sephoraRating;
 
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL)

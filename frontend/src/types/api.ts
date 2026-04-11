@@ -54,14 +54,23 @@ export interface ProductResponseDTO {
   name: string;
   brand: string;
   price?: number;
-  imageUrl?: string;
   category?: string;
   ingredients?: string;
   qualityScore?: number;
+  personalScore?: number;
+}
+export interface PageResponse<T> {
+  content: T[];
+  totalPages: number;
+  totalElements: number;
+  size: number;
+  number: number;
 }
 export interface ProductDetailDTO extends ProductResponseDTO {
   description?: string;
   averageUserRating?: number;
+  totalRatings?: number;
+  totalPurchases?: number;
 }
 export interface ProductCreateDTO { name: string; brand: string; price: number; }
 export type ProductUpdateDTO = Partial<ProductCreateDTO>;
@@ -147,12 +156,14 @@ apiClient.interceptors.request.use(
     }
 
     let token = localStorage.getItem('authHeader');
+    let source = 'localStorage';
 
     // Firebase kullanıcısı varsa güncel token al
     if (auth.currentUser) {
       try {
         const firebaseToken = await auth.currentUser.getIdToken();
         token = `Bearer ${firebaseToken}`;
+        source = 'firebase';
       } catch (error) {
         console.error("Token refresh error:", error);
       }
@@ -220,8 +231,10 @@ export const userApi = {
 
 export const productApi = {
   getProductById: async (id: number) => (await apiClient.get<ProductDetailDTO>(`/api/products/${id}`)).data,
-  getAllProducts: async () => (await apiClient.get<ProductResponseDTO[]>('/api/products')).data,
-  searchProducts: async (query: string) => (await apiClient.get<ProductResponseDTO[]>(`/api/products/search?query=${query}`)).data,
+  getAllProducts: async (page = 0, size = 20, sort?: string) => (await apiClient.get<PageResponse<ProductResponseDTO>>(`/api/products?page=${page}&size=${size}${sort ? `&sort=${sort}` : ''}`)).data,
+  searchProducts: async (query: string, page = 0, size = 20, sort?: string) =>
+    (await apiClient.get<PageResponse<ProductResponseDTO>>(`/api/products/search?query=${query}&page=${page}&size=${size}${sort ? `&sort=${sort}` : ''}`)).data,
+  getTopQualityProducts: async (limit = 10) => (await apiClient.get<ProductDetailDTO[]>(`/api/products/top/quality?limit=${limit}`)).data,
 };
 
 export const streakApi = {
@@ -254,4 +267,4 @@ export const cartApi = {
   removeItem: async (productId: string | number) => await apiClient.delete(`/api/cart/item/${productId}`),
   clearCart: async () => await apiClient.delete('/api/cart'),
   mergeCart: async (localItems: CartItemAddDTO[]) => (await apiClient.post<CartItemResponseDTO[]>('/api/cart/merge', localItems)).data,
-};
+};

@@ -18,4 +18,11 @@ public class ProductUpdateDTO {
     @DecimalMin(value = "0.0", message = "Quality score must be at least 0")
     @DecimalMax(value = "10.0", message = "Quality score must be at most 10")
     private Double qualityScore;
+
+    private Double baseScore;
+    private Double price;
+    private String sephoraProductId;
+    private String category;
+    private String secondaryCategory;
+    private Double sephoraRating;
 }
