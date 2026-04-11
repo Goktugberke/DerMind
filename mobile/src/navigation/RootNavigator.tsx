@@ -11,6 +11,11 @@ import { RegisterScreen } from '@features/auth/RegisterScreen';
 import { ProductDetailScreen } from '@features/product_detail/ProductDetailScreen';
 import { StartRoutineScreen } from '@features/products/StartRoutineScreen';
 import { RateScreen } from '@features/products/RateScreen';
+import { CheckoutScreen } from '@features/cart/CheckoutScreen';
+import { SkinProfileScreen } from '@features/profile/SkinProfileScreen';
+import { OrdersScreen } from '@features/profile/OrdersScreen';
+import { TrackOrderScreen } from '@features/profile/TrackOrderScreen';
+import { CouponsScreen } from '@features/profile/CouponsScreen';
 
 // Tabs
 import { TabNavigator } from './TabNavigator';
@@ -55,6 +60,11 @@ export const RootNavigator = () => {
           <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
           <Stack.Screen name="StartRoutine" component={StartRoutineScreen} />
           <Stack.Screen name="RateScreen" component={RateScreen} />
+          <Stack.Screen name="Checkout" component={CheckoutScreen} />
+          <Stack.Screen name="SkinProfile" component={SkinProfileScreen} />
+          <Stack.Screen name="Orders" component={OrdersScreen} />
+          <Stack.Screen name="TrackOrder" component={TrackOrderScreen} />
+          <Stack.Screen name="Coupons" component={CouponsScreen} />
         </>
       ) : (
         /* KULLANICI GİRİŞ YAPMAMIŞSA: Sadece Giriş Ekranlarını göster */

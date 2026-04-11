@@ -84,11 +84,17 @@ export const ProductsScreen = () => {
 
       {/* HEADER BLOGU */}
       <PageHeader
-        title="My Products"
+        title="Products"
         fontSize={24}
         fontWeight="400"
         align="center"
       />
+      <View style={styles.listHeader}>
+        <Text style={styles.title}>Your Products</Text>
+        <Text style={styles.subtitle}>Track your skincare journey</Text>
+      </View>
+
+
 
       {/* ARAMA VE SIRALAMA */}
       <View style={styles.searchRow}>
@@ -203,16 +209,9 @@ const styles = StyleSheet.create({
     marginTop: 15,
     gap: 10, // Arama çubuğu ve butonlar arasına dikey boşluk koyar
   },
-  titleSection: {
-    paddingHorizontal: 30,
-    marginVertical: 5,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '400',
-    color: theme.colors.text,
-    letterSpacing: -0.5
-  },
+  listHeader: { marginTop: 20, alignItems: 'flex-start', paddingHorizontal: 20 },
+  title: { fontSize: 24, fontWeight: 'bold', color: '#1E293B' },
+  subtitle: { fontSize: 14, color: '#64748B', marginTop: 4 },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',

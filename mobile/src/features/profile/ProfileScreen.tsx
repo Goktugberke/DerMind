@@ -3,10 +3,13 @@ import { SafeAreaView, View, Text, StyleSheet, Image, TouchableOpacity, ScrollVi
 import { getAuth } from '@react-native-firebase/auth';
 import { Bell, MessageCircle, Settings, ShoppingBag, CreditCard, LogOut, Sparkles } from 'lucide-react-native';
 import { ProfileMenuItem } from '@components/ProfileMenuItem';
+import { PageHeader } from '@components/PageHeader';
 import { theme } from '@constants/theme';
+import { useNavigation } from '@react-navigation/native';
 
 export const ProfileScreen = () => {
   const authInstance = getAuth();
+  const navigation = useNavigation<any>();
 
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [
@@ -18,14 +21,13 @@ export const ProfileScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       {/* Üst Header: Bildirim ve Mesaj */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.roundButton}>
-          <Bell size={22} color={theme.colors.gray} />
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.roundButton, { marginLeft: 12 }]}>
-          <MessageCircle size={22} color={theme.colors.gray} />
-        </TouchableOpacity>
-      </View>
+      <PageHeader
+        title="Profile"
+        fontSize={24}
+        fontWeight="400"
+        align="center"
+        rightIcon={<Bell size={22} color={theme.colors.gray} />}
+      />
 
       <ScrollView>
         {/* Profil Bilgileri Bölümü */}
@@ -34,37 +36,39 @@ export const ProfileScreen = () => {
             {/* Varsa profil fotosu yoksa harf/ikon */}
             <Text style={styles.imageLetter}>{authInstance.currentUser?.displayName?.charAt(0) || 'A'}</Text>
           </View>
-          <Text style={styles.userName}>{authInstance.currentUser?.displayName || 'Ayşe Yılmaz'}</Text>
-          <Text style={styles.userEmail}>{authInstance.currentUser?.email || 'ayse@example.com'}</Text>
+          <View style={styles.textContainer}>
+            <Text style={styles.userName}>{authInstance.currentUser?.displayName || 'Ayşe Yılmaz'}</Text>
+            <Text style={styles.userEmail}>{authInstance.currentUser?.email || 'ayse@example.com'}</Text>
+          </View>
         </View>
 
         {/* Menü Listesi */}
         <View style={styles.menuSection}>
-          <ProfileMenuItem 
-            label="My skin type" 
-            icon={<Sparkles size={22} color={theme.colors.primary} />} 
-            onPress={() => console.log("Cilt Tipi")} 
+          <ProfileMenuItem
+            label="My skin type"
+            icon={<Sparkles size={22} color={theme.colors.primary} />}
+            onPress={() => navigation.navigate('SkinProfile')}
           />
-          <ProfileMenuItem 
-            label="My orders" 
-            icon={<ShoppingBag size={22} color={theme.colors.text} />} 
-            onPress={() => console.log("Siparişler")} 
+          <ProfileMenuItem
+            label="My orders"
+            icon={<ShoppingBag size={22} color={theme.colors.text} />}
+            onPress={() => navigation.navigate('Orders')}
           />
-          <ProfileMenuItem 
-            label="My coupons" 
-            icon={<CreditCard size={22} color={theme.colors.text} />} 
-            onPress={() => console.log("Kuponlar")} 
+          <ProfileMenuItem
+            label="My coupons"
+            icon={<CreditCard size={22} color={theme.colors.text} />}
+            onPress={() => navigation.navigate('Coupons')}
           />
-          <ProfileMenuItem 
-            label="Settings" 
-            icon={<Settings size={22} color={theme.colors.text} />} 
-            onPress={() => console.log("Ayarlar")} 
+          <ProfileMenuItem
+            label="Settings"
+            icon={<Settings size={22} color={theme.colors.text} />}
+            onPress={() => console.log("Ayarlar")}
           />
-          <ProfileMenuItem 
-            label="Logout" 
-            isLogout 
-            icon={<LogOut size={22} color={theme.colors.text} />} 
-            onPress={handleLogout} 
+          <ProfileMenuItem
+            label="Logout"
+            isLogout
+            icon={<LogOut size={22} color={theme.colors.text} />}
+            onPress={handleLogout}
           />
         </View>
       </ScrollView>
@@ -73,30 +77,19 @@ export const ProfileScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#FFFFFF' 
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingHorizontal: 20,
-    paddingTop: 10,
-  },
-  roundButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.deepbackground,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.primary,
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.deepbackground
   },
   profileInfoSection: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 50,
+    marginLeft: 20,
+    marginTop: 30,
     marginBottom: 60,
+  },
+  textContainer: {
+    marginLeft: 20,       // Fotoğraf ile yazı arasındaki mesafe
   },
   imagePlaceholder: {
     width: 100,
@@ -107,7 +100,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#E2E8F0',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
   },
   imageLetter: { fontSize: 32, fontWeight: 'bold', color: '#64748B' },
   userName: { fontSize: 22, fontWeight: 'bold', color: '#1E293B' },
