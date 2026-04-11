@@ -1,19 +1,20 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  SafeAreaView, 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  FlatList, 
-  Modal, 
+import {
+  SafeAreaView,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  Modal,
   StatusBar,
   Image,
   Dimensions
 } from 'react-native';
+import { PageHeader } from '@components/PageHeader';
 import { SearchBar } from '@components/SearchBar';
 import { theme } from '@constants/theme';
-import { ListFilter, X, Check, Heart, ShoppingCart, Ghost } from 'lucide-react-native';
+import { X, Check, Heart, ShoppingCart, Ghost, SlidersHorizontal } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 const COLUMN_WIDTH = (width - 50) / 2; // Yanlardaki boşlukları düşüp 2'ye bölüyoruz
@@ -51,8 +52,8 @@ export const FavoritesScreen = ({ navigation }: any) => {
 
   // Arama filtresi (Frontend tarafında basit filtreleme)
   const filteredData = useMemo(() => {
-    return favorites.filter(item => 
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    return favorites.filter(item =>
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.brand.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [searchQuery, favorites]);
@@ -63,9 +64,9 @@ export const FavoritesScreen = ({ navigation }: any) => {
       <TouchableOpacity style={styles.heartButton} onPress={() => handleRemoveFavorite(item.id)}>
         <Heart size={20} color="#FF4D4D" fill="#FF4D4D" />
       </TouchableOpacity>
-      
+
       <Image source={{ uri: item.image }} style={styles.productImage} />
-      
+
       <View style={styles.cardDetails}>
         <Text style={styles.brandText}>{item.brand}</Text>
         <Text style={styles.nameText} numberOfLines={1}>{item.name}</Text>
@@ -82,28 +83,29 @@ export const FavoritesScreen = ({ navigation }: any) => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      
+
       {/* 1. HEADER (Diğer sayfalarla birebir aynı) */}
-      <View style={styles.headerContainer}>
-        <View style={styles.titleSection}>
-          <Text style={styles.headerTitle}>Favorites</Text>
-        </View>
-      </View>
+      <PageHeader
+        title="Favorites"
+        fontSize={24}
+        fontWeight="400"
+        align="center"
+      />
 
       {/* 2. SEARCH & SORT */}
       <View style={styles.searchRow}>
         <View style={styles.searchWrapper}>
-          <SearchBar 
-            value={searchQuery} 
-            onChangeText={setSearchQuery} 
+          <SearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
             placeholder="Search in favorites..."
           />
         </View>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.sortIconButton}
           onPress={() => setSortModalVisible(true)}
         >
-          <ListFilter size={24} color={theme.colors.gray} />
+          <SlidersHorizontal size={24} color={theme.colors.gray} />
         </TouchableOpacity>
       </View>
 
@@ -140,8 +142,8 @@ export const FavoritesScreen = ({ navigation }: any) => {
               </TouchableOpacity>
             </View>
             {sortOptions.map((option) => (
-              <TouchableOpacity 
-                key={option.id} 
+              <TouchableOpacity
+                key={option.id}
                 style={styles.sortOption}
                 onPress={() => { setSelectedSort(option.id); setSortModalVisible(false); }}
               >
@@ -168,7 +170,7 @@ const styles = StyleSheet.create({
   },
   titleSection: { paddingHorizontal: 30, marginVertical: 5 },
   headerTitle: { fontSize: 24, fontWeight: '400', color: theme.colors.text },
-  
+
   // Search & Sort Row
   searchRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginTop: 15 },
   searchWrapper: { flex: 1, marginRight: 6 },
@@ -196,10 +198,10 @@ const styles = StyleSheet.create({
   brandText: { fontSize: 11, fontWeight: 'bold', color: theme.colors.gray, textTransform: 'uppercase' },
   nameText: { fontSize: 13, color: theme.colors.text, marginVertical: 2 },
   priceText: { fontSize: 14, fontWeight: 'bold', color: theme.colors.primary },
-  
+
   addToCartBtn: {
-    flexDirection: 'row', backgroundColor: theme.colors.primary, 
-    width: '100%', paddingVertical: 10, borderRadius: 12, 
+    flexDirection: 'row', backgroundColor: theme.colors.primary,
+    width: '100%', paddingVertical: 10, borderRadius: 12,
     justifyContent: 'center', alignItems: 'center'
   },
   addToCartText: { color: 'white', fontWeight: 'bold', fontSize: 13, marginLeft: 6 },
