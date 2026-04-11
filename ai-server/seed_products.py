@@ -21,7 +21,7 @@ from psycopg2.extras import execute_batch
 
 # ── Veritabani baglantion ayarlari ──────────────────────────
 DB_HOST = "localhost"
-DB_PORT = 5432
+DB_PORT = 5438
 DB_NAME = "dermind"
 DB_USER = "postgres"
 DB_PASS = "postgres"
@@ -77,13 +77,13 @@ INSERT INTO products (
     name, brand, ingredients,
     quality_score, base_score, sephora_product_id,
     category, secondary_category,
-    price_usd, sephora_rating
+    price, sephora_rating
 )
 VALUES (
     %(name)s, %(brand)s, %(ingredients)s,
     %(quality_score)s, %(base_score)s, %(sephora_product_id)s,
     %(category)s, %(secondary_category)s,
-    %(price_usd)s, %(sephora_rating)s
+    %(price)s, %(sephora_rating)s
 )
 ON CONFLICT (sephora_product_id) DO NOTHING;
 """
@@ -102,7 +102,7 @@ for _, row in df.iterrows():
         "sephora_product_id":  clean(row.get("product_id")),
         "category":            clean(row.get("primary_category")),
         "secondary_category":  clean(row.get("secondary_category")),
-        "price_usd":           clean(row.get("price_usd")),
+        "price":               clean(row.get("price_usd")),
         "sephora_rating":      clean(row.get("rating")),
     })
 

@@ -73,7 +73,10 @@ export const registerUser = createAsyncThunk(
       // const token = await firebaseUser.getIdToken();
 
       // 3. Backend'e kaydet (Firebase UID ile)
-      // Password backend'de null olabilir veya boş string gönderilebilir
+      const token = await firebaseUser.getIdToken();
+      localStorage.setItem('authHeader', `Bearer ${token}`);
+      localStorage.setItem('isLoggedIn', 'true');
+
       const response = await userApi.createUser({
         id: firebaseUser.uid,
         email: userData.email,
@@ -103,6 +106,10 @@ export const loginUser = createAsyncThunk(
           picture: credentials.picture || '',
           uid: credentials.uid
         });
+        
+        // Save token for storage-based persistence on refresh
+        localStorage.setItem('authHeader', `Bearer ${credentials.token}`);
+        localStorage.setItem('isLoggedIn', 'true');
       } else if (credentials.email && credentials.password) {
         // Email/Password Login -> Önce Firebase'e giriş yap
         const userCredential = await signInWithEmailAndPassword(auth, credentials.email, credentials.password);

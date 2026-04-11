@@ -14,7 +14,7 @@ const convertToProduct = (dto: ProductDetailDTO): Product => {
     price: mockPrice,
     description: dto.ingredients || '',
     rating: dto.averageUserRating || dto.qualityScore || 0,
-    image: dto.imageUrl || 'https://via.placeholder.com/300'
+    image: undefined
   };
 };
 
@@ -33,6 +33,7 @@ const ProductDetail = () => {
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
+  const authLoading = useAppSelector((state) => state.auth.loading);
 
   const [product, setProduct] = useState<Product | null>(null);
   const [productDetail, setProductDetail] = useState<ProductDetailDTO | null>(null);
@@ -51,27 +52,30 @@ const ProductDetail = () => {
   // Routine Modal State
   const [showRoutineModal, setShowRoutineModal] = useState(false);
   const [usageFrequency, setUsageFrequency] = useState<UsageFrequency>(UsageFrequency.DAILY);
-  const [usageTime, setUsageTime] = useState<string>('08:00');
+  const [usageTimes, setUsageTimes] = useState<string[]>(['08:00']);
   const [routineLoading, setRoutineLoading] = useState(false);
 
-  const calculateMLScore = useCallback((productData: ProductDetailDTO) => {
-    const baseScore = productData.averageUserRating || productData.qualityScore || 4.0;
-    const skinTypeMatch = user?.skinType ? Math.random() * 0.3 + 0.7 : 0.5;
-    const allergySafe = user?.allergies && user.allergies.length > 0 ? Math.random() * 0.2 + 0.8 : 1.0;
-    const ingredientQuality = (productData.qualityScore || 0) / 10;
-    const mlScore = (baseScore * 0.3 + skinTypeMatch * 0.3 + allergySafe * 0.2 + ingredientQuality * 0.2) * 20;
+  const calculateScoreFromDTO = useCallback((productData: ProductDetailDTO) => {
+    // The backend now guarantees personalScore is populated (defaults to qualityScore)
+    const mlScore = productData.personalScore ?? 0;
 
     setScore({
-      overallScore: mlScore,
-      skinTypeMatch: skinTypeMatch * 100,
-      allergySafe: allergySafe * 100,
-      ingredientQuality: ingredientQuality * 100,
-      userRating: baseScore * 20,
-      mlScore: mlScore,
+      overallScore: mlScore * 10,
+      skinTypeMatch: mlScore > 7 ? 90 : 60,
+      allergySafe: 100,
+      ingredientQuality: (productData.qualityScore || 0) * 10,
+      userRating: (productData.averageUserRating || 5.0) * 20,
+      mlScore: mlScore * 10,
     });
-  }, [user]);
+  }, []);
 
   useEffect(() => {
+    // Reset states when ID changes to avoid showing stale data from previous product
+    setProduct(null);
+    setProductDetail(null);
+    setScore(null);
+    setError(null);
+
     const fetchProduct = async () => {
       if (!id) return;
       try {
@@ -79,8 +83,12 @@ const ProductDetail = () => {
         const productId = parseInt(id, 10);
         if (isNaN(productId)) {
           setError('Geçersiz ürün ID');
+          setLoading(false);
           return;
         }
+
+        const currentToken = localStorage.getItem('authHeader');
+        console.log(`[ProductDetail] Fetching product ${productId}. Auth status: ${isAuthenticated}, Profile exists: ${!!user}, Header present: ${!!currentToken}`);
 
         const productData = await productApi.getProductById(productId);
         setProductDetail(productData);
@@ -98,15 +106,26 @@ const ProductDetail = () => {
           } catch (e) { console.error("Favorite check error", e); }
         }
 
-        calculateMLScore(productData);
-      } catch {
+        calculateScoreFromDTO(productData);
+        console.log(`[ProductDetail] Score details - Personal: ${productData.personalScore}, Quality: ${productData.qualityScore}`);
+      } catch (err) {
+        console.error("Fetch product error", err);
         setError('Ürün yüklenirken bir hata oluştu');
       } finally {
         setLoading(false);
       }
     };
+
+    // Strict Auth Sync: Wait if we suspect the user is logged in but profile hasn't loaded yet
+    const hasLoginHint = localStorage.getItem('isLoggedIn') === 'true';
+    const shouldWait = authLoading || (hasLoginHint && !user);
+
+    if (shouldWait) {
+      return;
+    }
+
     fetchProduct();
-  }, [id, user, calculateMLScore, isAuthenticated]);
+  }, [id, user, calculateScoreFromDTO, isAuthenticated, authLoading]);
 
   const handleAddToRoutine = async () => {
     if (!isAuthenticated) {
@@ -118,10 +137,11 @@ const ProductDetail = () => {
     if (product && id) {
       try {
         setRoutineLoading(true);
+        const finalTimes = usageFrequency === UsageFrequency.DAILY ? [usageTimes[0]] : usageTimes;
         await streakApi.createStreak({
           productId: parseInt(id),
           usageFrequency,
-          customTimes: [usageTime]
+          customTimes: finalTimes
         });
         alert('Ürün rutine eklendi!');
         setShowRoutineModal(false);
@@ -173,7 +193,7 @@ const ProductDetail = () => {
       return;
     }
     if (!id) return;
-    
+
     try {
       setReviewLoading(true);
       if (editingRatingId) {
@@ -215,13 +235,13 @@ const ProductDetail = () => {
       setReviewLoading(false);
     }
   };
-  
+
   const handleEditReview = (rating: RatingResponseDTO) => {
     setEditingRatingId(rating.id);
     setReviewText(rating.review || rating.comment || '');
     setReviewRating(rating.rating);
   };
-  
+
   const handleCancelEdit = () => {
     setEditingRatingId(null);
     setReviewText('');
@@ -246,11 +266,45 @@ const ProductDetail = () => {
             <div className="product-price-large">{product.price.toFixed(2)} ₺</div>
 
             {score && (
-              <div className="product-scoring">
-                <h3>ML Analizi</h3>
-                <div className="score-value">Puan: {score.overallScore.toFixed(1)}</div>
+              <div className="product-scoring" style={{ marginTop: '15px', padding: '15px', backgroundColor: '#f3f4f6', borderRadius: '12px' }}>
+                <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  ML Analizi
+                  {productDetail?.personalScore !== productDetail?.qualityScore && (
+                    <small style={{ fontWeight: 'normal', color: '#6b7280' }}>(Sana Özel)</small>
+                  )}
+                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                  <div className="score-main" style={{
+                    fontSize: '2em',
+                    fontWeight: 'bold',
+                    color: score.overallScore > 70 ? '#10b981' : score.overallScore > 30 ? '#f59e0b' : '#ef4444'
+                  }}>
+                    %{score.overallScore.toFixed(0)}
+                  </div>
+                  <div className="score-desc" style={{ fontSize: '0.9em', color: '#4b5563' }}>
+                    Bu ürün cilt tipin ve tercihlerine göre <strong>{score.overallScore > 70 ? 'yüksek' : score.overallScore > 30 ? 'orta' : 'düşük'}</strong> uyumluluk gösteriyor.
+                  </div>
+                </div>
               </div>
             )}
+
+            <div className="product-ingredients-section" style={{ marginTop: '20px', marginBottom: '25px' }}>
+              <h3 style={{ fontSize: '1.1em', marginBottom: '10px', color: '#1f2937' }}>Ürün İçeriği</h3>
+              <div style={{
+                padding: '12px',
+                backgroundColor: '#ffffff',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                fontSize: '0.9em',
+                lineHeight: '1.6',
+                color: productDetail?.ingredients ? '#4b5563' : '#9ca3af',
+                maxHeight: '150px',
+                overflowY: 'auto',
+                fontStyle: productDetail?.ingredients ? 'normal' : 'italic'
+              }}>
+                {productDetail?.ingredients || 'Bu ürün için içerik bilgisi henüz eklenmemiştir.'}
+              </div>
+            </div>
 
             <div className="product-actions" style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
               <button className="btn btn-primary" onClick={() => dispatch(addToCartAsync(product))}>Sepete Ekle</button>
@@ -259,15 +313,15 @@ const ProductDetail = () => {
                 className="btn btn-secondary"
                 style={{ backgroundColor: '#6c757d', color: 'white' }}
               >
-                📅 Rutine Ekle
+                Rutine Ekle
               </button>
               <button
                 className={`btn ${isFavorite ? 'btn-danger' : 'btn-outline'}`}
                 onClick={toggleFavorite}
                 disabled={favLoading}
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
                   gap: '8px',
                   backgroundColor: isFavorite ? '#ef4444' : 'transparent',
                   color: isFavorite ? 'white' : '#1f2937',
@@ -309,14 +363,33 @@ const ProductDetail = () => {
                   </div>
 
                   <div className="form-group" style={{ marginBottom: '15px' }}>
-                    <label style={{ display: 'block', marginBottom: '5px' }}>Kullanım Zamanı</label>
-                    <input
-                      type="time"
-                      className="form-control"
-                      style={{ width: '100%', padding: '8px' }}
-                      value={usageTime}
-                      onChange={(e) => setUsageTime(e.target.value)}
-                    />
+                    <label style={{ display: 'block', marginBottom: '5px' }}>Kullanım Zamanları</label>
+                    {usageFrequency === UsageFrequency.TWICE_DAILY ? (
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <input
+                          type="time"
+                          className="form-control"
+                          style={{ width: '100%', padding: '8px' }}
+                          value={usageTimes[0] || '08:00'}
+                          onChange={(e) => setUsageTimes([e.target.value, usageTimes[1] || '20:00'])}
+                        />
+                        <input
+                          type="time"
+                          className="form-control"
+                          style={{ width: '100%', padding: '8px' }}
+                          value={usageTimes[1] || '20:00'}
+                          onChange={(e) => setUsageTimes([usageTimes[0] || '08:00', e.target.value])}
+                        />
+                      </div>
+                    ) : (
+                      <input
+                        type="time"
+                        className="form-control"
+                        style={{ width: '100%', padding: '8px' }}
+                        value={usageTimes[0] || '08:00'}
+                        onChange={(e) => setUsageTimes([e.target.value])}
+                      />
+                    )}
                   </div>
 
                   <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
@@ -342,15 +415,15 @@ const ProductDetail = () => {
 
             <div className="product-ratings" style={{ marginTop: '30px', color: 'black' }}>
               <h3>Yorumlar</h3>
-              
+
               {/* Add/Edit Review Form */}
               {isAuthenticated ? (
                 <form onSubmit={handleReviewSubmit} style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
                   <h4 style={{ margin: '0 0 10px 0', color: '#333' }}>{editingRatingId ? 'Yorumu Düzenle' : 'Yorum Yap'}</h4>
                   <div style={{ marginBottom: '10px' }}>
                     <label style={{ display: 'block', marginBottom: '5px', color: '#555' }}>Puan:</label>
-                    <select 
-                      value={reviewRating} 
+                    <select
+                      value={reviewRating}
                       onChange={(e) => setReviewRating(Number(e.target.value))}
                       style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', width: '100px', backgroundColor: '#fff', color: '#333' }}
                     >
@@ -361,8 +434,8 @@ const ProductDetail = () => {
                   </div>
                   <div style={{ marginBottom: '10px' }}>
                     <label style={{ display: 'block', marginBottom: '5px', color: '#555' }}>Yorumunuz:</label>
-                    <textarea 
-                      value={reviewText} 
+                    <textarea
+                      value={reviewText}
                       onChange={(e) => setReviewText(e.target.value)}
                       style={{ width: '100%', minHeight: '80px', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', backgroundColor: '#fff', color: '#333' }}
                       placeholder="Ürün hakkındaki düşüncelerinizi paylaşın..."
@@ -397,14 +470,14 @@ const ProductDetail = () => {
                         </div>
                         {user && rating.userId === user.id && (
                           <div style={{ display: 'flex', gap: '10px' }}>
-                            <button 
+                            <button
                               onClick={() => handleEditReview(rating)}
                               style={{ border: 'none', background: 'none', color: '#007bff', cursor: 'pointer', padding: 0 }}
                               disabled={reviewLoading}
                             >
                               Düzenle
                             </button>
-                            <button 
+                            <button
                               onClick={() => handleDeleteReview(rating.id)}
                               style={{ border: 'none', background: 'none', color: '#dc3545', cursor: 'pointer', padding: 0 }}
                               disabled={reviewLoading}

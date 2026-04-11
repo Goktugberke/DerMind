@@ -62,6 +62,7 @@ ai-server/models/*.pkl
 ai-server/allChat.txt
 ai-server/bitirme fikir.txt
 ai-server/*.pdf
+ai-server/__pycache__/*
 # firebase
 firebase-service-account.json
 

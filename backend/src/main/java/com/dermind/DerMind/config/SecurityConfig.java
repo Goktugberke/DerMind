@@ -45,6 +45,7 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/users/email/**").permitAll()
                                                 .requestMatchers("/api/products/**").permitAll()
                                                 .requestMatchers("/api/ratings/**").permitAll()
+                                                .requestMatchers("/actuator/health").permitAll()
                                                 .requestMatchers("/", "/login").permitAll()
                                                 .anyRequest().authenticated())
                                 .addFilterBefore(firebaseTokenFilter, UsernamePasswordAuthenticationFilter.class)

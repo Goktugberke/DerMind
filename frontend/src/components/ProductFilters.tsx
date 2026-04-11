@@ -28,25 +28,6 @@ const ProductFilters = ({
     });
   };
 
-  const categories = [
-    'Tümü',
-    'Temizleme',
-    'Nemlendirme',
-    'Güneş Koruyucu',
-    'Serum',
-    'Tonik',
-    'Göz Bakımı',
-  ];
-
-  const skinTypes = [
-    'Tümü',
-    'Kuru',
-    'Yağlı',
-    'Karma',
-    'Hassas',
-    'Normal',
-  ];
-
   return (
     <div className="product-filters">
       <button
@@ -66,20 +47,24 @@ const ProductFilters = ({
                   type="number"
                   placeholder="Min"
                   value={filters.minPrice || ''}
-                  onChange={(e) =>
-                    handleChange('minPrice', parseInt(e.target.value) || 0)
-                  }
+                  onChange={(e) => {
+                    const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                    handleChange('minPrice', val);
+                  }}
                   className="range-input"
+                  min="0"
                 />
                 <span>-</span>
                 <input
                   type="number"
                   placeholder="Max"
                   value={filters.maxPrice || ''}
-                  onChange={(e) =>
-                    handleChange('maxPrice', parseInt(e.target.value) || 1000)
-                  }
+                  onChange={(e) => {
+                    const val = e.target.value === '' ? 1000 : parseInt(e.target.value);
+                    handleChange('maxPrice', val);
+                  }}
                   className="range-input"
+                  min="0"
                 />
               </div>
             </div>
@@ -107,35 +92,7 @@ const ProductFilters = ({
             </div>
           </div>
 
-          <div className="filter-section">
-            <h3>Kategori</h3>
-            <select
-              value={filters.category}
-              onChange={(e) => handleChange('category', e.target.value)}
-              className="filter-select"
-            >
-              {categories.map((cat) => (
-                <option key={cat} value={cat === 'Tümü' ? '' : cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="filter-section">
-            <h3>Cilt Tipi</h3>
-            <select
-              value={filters.skinType}
-              onChange={(e) => handleChange('skinType', e.target.value)}
-              className="filter-select"
-            >
-              {skinTypes.map((type) => (
-                <option key={type} value={type === 'Tümü' ? '' : type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Unused Category and Skin Type filters removed as requested */}
 
           <div className="filter-actions">
             <button className="btn btn-secondary" onClick={onReset}>
@@ -149,4 +106,3 @@ const ProductFilters = ({
 };
 
 export default ProductFilters;
-

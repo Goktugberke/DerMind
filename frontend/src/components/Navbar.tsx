@@ -4,6 +4,7 @@ import { selectTotalItems } from '../store/slices/cartSlice';
 import { logoutUser } from '../store/slices/authSlice';
 import { useNavigate } from 'react-router-dom';
 import { selectTheme, toggleTheme } from '../store/slices/themeSlice';
+import { useState } from 'react';
 
 const Navbar = () => {
   const dispatch = useAppDispatch();
@@ -12,9 +13,11 @@ const Navbar = () => {
   const user = useAppSelector((state) => state.auth.user);
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const theme = useAppSelector(selectTheme);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     await dispatch(logoutUser());
+    setIsMenuOpen(false);
     navigate('/');
   };
 
@@ -22,17 +25,30 @@ const Navbar = () => {
     dispatch(toggleTheme());
   };
 
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
+  };
+
+  const closeMenu = () => {
+    setIsMenuOpen(false);
+  };
+
   return (
     <nav className="navbar">
       <div className="navbar-container">
-        <Link to="/" className="navbar-logo">
+        <Link to="/" className="navbar-logo" onClick={closeMenu}>
           DerMind
         </Link>
-        <div className="navbar-links">
-          <Link to="/">Ana Sayfa</Link>
-          <Link to="/products">Ürünler</Link>
-          <Link to="/routine">Rutinler</Link>
-          <Link to="/cart" className="cart-link">
+        
+        <button className="navbar-toggle" onClick={toggleMenu} aria-label="Menüyü aç/kapat">
+          {isMenuOpen ? '✕' : '☰'}
+        </button>
+
+        <div className={`navbar-links ${isMenuOpen ? 'active' : ''}`}>
+          <Link to="/" onClick={closeMenu}>Ana Sayfa</Link>
+          <Link to="/products" onClick={closeMenu}>Ürünler</Link>
+          <Link to="/routine" onClick={closeMenu}>Rutinler</Link>
+          <Link to="/cart" className="cart-link" onClick={closeMenu}>
             Sepet
             {totalItems > 0 && (
               <span className="cart-badge">{totalItems}</span>
@@ -47,7 +63,7 @@ const Navbar = () => {
           </button>
           {isAuthenticated ? (
             <>
-              <Link to="/profile" className="user-name">
+              <Link to="/profile" className="user-name" onClick={closeMenu}>
                 {user?.name}
               </Link>
               <button className="btn btn-secondary btn-sm" onClick={handleLogout}>
@@ -55,7 +71,7 @@ const Navbar = () => {
               </button>
             </>
           ) : (
-            <Link to="/login" className="btn btn-primary btn-sm">
+            <Link to="/login" className="btn btn-primary btn-sm" onClick={closeMenu}>
               Giriş
             </Link>
           )}
