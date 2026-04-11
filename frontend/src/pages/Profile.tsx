@@ -15,14 +15,14 @@ const Profile = () => {
     allergies: user?.allergies?.join(', ') || '',
   });
 
-  const skinTypes = [
-    'Kuru',
-    'Yağlı',
-    'Karma',
-    'Hassas',
-    'Normal',
-    'Kombine',
-  ];
+  const skinTypeLabels: Record<string, string> = {
+    'dry': 'Kuru',
+    'oily': 'Yağlı',
+    'combination': 'Karma',
+    'normal': 'Normal',
+  };
+
+  const skinTypes = Object.keys(skinTypeLabels);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -115,7 +115,7 @@ const Profile = () => {
                 </div>
                 <div className="info-item">
                   <label>Cilt Tipi</label>
-                  <p>{user.skinType || 'Belirtilmemiş'}</p>
+                  <p>{user.skinType ? (skinTypeLabels[user.skinType] || user.skinType) : 'Belirtilmemiş'}</p>
                 </div>
                 <div className="info-item">
                   <label>Alerjiler</label>
@@ -177,7 +177,7 @@ const Profile = () => {
                     <option value="">Seçiniz</option>
                     {skinTypes.map((type) => (
                       <option key={type} value={type}>
-                        {type}
+                        {skinTypeLabels[type]}
                       </option>
                     ))}
                   </select>

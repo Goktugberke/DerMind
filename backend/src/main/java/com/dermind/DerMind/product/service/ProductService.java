@@ -129,6 +129,11 @@ public class ProductService {
                 .map(this::convertToResponseDTO);
     }
 
+    public Page<ProductResponseDTO> filterProducts(String searchTerm, Double minPrice, Double maxPrice, Double minQuality, Pageable pageable) {
+        return productRepository.filterProducts(searchTerm, minPrice, maxPrice, minQuality, pageable)
+                .map(this::convertToResponseDTO);
+    }
+
     public List<ProductDetailDTO> getTopQualityProducts(int limit) {
         return productRepository.findTopQualityProducts(Pageable.ofSize(limit))
                 .getContent().stream().map(this::convertToDetailDTO).collect(Collectors.toList());

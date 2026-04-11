@@ -51,8 +51,8 @@ const Routine = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const data = await productApi.getAllProducts();
-        setAllProducts(data);
+        const data = await productApi.getAllProducts(0, 500); // Fetch a large batch for selection
+        setAllProducts(data.content);
       } catch (err) {
         console.error('Error fetching products:', err);
       }
