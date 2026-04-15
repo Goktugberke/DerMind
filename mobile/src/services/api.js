@@ -1,12 +1,9 @@
 import axios from 'axios';
 import { Platform } from 'react-native';
 import { getAuth } from '@react-native-firebase/auth';
+import { API_URL_ANDROID, API_URL_IOS } from '@env';
 
-
-// Emulator tipine göre IP'yi otomatik seçelim
-const BASE_URL = Platform.OS === 'android' 
-  ? 'http://10.0.2.2:8080' 
-  : 'http://localhost:8080';
+const BASE_URL = Platform.OS === 'android' ? API_URL_ANDROID : API_URL_IOS;
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -33,6 +30,11 @@ export const authService = {
 
   // Kullanıcı Detayı Çekme (GET /api/users/me)
   getCurrentUser: () => api.get('/api/users/me'),
+};
+
+export const productService = {
+  getAllProducts: () => api.get('/api/products'),
+  searchProducts: (q) => api.get(`/api/products/search?q=${q}`),
 };
 
 export default api;

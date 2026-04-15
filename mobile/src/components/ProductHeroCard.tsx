@@ -12,7 +12,7 @@ export const ProductHeroCard = ({ name, brand, imageUrl }: ProductHeroProps) => 
         <View style={styles.container}>
             {/* Görsel Kartı */}
             <ImageBackground
-                source={{ uri: 'https://images.unsplash.com/photo-1595295333158-4742f28fbd85?auto=format&fit=crop&q=80&w=200' }}
+                source={{ uri: imageUrl }}
                 style={styles.cardContainer}
                 imageStyle={{ borderRadius: 20 }}
                 resizeMode='cover'

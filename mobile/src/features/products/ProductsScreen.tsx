@@ -21,12 +21,10 @@ export const ProductsScreen = () => {
 
   // Backend'den (GET /api/purchases/user/{userId}) gelecek örnek veri
   const dummyPurchases = [
-    { id: '1', brand: 'La Roche Posay', name: 'Effaclar Gel', orderStatus: 'TESLİM EDİLDİ', price: '250', date: '2024-02-10' },
-    { id: '2', brand: 'CeraVe', name: 'Moisturizing Cream', orderStatus: 'YOLDA', price: '320', date: '2024-02-15' },
-    { id: '3', brand: 'Vichy', name: 'Mineral 89', orderStatus: 'TESLİM EDİLDİ', price: '450', date: '2024-01-20' },
-    { id: '4', brand: 'La Roche Posay', name: 'Effaclar Gel', orderStatus: 'TESLİM EDİLDİ', price: '250', date: '2024-02-10' },
-    { id: '5', brand: 'CeraVe', name: 'Moisturizing Cream', orderStatus: 'YOLDA', price: '320', date: '2024-02-15' },
-    { id: '6', brand: 'Vichy', name: 'Mineral 89', orderStatus: 'TESLİM EDİLDİ', price: '450', date: '2024-01-20' },
+    { id: '1', brand: 'La Roche Posay', name: 'Effaclar Gel', orderStatus: 'TESLİM EDİLDİ', price: '250', date: '2024-02-10', image: 'https://images.unsplash.com/photo-1556229010-6c3f2c9ca5f8?q=80&w=400&auto=format&fit=crop' },
+    { id: '2', brand: 'CeraVe', name: 'Moisturizing Cream', orderStatus: 'YOLDA', price: '320', date: '2024-02-15', image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?q=80&w=400&auto=format&fit=crop' },
+    { id: '3', brand: 'Vichy', name: 'Mineral 89', orderStatus: 'TESLİM EDİLDİ', price: '450', date: '2024-01-20', image: 'https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?q=80&w=400&auto=format&fit=crop' },
+
   ];
 
   const sortOptions = [

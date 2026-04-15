@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, SafeAreaView, TextInput, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, SafeAreaView, TextInput, TouchableOpacity, Image } from 'react-native';
 import { PageHeader } from '@components/PageHeader';
 import { CustomButton } from '@components/CustomButton';
 import { FeedbackInput } from '@components/FeedbackInput';
@@ -60,7 +60,7 @@ export const RateScreen = () => {
                 <View style={styles.card}>
                     <View style={styles.userRow}>
                         {/* Burası sabit kalabilir veya kullanıcı profili çekilebilir */}
-                        <View style={styles.avatarPlaceholder} />
+                        <Image source={{ uri: 'https://i.pravatar.cc/300' }} style={styles.avatarPlaceholder} />
                         <View>
                             <Text style={styles.userName}>Ayşe Yılmaz</Text>
                             <Text style={styles.userSub}>Rating your experience</Text>

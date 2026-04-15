@@ -69,6 +69,7 @@ export const ProductDetailScreen = ({ navigation, route }: any) => {
                 <ProductInfoCard
                     brand={product.brand}
                     name={product.name}
+                    imageUrl={product.image}
                     description={product.description}
                     rating={product.rating}
                     reviewsCount={product.reviewsCount}

@@ -26,10 +26,10 @@ export const FavoritesScreen = ({ navigation }: any) => {
 
   // Dummy Favori Verisi
   const [favorites, setFavorites] = useState([
-    { id: '1', brand: 'Nivea', name: 'Sun Cream', price: '24.95', image: 'https://via.placeholder.com/150' },
-    { id: '2', brand: 'Bioderma', name: 'Sebium Foaming Gel', price: '55.10', image: 'https://via.placeholder.com/150' },
-    { id: '3', brand: 'La Roche', name: 'Effaclar Duo', price: '32.50', image: 'https://via.placeholder.com/150' },
-    { id: '4', brand: 'Cerave', name: 'Hydrating Cleanser', price: '64.00', image: 'https://via.placeholder.com/150' },
+    { id: '1', brand: 'Nivea', name: 'Sun Cream', price: '24.95', image: 'https://images.unsplash.com/photo-1612817288484-6f916006741a?q=80&w=400&auto=format&fit=crop' },
+    { id: '2', brand: 'Bioderma', name: 'Sebium Foaming Gel', price: '55.10', image: 'https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?q=80&w=400&auto=format&fit=crop' },
+    { id: '3', brand: 'La Roche', name: 'Effaclar Duo', price: '32.50', image: 'https://images.unsplash.com/photo-1556229010-6c3f2c9ca5f8?q=80&w=400&auto=format&fit=crop' },
+    { id: '4', brand: 'Cerave', name: 'Hydrating Cleanser', price: '64.00', image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?q=80&w=400&auto=format&fit=crop' },
   ]);
 
   const sortOptions = [

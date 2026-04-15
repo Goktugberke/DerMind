@@ -7,6 +7,7 @@ import { RoutineCalendar } from '@components/RoutineCalendar';
 import { DateInfoCard } from '@components/DateInfoCard';
 import { CustomButton } from '@components/CustomButton';
 import { ExpertTipBox } from '@components/ExpertTipBox';
+import { FrequencySelector } from '@components/FrequencySelector';
 import { ReminderRow } from '@components/ReminderRow';
 import { theme } from '@constants/theme';
 
@@ -47,7 +48,7 @@ export const StartRoutineScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <PageHeader
-        title="Start Routine"
+        title="Edit Routine"
         fontSize={20}
         fontWeight="600"
         align="left"
@@ -61,7 +62,7 @@ export const StartRoutineScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         {/* Tasarımdaki başlıklar */}
-        <Text style={styles.mainTitle}>New Plan</Text>
+        <Text style={styles.mainTitle}>Your Plan</Text>
         <Text style={styles.subTitle}>Customize your schedule</Text>
         {/* 2. New Plan & Product Card Bölümü buraya gelecek */}
         <View style={styles.section}>
@@ -91,6 +92,10 @@ export const StartRoutineScreen = () => {
           />
         </View>
 
+        <View style={styles.section}>
+          <FrequencySelector />
+        </View>
+
         {/* 5. Expert Tip ve Hatırlatıcılar */}
         <View style={styles.section}>
           <ExpertTipBox
@@ -107,11 +112,11 @@ export const StartRoutineScreen = () => {
       {/* 6. Sabit Alt Buton (Footer) */}
       <View style={styles.footer}>
         <CustomButton
-          title="Start Routine"
+          title="Edit Routine"
 
           onPress={handleStartRoutine}
           isLoading={loading}
-          disabled={isButtonDisabled}
+          disabled={false}
         />
       </View>
     </SafeAreaView>
@@ -152,7 +157,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     width: '100%',
-    padding: 20,
+    padding: 10,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#EEE',
