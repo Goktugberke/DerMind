@@ -7,14 +7,15 @@ import { SearchBar } from '@components/SearchBar';
 import { FilterActions } from '@components/FilterActions';
 import { ProductCard } from '@components/ProductCard';
 import { theme } from '@constants/theme';
+import { authService, productService } from '@services/api';
 
 const initialProducts = [
-  { id: '1', brand: 'Nivea', name: 'Sun Cream', volume: 40, generalScore: '7.3', aiScore: '8.5', price: '24.95' },
-  { id: '2', brand: 'Bioderma', name: 'Sun Cream', volume: 50, generalScore: '9.1', aiScore: '8.9', price: '55.10' },
-  { id: '3', brand: 'La Roche', name: 'Moisturizer', volume: 75, generalScore: '8.2', aiScore: '2.0', price: '32.50' },
-  { id: '4', brand: 'Vichy', name: 'Tonic', volume: 200, generalScore: '3.8', aiScore: '7.4', price: '41.00' },
-  { id: '5', brand: 'Garnier', name: 'Face Wash', volume: 150, generalScore: '7.0', aiScore: '7.9', price: '18.90' },
-  { id: '6', brand: 'Cerave', name: 'Cleanser', volume: 236, generalScore: '9.3', aiScore: '9.5', price: '64.00' },
+  { id: '1', brand: 'Nivea', name: 'Sun Cream', volume: 40, generalScore: '7.3', aiScore: '8.5', price: '24.95', image: 'https://images.unsplash.com/photo-1556229010-6c3f2c9ca5f8?q=80&w=400&auto=format&fit=crop' },
+  { id: '2', brand: 'Bioderma', name: 'Sun Cream', volume: 50, generalScore: '9.1', aiScore: '8.9', price: '55.10', image: 'https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?q=80&w=400&auto=format&fit=crop' },
+  { id: '3', brand: 'La Roche', name: 'Moisturizer', volume: 75, generalScore: '8.2', aiScore: '2.0', price: '32.50', image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?q=80&w=400&auto=format&fit=crop' },
+  { id: '4', brand: 'Vichy', name: 'Tonic', volume: 200, generalScore: '3.8', aiScore: '7.4', price: '41.00', image: 'https://images.unsplash.com/photo-1612817288484-6f916006741a?q=80&w=400&auto=format&fit=crop' },
+  { id: '5', brand: 'Garnier', name: 'Face Wash', volume: 150, generalScore: '7.0', aiScore: '7.9', price: '18.90', image: 'https://loremflickr.com/400/400/skincare,cosmetics' },
+  { id: '6', brand: 'Cerave', name: 'Cleanser', volume: 236, generalScore: '9.3', aiScore: '9.5', price: '64.00', image: 'https://images.unsplash.com/photo-1608848461970-4909a5a5195b?q=80&w=400&auto=format&fit=crop' },
   { id: '7', brand: 'Nivea', name: 'Sun Cream', volume: 40, generalScore: '4.3', aiScore: '8.5', price: '24.95' },
   { id: '8', brand: 'Bioderma', name: 'Sun Cream', volume: 50, generalScore: '9.1', aiScore: '8.9', price: '55.10' },
   { id: '9', brand: 'La Roche', name: 'Moisturizer', volume: 75, generalScore: '8.2', aiScore: '2.0', price: '32.50' },
@@ -27,29 +28,43 @@ const HEADER_SCROLL_DISTANCE = 110;
 
 export const HomeScreen = ({ navigation }: any) => {
   const [searchQuery, setSearchQuery] = React.useState('');
-  const [userName, setUserName] = React.useState('Ayşe');
+  const [userName, setUserName] = React.useState('Kullanıcı');
   const [products, setProducts] = React.useState(initialProducts);
   const headerAnimValue = useSharedValue(0);
   const scrollY = useSharedValue(0);
   const insets = useSafeAreaInsets();
 
-  // const [userName, setUserName] = React.useState('');
-  // const [loadingUser, setLoadingUser] = React.useState(true);
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [userRes, prodRes] = await Promise.all([
+          authService.getCurrentUser().catch(() => null),
+          productService.getAllProducts().catch(() => null)
+        ]);
 
-  // React.useEffect(() => {
-  //   const fetchUser = async () => {
-  //     try {
-  //       const response = await authService.getCurrentUser();
-  //       setUserName(response.data.name); // backend field neyse onu yaz
-  //     } catch (error) {
-  //       console.log('User fetch error:', error);
-  //     } finally {
-  //       setLoadingUser(false);
-  //     }
-  //   };
+        if (userRes && userRes.data && userRes.data.name) {
+          setUserName(userRes.data.name.split(' ')[0]); // Kullanıcının adının ilk kelimesini al
+        }
 
-  //   fetchUser();
-  // }, []);
+        if (prodRes && prodRes.data && Array.isArray(prodRes.data)) {
+          const apiProducts = prodRes.data.map((p: any) => ({
+            id: p.id ? p.id.toString() : Math.random().toString(),
+            brand: p.brand || 'Ürün Markası',
+            name: p.name || 'Ürün Adı',
+            volume: 50,
+            generalScore: p.qualityScore ? p.qualityScore.toString() : '0.0',
+            aiScore: p.qualityScore ? p.qualityScore.toString() : '0.0',
+            price: p.price ? p.price.toString() : '0.00',
+            image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?q=80&w=400&auto=format&fit=crop'
+          }));
+          setProducts(apiProducts.length > 0 ? apiProducts : initialProducts);
+        }
+      } catch (error) {
+        console.log('Error fetching home data:', error);
+      }
+    };
+    fetchData();
+  }, []);
 
   // const onScroll = useAnimatedScrollHandler((event) => {
   //   scrollY.value = event.contentOffset.y;
@@ -136,12 +151,13 @@ export const HomeScreen = ({ navigation }: any) => {
       <Animated.FlatList
         onScroll={onScroll}
         scrollEventThrottle={16}
-        data={initialProducts}
+        data={products}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <ProductCard item={item} onPress={() => navigation.navigate('ProductDetail', {
           product: {
             brand: item.brand,
             name: item.name,
+            image: item.image,
             description: 'Advanced daily UV fluid with Antioxidant Vitamin C. High protection.', // Mock till actual data
             rating: parseFloat(item.generalScore),
             reviewsCount: Math.floor(Math.random() * 500) + 50,
