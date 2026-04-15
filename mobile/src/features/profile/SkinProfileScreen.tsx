@@ -113,7 +113,7 @@ export const SkinProfileScreen = () => {
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#FFFFFF' },
+    container: { flex: 1, backgroundColor: theme.colors.deepbackground },
     scrollContent: { padding: 20 },
     sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 15 },
     sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1E293B' },

@@ -8,7 +8,11 @@ export const PurchasedProductCard = ({ item, onRate, onStartStreak }: any) => {
     <View style={styles.card}>
       {/* Ürün Görseli ve Bilgisi */}
       <View style={styles.mainInfo}>
-        <View style={styles.imagePlaceholder} />
+        <Image
+          source={{ uri: item.image }}
+          style={styles.productImage}
+          resizeMode="contain"
+        />
         <View style={styles.textContainer}>
           <Text style={styles.brand}>{item.brand}</Text>
           <Text style={styles.productName}>{item.name}</Text>
@@ -43,7 +47,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   mainInfo: { flexDirection: 'row', alignItems: 'center' },
-  imagePlaceholder: { width: 60, height: 60, backgroundColor: '#f4f4f4ff', borderRadius: 12 },
+  productImage: { width: 60, height: 60, backgroundColor: '#f4f4f4ff', borderRadius: 12 },
   textContainer: { flex: 1, marginLeft: 15 },
   brand: { fontSize: 14, fontWeight: 'bold', color: theme.colors.primary },
   productName: { fontSize: 16, fontWeight: '700', color: theme.colors.text },

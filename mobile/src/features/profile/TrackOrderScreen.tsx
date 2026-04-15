@@ -21,7 +21,7 @@ export const TrackOrderScreen = () => {
                 {/* ÜRÜN ÖZET KARTI */}
                 <View style={styles.productSummary}>
                     <Image
-                        source={{ uri: 'https://via.placeholder.com/200' }}
+                        source={{ uri: 'https://images.unsplash.com/photo-1612817288484-6f916006741a?q=80&w=400&auto=format&fit=crop' }}
                         style={styles.productImage}
                     />
                     <View style={styles.productInfo}>

@@ -31,7 +31,10 @@ export const ProductInfoCard = ({
             {/* Left Side: Product Image Wrapper */}
             <View style={styles.imageWrapper}>
                 {imageUrl ? (
-                    <Image source={imageUrl} style={styles.productImage} resizeMode="contain" />
+                    <Image
+                        source={{ uri: imageUrl }}
+                        style={styles.productImage}
+                        resizeMode="contain" />
                 ) : (
                     <View style={styles.imagePlaceholder} />
                 )}
