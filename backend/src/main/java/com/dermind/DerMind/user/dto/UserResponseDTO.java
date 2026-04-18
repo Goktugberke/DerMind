@@ -13,5 +13,6 @@ public class UserResponseDTO {
     private String name;
     private String allergens;
     private String skinType;
+    private boolean hasAcne;
     private String picture;
 }

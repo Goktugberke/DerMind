@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>DerMind — System Flow Diagram</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Arial, sans-serif;
+    background: #fff;
+    padding: 40px;
+    color: #111;
+  }
+  h1 {
+    text-align: center;
+    font-size: 20px;
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 13px;
+    color: #555;
+    margin-bottom: 40px;
+  }
+  .flow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+  .node {
+    border: 2px solid #222;
+    padding: 10px 24px;
+    font-size: 13px;
+    text-align: center;
+    min-width: 260px;
+    max-width: 340px;
+    background: #fff;
+    line-height: 1.5;
+  }
+  .node.rounded   { border-radius: 50px; }
+  .node.diamond   { display: none; }
+  .node.process   { border-radius: 0; }
+  .node.data      { border-radius: 0; border-style: dashed; }
+  .node.internal  {
+    border-radius: 0;
+    border: 2px solid #222;
+    background: #f5f5f5;
+    max-width: 420px;
+    padding: 14px 20px;
+    text-align: left;
+  }
+  .node.internal .step {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin-bottom: 8px;
+  }
+  .node.internal .step:last-child { margin-bottom: 0; }
+  .node.internal .num {
+    font-weight: bold;
+    min-width: 20px;
+  }
+  .note {
+    font-size: 11px;
+    color: #555;
+    border: 1px solid #999;
+    padding: 6px 12px;
+    max-width: 260px;
+    text-align: center;
+    margin-left: 16px;
+    align-self: center;
+  }
+  .arrow {
+    width: 2px;
+    height: 28px;
+    background: #222;
+    position: relative;
+    margin: 0 auto;
+  }
+  .arrow::after {
+    content: '';
+    position: absolute;
+    bottom: -7px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 8px solid #222;
+  }
+  /* decision diamond via CSS clip */
+  .diamond-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .diamond-box {
+    border: 2px solid #222;
+    padding: 10px 20px;
+    font-size: 13px;
+    text-align: center;
+    min-width: 220px;
+    transform: none;
+    background: #fff;
+  }
+  .split {
+    display: flex;
+    gap: 60px;
+    align-items: flex-start;
+    justify-content: center;
+    margin-top: 0;
+  }
+  .split-branch {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+  .branch-label {
+    font-size: 12px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 4px;
+    text-align: center;
+  }
+  .h-line {
+    height: 2px;
+    background: #222;
+    width: 100%;
+    margin: 0;
+  }
+  .section-label {
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: #555;
+    text-align: center;
+    margin: 16px 0 4px 0;
+    text-transform: uppercase;
+  }
+  .join-line {
+    width: 360px;
+    height: 2px;
+    background: #222;
+    margin: 0 auto;
+  }
+  .horizontal-connector {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    position: relative;
+  }
+  .v-line {
+    width: 2px;
+    background: #222;
+    margin: 0 auto;
+  }
+</style>
+</head>
+<body>
+
+<h1>DerMind — System Flow Diagram</h1>
+<div class="subtitle">4.2.2 System Flow Diagrams — Güncel Versiyon</div>
+
+<div class="flow">
+
+  <!-- START -->
+  <div class="node rounded">(Start) User Opens App</div>
+  <div class="arrow"></div>
+
+  <!-- AUTH DECISION -->
+  <div class="section-label">Authentication</div>
+  <div class="diamond-box">(Decision) Already Logged In?</div>
+  <div style="display:flex; gap:80px; align-items:flex-start; justify-content:center; margin-top:0;">
+    <!-- YES branch -->
+    <div class="split-branch">
+      <div class="arrow"></div>
+      <div class="branch-label">YES</div>
+      <div style="height:20px;"></div>
+    </div>
+    <!-- NO branch -->
+    <div class="split-branch">
+      <div class="arrow"></div>
+      <div class="branch-label">NO</div>
+      <div class="node process">(Process) Google OAuth2 Login</div>
+      <div class="arrow"></div>
+    </div>
+  </div>
+
+  <!-- rejoin -->
+  <div class="arrow"></div>
+
+  <!-- SKIN PROFILE -->
+  <div class="section-label">Profile</div>
+  <div class="node process">(Process) Submit Skin Profile Form<br><small>Skin Type, Allergens</small></div>
+  <div class="arrow"></div>
+
+  <!-- SAVE DB -->
+  <div class="node data">(Data) Save to Database<br><small>User Profile — PostgreSQL</small></div>
+  <div class="arrow"></div>
+
+  <!-- REQUEST PRODUCTS -->
+  <div class="node process">(Process) Request Product List</div>
+  <div class="arrow"></div>
+
+  <!-- AI ENGINE -->
+  <div class="section-label">AI Engine (ai-server :8000)</div>
+  <div class="node internal">
+    <div style="font-weight:bold; margin-bottom:10px; text-align:center;">(Internal Process) AI Scoring Engine</div>
+    <div class="step">
+      <span class="num">1.</span>
+      <span><strong>Allergen Check</strong><br>Product ingredients vs. user allergens.<br>Match found → penalty applied to score.</span>
+    </div>
+    <div class="step">
+      <span class="num">2.</span>
+      <span><strong>XGBoost Scoring</strong><br>27 features → Personalized Score (0–10).<br>Skin type, ingredient quality, streak weight.</span>
+    </div>
+    <div class="step">
+      <span class="num">3.</span>
+      <span><strong>KNN Recommendation Filter</strong><br>Cosine similarity on product vectors.<br>Most similar products ranked and returned.</span>
+    </div>
+  </div>
+  <div class="arrow"></div>
+
+  <!-- DISPLAY -->
+  <div class="node process">(Process) Display Products with 'Personalized Score'</div>
+  <div class="arrow"></div>
+
+  <!-- ACTION DECISION -->
+  <div class="section-label">User Action</div>
+  <div class="diamond-box">(Decision) Select Action?</div>
+  <div class="arrow"></div>
+
+  <!-- 3-WAY SPLIT -->
+  <div style="display:flex; gap:40px; align-items:flex-start; justify-content:center;">
+
+    <!-- Branch 1: Purchase -->
+    <div class="split-branch">
+      <div class="branch-label">Add to Cart</div>
+      <div class="node process">(Process) Add to Cart</div>
+      <div class="arrow"></div>
+      <div class="node rounded">(End) Checkout</div>
+      <div class="arrow"></div>
+      <div class="node process">(Process) Update Streak</div>
+      <div class="arrow"></div>
+      <div class="node process">(Notification) Streak / Order Alert</div>
+    </div>
+
+    <!-- Branch 2: Explain -->
+    <div class="split-branch">
+      <div class="branch-label">Get Explanation</div>
+      <div class="node process">(Process) Request XAI<br>Explanation</div>
+      <div class="arrow"></div>
+      <div class="node internal" style="max-width:200px; font-size:12px;">
+        <div style="font-weight:bold; margin-bottom:6px;">SHAP + LLM</div>
+        <div>Feature importance via SHAP TreeExplainer → Ollama / OpenAI → Natural language output</div>
+      </div>
+      <div class="arrow"></div>
+      <div class="node rounded">(End) Explanation Shown</div>
+    </div>
+
+    <!-- Branch 3: Favorite -->
+    <div class="split-branch">
+      <div class="branch-label">Add to Favorites</div>
+      <div class="node process">(Process) Add to Favorites</div>
+      <div class="arrow"></div>
+      <div class="node rounded">(End) Saved to Wishlist</div>
+    </div>
+
+  </div>
+
+</div>
+
+</body>
+</html>

@@ -20,6 +20,7 @@ public class UserCreateDto {
     private String name;
     private String allergens;
     private String skinType;
+    private boolean hasAcne = false;
     private String picture;
 }
 

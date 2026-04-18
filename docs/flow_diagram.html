@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DerMind — System Flow Diagram</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Arial, sans-serif;
+    background: #ffffff;
+    padding: 32px 40px;
+    color: #000;
+    font-size: 11px;
+  }
+  .page-title {
+    font-size: 15px;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 2px;
+    letter-spacing: 0.5px;
+  }
+  .page-sub {
+    font-size: 10px;
+    color: #555;
+    text-align: center;
+    margin-bottom: 24px;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-title">DerMind — Personalized Product Recommendation Flow</div>
+<div class="page-sub">System Flow Diagram · April 2026</div>
+
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="900" height="1080"
+     style="display:block; margin:0 auto; border:1.5px solid #ccc; background:#fff;">
+
+  <defs>
+    <marker id="arr" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0,0 8,3.5 0,7" fill="#222"/>
+    </marker>
+    <marker id="arr-no" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0,0 8,3.5 0,7" fill="#c0392b"/>
+    </marker>
+    <marker id="arr-yes" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0,0 8,3.5 0,7" fill="#27ae60"/>
+    </marker>
+  </defs>
+
+  <!-- ────────────────────────────────────────
+       SWIM LANE BACKGROUNDS
+  ─────────────────────────────────────────── -->
+  <!-- Lane 1: Authentication -->
+  <rect x="0" y="40" width="900" height="130" fill="#f0f4ff" opacity="0.6"/>
+  <text x="8" y="90" font-size="9" fill="#3a4a8a" font-weight="bold" transform="rotate(-90,8,90)">AUTH</text>
+
+  <!-- Lane 2: Profile -->
+  <rect x="0" y="170" width="900" height="110" fill="#f0fff4" opacity="0.6"/>
+  <text x="8" y="220" font-size="9" fill="#1a6a3a" font-weight="bold" transform="rotate(-90,8,220)">PROFILE</text>
+
+  <!-- Lane 3: AI Engine -->
+  <rect x="0" y="280" width="900" height="180" fill="#fff8f0" opacity="0.7"/>
+  <text x="8" y="370" font-size="9" fill="#8a4a00" font-weight="bold" transform="rotate(-90,8,370)">AI ENGINE</text>
+
+  <!-- Lane 4: User Action -->
+  <rect x="0" y="460" width="900" height="580" fill="#fdf0ff" opacity="0.5"/>
+  <text x="8" y="750" font-size="9" fill="#5a1a8a" font-weight="bold" transform="rotate(-90,8,750)">USER ACTION</text>
+
+  <!-- Lane labels right side -->
+  <text x="872" y="110" font-size="9" fill="#3a4a8a" font-weight="bold" text-anchor="end">AUTHENTICATION</text>
+  <text x="872" y="228" font-size="9" fill="#1a6a3a" font-weight="bold" text-anchor="end">PROFILE</text>
+  <text x="872" y="375" font-size="9" fill="#8a4a00" font-weight="bold" text-anchor="end">AI ENGINE  (ai-server:8000)</text>
+  <text x="872" y="760" font-size="9" fill="#5a1a8a" font-weight="bold" text-anchor="end">USER ACTION</text>
+
+  <!-- Lane dividers -->
+  <line x1="0" y1="40"  x2="900" y2="40"  stroke="#ccd" stroke-width="1.5"/>
+  <line x1="0" y1="170" x2="900" y2="170" stroke="#ccd" stroke-width="1.5"/>
+  <line x1="0" y1="280" x2="900" y2="280" stroke="#ccd" stroke-width="1.5"/>
+  <line x1="0" y1="460" x2="900" y2="460" stroke="#ccd" stroke-width="1.5"/>
+
+  <!-- ══════════════════════════════════════
+       NODE HELPERS  (macros via text shapes)
+  ══════════════════════════════════════════ -->
+
+  <!-- ── START node ── -->
+  <!-- (Start) User Opens App -->
+  <ellipse cx="450" cy="20" rx="110" ry="16" fill="#222" stroke="#000" stroke-width="1.5"/>
+  <text x="450" y="24" text-anchor="middle" font-size="10" fill="#fff" font-weight="bold">(Start)  User Opens App</text>
+
+  <!-- arrow down -->
+  <line x1="450" y1="36" x2="450" y2="58" stroke="#222" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ── DECISION: Already Logged In? ── -->
+  <!-- diamond -->
+  <polygon points="450,58 560,96 450,134 340,96" fill="#ddeeff" stroke="#3355aa" stroke-width="1.8"/>
+  <text x="450" y="91" text-anchor="middle" font-size="9.5" font-weight="bold">(Decision)</text>
+  <text x="450" y="104" text-anchor="middle" font-size="9.5" font-weight="bold">Already Logged In?</text>
+
+  <!-- YES → right bypass -->
+  <line x1="560" y1="96" x2="640" y2="96" stroke="#27ae60" stroke-width="1.5" marker-end="url(#arr-yes)"/>
+  <text x="592" y="89" font-size="9" fill="#27ae60" font-weight="bold">YES</text>
+  <!-- YES line goes down to Profile -->
+  <line x1="640" y1="96" x2="640" y2="195" stroke="#27ae60" stroke-width="1.5" marker-end="url(#arr-yes)"/>
+
+  <!-- NO → down -->
+  <line x1="450" y1="134" x2="450" y2="150" stroke="#c0392b" stroke-width="1.5" marker-end="url(#arr-no)"/>
+  <text x="458" y="146" font-size="9" fill="#c0392b" font-weight="bold">NO</text>
+
+  <!-- ── PROCESS: Google OAuth2 ── -->
+  <rect x="330" y="150" width="240" height="38" rx="6" fill="#fff" stroke="#3355aa" stroke-width="1.8"/>
+  <text x="450" y="165" text-anchor="middle" font-size="9" fill="#555">(Process)</text>
+  <text x="450" y="180" text-anchor="middle" font-size="10" font-weight="bold">Google OAuth2 Login</text>
+
+  <!-- down -->
+  <line x1="450" y1="188" x2="450" y2="195" stroke="#222" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ── PROCESS: Submit Skin Profile Form ── -->
+  <rect x="280" y="195" width="320" height="44" rx="6" fill="#e8fff0" stroke="#27ae60" stroke-width="1.8"/>
+  <text x="440" y="212" text-anchor="middle" font-size="9" fill="#1a6a3a">(Process)</text>
+  <text x="440" y="227" text-anchor="middle" font-size="10.5" font-weight="bold">Submit Skin Profile Form</text>
+  <text x="440" y="238" text-anchor="middle" font-size="8.5" fill="#555">Skin Type · Allergens · Concerns</text>
+  <!-- YES line joins here -->
+  <line x1="640" y1="195" x2="600" y2="217" stroke="#27ae60" stroke-width="1.5" marker-end="url(#arr-yes)"/>
+
+  <!-- down -->
+  <line x1="440" y1="239" x2="440" y2="252" stroke="#222" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ── DATA: Save to PostgreSQL ── -->
+  <!-- cylinder shape -->
+  <rect x="310" y="252" width="260" height="36" rx="4" fill="#fffbe6" stroke="#aa8800" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="440" y="267" text-anchor="middle" font-size="9" fill="#776600">(Data Store)</text>
+  <text x="440" y="280" text-anchor="middle" font-size="10" font-weight="bold" fill="#554400">User Profile → PostgreSQL</text>
+
+  <!-- down -->
+  <line x1="440" y1="288" x2="440" y2="295" stroke="#222" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ── AI ENGINE BANNER ── -->
+  <rect x="160" y="295" width="580" height="20" rx="3" fill="#cc6600"/>
+  <text x="450" y="309" text-anchor="middle" font-size="10" fill="#fff" font-weight="bold" letter-spacing="1">AI ENGINE  (ai-server : 8000)</text>
+
+  <!-- ── INTERNAL PROCESS BOX ── -->
+  <rect x="160" y="320" width="580" height="148" rx="6" fill="#fff8f0" stroke="#cc6600" stroke-width="2"/>
+
+  <!-- Step 1: Allergen Check -->
+  <rect x="175" y="330" width="170" height="50" rx="4" fill="#fff" stroke="#cc6600" stroke-width="1.2"/>
+  <text x="260" y="345" text-anchor="middle" font-size="9.5" font-weight="bold" fill="#8a3300">1. Allergen Check</text>
+  <text x="260" y="358" text-anchor="middle" font-size="8.5" fill="#555">Product ingredients vs.</text>
+  <text x="260" y="370" text-anchor="middle" font-size="8.5" fill="#555">user allergens → penalty applied</text>
+
+  <!-- Step 2: XGBoost Scoring -->
+  <rect x="365" y="330" width="175" height="50" rx="4" fill="#fff" stroke="#cc6600" stroke-width="1.2"/>
+  <text x="452" y="345" text-anchor="middle" font-size="9.5" font-weight="bold" fill="#8a3300">2. XGBoost Scoring</text>
+  <text x="452" y="358" text-anchor="middle" font-size="8.5" fill="#555">28 features → Personal Score</text>
+  <text x="452" y="370" text-anchor="middle" font-size="8.5" fill="#555">(1–10) · cold-start + fine-tune</text>
+
+  <!-- Step 3: KNN Filter -->
+  <rect x="560" y="330" width="165" height="50" rx="4" fill="#fff" stroke="#cc6600" stroke-width="1.2"/>
+  <text x="642" y="345" text-anchor="middle" font-size="9.5" font-weight="bold" fill="#8a3300">3. KNN Recommendation</text>
+  <text x="642" y="358" text-anchor="middle" font-size="8.5" fill="#555">Cosine similarity (k=10)</text>
+  <text x="642" y="370" text-anchor="middle" font-size="8.5" fill="#555">Top products ranked &amp; returned</text>
+
+  <!-- horizontal arrows between steps -->
+  <line x1="345" y1="355" x2="365" y2="355" stroke="#cc6600" stroke-width="1.3" marker-end="url(#arr)"/>
+  <line x1="540" y1="355" x2="560" y2="355" stroke="#cc6600" stroke-width="1.3" marker-end="url(#arr)"/>
+
+  <!-- AI engine footer note -->
+  <text x="450" y="400" text-anchor="middle" font-size="8.5" fill="#665500">POST /score  ·  POST /recommend  ·  POST /explain</text>
+  <text x="450" y="413" text-anchor="middle" font-size="8.5" fill="#887755">XGBoost Regressor · Random Forest (baseline) · SHAP TreeExplainer · LLM (OpenAI / Ollama)</text>
+  <text x="450" y="426" text-anchor="middle" font-size="8.5" fill="#887755">R² = 0.853  ·  MAE = 0.391  ·  RMSE = 0.519  ·  5-fold CV R² = 0.839 ± 0.017</text>
+  <text x="450" y="440" text-anchor="middle" font-size="8.5" fill="#887755">Cold-start: 50,000 synthetic samples  →  Fine-tune: 966,157 Sephora reviews</text>
+  <text x="450" y="456" text-anchor="middle" font-size="8" fill="#aaa888">NotificationScheduler: 5 cron jobs  (08:00 morning reminder · 22:00 evening reminder · 12:00 streak warning · Sunday weekly summary · 00:01 streak reset)</text>
+
+  <!-- down from AI box -->
+  <line x1="450" y1="468" x2="450" y2="480" stroke="#222" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ── PROCESS: Display Products with Score ── -->
+  <rect x="280" y="480" width="340" height="42" rx="6" fill="#f0e8ff" stroke="#5a1a8a" stroke-width="1.8"/>
+  <text x="450" y="496" text-anchor="middle" font-size="9" fill="#5a1a8a">(Process)</text>
+  <text x="450" y="511" text-anchor="middle" font-size="10.5" font-weight="bold">Display Products with Personalized Score</text>
+
+  <!-- down -->
+  <line x1="450" y1="522" x2="450" y2="542" stroke="#222" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ── DECISION: Select Action ── -->
+  <polygon points="450,542 580,580 450,618 320,580" fill="#f0e8ff" stroke="#5a1a8a" stroke-width="1.8"/>
+  <text x="450" y="575" text-anchor="middle" font-size="9.5" font-weight="bold">(Decision)</text>
+  <text x="450" y="588" text-anchor="middle" font-size="9.5" font-weight="bold">Select Action</text>
+
+  <!-- ── BRANCH LEFT: Add to Cart ── -->
+  <line x1="320" y1="580" x2="165" y2="580" stroke="#222" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="240" y="572" font-size="9" fill="#444" text-anchor="middle">Add to Cart</text>
+
+  <rect x="60" y="597" width="160" height="36" rx="5" fill="#fff" stroke="#444" stroke-width="1.5"/>
+  <text x="140" y="612" text-anchor="middle" font-size="9" fill="#333">(Process)</text>
+  <text x="140" y="625" text-anchor="middle" font-size="10" font-weight="bold">Add to Cart</text>
+
+  <line x1="140" y1="633" x2="140" y2="652" stroke="#222" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Checkout terminal -->
+  <ellipse cx="140" cy="666" rx="65" ry="14" fill="#222" stroke="#000" stroke-width="1.5"/>
+  <text x="140" y="670" text-anchor="middle" font-size="9.5" fill="#fff" font-weight="bold">(End) Checkout</text>
+
+  <line x1="140" y1="680" x2="140" y2="698" stroke="#222" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Update Streak -->
+  <rect x="58" y="698" width="164" height="36" rx="5" fill="#e8f4ff" stroke="#2266aa" stroke-width="1.5"/>
+  <text x="140" y="713" text-anchor="middle" font-size="9" fill="#2266aa">(Process)</text>
+  <text x="140" y="726" text-anchor="middle" font-size="10" font-weight="bold">Update Streak</text>
+
+  <line x1="140" y1="734" x2="140" y2="752" stroke="#222" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Notification -->
+  <rect x="44" y="752" width="192" height="46" rx="5" fill="#fff9e6" stroke="#aa7700" stroke-width="1.5"/>
+  <text x="140" y="768" text-anchor="middle" font-size="9" fill="#775500">(Notification)</text>
+  <text x="140" y="781" text-anchor="middle" font-size="9.5" font-weight="bold">Streak / Order Alert</text>
+  <text x="140" y="793" text-anchor="middle" font-size="8" fill="#999">(in-app DB notification)</text>
+
+  <!-- ── BRANCH CENTRE: Get Explanation ── -->
+  <line x1="450" y1="618" x2="450" y2="640" stroke="#222" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="470" y="636" font-size="9" fill="#444">Get Explanation</text>
+
+  <rect x="318" y="640" width="264" height="36" rx="5" fill="#fff" stroke="#444" stroke-width="1.5"/>
+  <text x="450" y="655" text-anchor="middle" font-size="9" fill="#333">(Process)</text>
+  <text x="450" y="668" text-anchor="middle" font-size="10" font-weight="bold">Request XAI Explanation  (POST /explain)</text>
+
+  <line x1="450" y1="676" x2="450" y2="696" stroke="#222" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- SHAP + LLM box -->
+  <rect x="290" y="696" width="320" height="82" rx="6" fill="#fff8f0" stroke="#cc6600" stroke-width="1.8"/>
+  <text x="450" y="714" text-anchor="middle" font-size="10" font-weight="bold" fill="#8a3300">SHAP + LLM Explainer</text>
+  <line x1="295" y1="720" x2="606" y2="720" stroke="#cc6600" stroke-width="0.8"/>
+  <text x="450" y="734" text-anchor="middle" font-size="9" fill="#555">1. SHAP TreeExplainer → feature importance</text>
+  <text x="450" y="747" text-anchor="middle" font-size="9" fill="#555">2. Top 5 factors → LLM (Ollama / OpenAI)</text>
+  <text x="450" y="760" text-anchor="middle" font-size="9" fill="#555">3. Natural language output  (TR / EN)</text>
+  <text x="450" y="773" text-anchor="middle" font-size="8.5" fill="#888">Result cached by MD5(product_id + skin_type + language)</text>
+
+  <line x1="450" y1="778" x2="450" y2="796" stroke="#222" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- End: Explanation shown -->
+  <ellipse cx="450" cy="810" rx="100" ry="14" fill="#222" stroke="#000" stroke-width="1.5"/>
+  <text x="450" y="814" text-anchor="middle" font-size="9.5" fill="#fff" font-weight="bold">(End) Explanation Shown</text>
+
+  <!-- ── BRANCH RIGHT: Add to Favorites ── -->
+  <line x1="580" y1="580" x2="740" y2="580" stroke="#222" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="660" y="572" font-size="9" fill="#444" text-anchor="middle">Add to Favorites</text>
+
+  <rect x="668" y="597" width="176" height="36" rx="5" fill="#fff" stroke="#444" stroke-width="1.5"/>
+  <text x="756" y="612" text-anchor="middle" font-size="9" fill="#333">(Process)</text>
+  <text x="756" y="625" text-anchor="middle" font-size="10" font-weight="bold">Add to Favorites</text>
+
+  <line x1="756" y1="633" x2="756" y2="652" stroke="#222" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <ellipse cx="756" cy="666" rx="76" ry="14" fill="#222" stroke="#000" stroke-width="1.5"/>
+  <text x="756" y="670" text-anchor="middle" font-size="9.5" fill="#fff" font-weight="bold">(End) Saved to Wishlist</text>
+
+  <!-- ── LEGEND ── -->
+  <rect x="0" y="840" width="900" height="240" fill="#f9f9f9" stroke="#ccc" stroke-width="1"/>
+  <text x="20" y="862" font-size="11" font-weight="bold">Legend</text>
+  <line x1="20" y1="866" x2="880" y2="866" stroke="#ccc" stroke-width="1"/>
+
+  <!-- Start/End -->
+  <ellipse cx="55" cy="882" rx="36" ry="10" fill="#222"/>
+  <text x="100" y="886" font-size="9" fill="#333">Start / End (terminal)</text>
+
+  <!-- Process -->
+  <rect x="20" y="900" width="70" height="20" rx="4" fill="#fff" stroke="#444" stroke-width="1.5"/>
+  <text x="100" y="913" font-size="9" fill="#333">Process (action / computation)</text>
+
+  <!-- Decision -->
+  <polygon points="55,930 85,945 55,960 25,945" fill="#ddeeff" stroke="#3355aa" stroke-width="1.5"/>
+  <text x="100" y="949" font-size="9" fill="#333">Decision (branching point)</text>
+
+  <!-- Data store -->
+  <rect x="20" y="970" width="70" height="20" rx="2" fill="#fffbe6" stroke="#aa8800" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="100" y="983" font-size="9" fill="#333">Data store (PostgreSQL)</text>
+
+  <!-- AI module -->
+  <rect x="20" y="998" width="70" height="20" rx="2" fill="#fff8f0" stroke="#cc6600" stroke-width="2"/>
+  <text x="100" y="1011" font-size="9" fill="#333">AI module (ai-server:8000)</text>
+
+  <!-- Notification -->
+  <rect x="20" y="1024" width="70" height="20" rx="2" fill="#fff9e6" stroke="#aa7700" stroke-width="1.5"/>
+  <text x="100" y="1037" font-size="9" fill="#333">Notification (in-app DB record, cron-triggered)</text>
+
+  <!-- Color lines -->
+  <line x1="250" y1="882" x2="310" y2="882" stroke="#27ae60" stroke-width="2" marker-end="url(#arr-yes)"/>
+  <text x="315" y="886" font-size="9" fill="#27ae60">YES / success path</text>
+  <line x1="250" y1="900" x2="310" y2="900" stroke="#c0392b" stroke-width="2" marker-end="url(#arr-no)"/>
+  <text x="315" y="904" font-size="9" fill="#c0392b">NO / alternative path</text>
+  <line x1="250" y1="918" x2="310" y2="918" stroke="#222" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="315" y="922" font-size="9" fill="#333">Standard flow</text>
+
+  <!-- Notes column -->
+  <text x="540" y="880" font-size="10" font-weight="bold">Key System Notes</text>
+  <line x1="540" y1="884" x2="880" y2="884" stroke="#ccc" stroke-width="1"/>
+  <text x="540" y="898" font-size="8.5" fill="#444">• All product scores are regression outputs (1–10 continuous)</text>
+  <text x="540" y="912" font-size="8.5" fill="#444">• AI engine called via AiController → AiServerClient → HTTP POST :8000</text>
+  <text x="540" y="926" font-size="8.5" fill="#444">• XAI explanations cached by MD5 hash to reduce LLM API calls</text>
+  <text x="540" y="940" font-size="8.5" fill="#444">• Streak update triggers in-app notification (DB record)</text>
+  <text x="540" y="954" font-size="8.5" fill="#444">• NotificationScheduler runs 5 cron jobs independently</text>
+  <text x="540" y="968" font-size="8.5" fill="#444">• OAuth2 (Google) handles auth; User.hasAcne stored in DB profile</text>
+  <text x="540" y="982" font-size="8.5" fill="#444">• KNN uses cosine similarity over 24-dim product feature vectors</text>
+  <text x="540" y="996" font-size="8.5" fill="#444">• AI server down → AiController returns 503; client falls back locally</text>
+  <text x="540" y="1010" font-size="8.5" fill="#444">• Cold-start: 50K synthetic → Fine-tune: 966K real Sephora reviews</text>
+  <text x="540" y="1024" font-size="8.5" fill="#444">• Models: XGBoost Regressor (primary) + Random Forest (baseline)</text>
+  <text x="540" y="1038" font-size="8.5" fill="#444">• Metrics: R²=0.853 · MAE=0.391 · RMSE=0.519 · 5-fold CV R²=0.839</text>
+</svg>
+
+</body>
+</html>

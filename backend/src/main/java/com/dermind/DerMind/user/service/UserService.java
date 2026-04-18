@@ -57,6 +57,7 @@ public class UserService {
         user.setName(dto.getName());
         user.setAllergens(dto.getAllergens());
         user.setSkinType(dto.getSkinType());
+        user.setHasAcne(dto.isHasAcne());
         user.setPicture(dto.getPicture());
 
         User savedUser = userRepository.save(user);
@@ -72,6 +73,7 @@ public class UserService {
         if (dto.getName() != null) user.setName(dto.getName());
         if (dto.getAllergens() != null) user.setAllergens(dto.getAllergens());
         if (dto.getSkinType() != null) user.setSkinType(dto.getSkinType());
+        if (dto.getHasAcne() != null) user.setHasAcne(dto.getHasAcne());
         if (dto.getPicture() != null) user.setPicture(dto.getPicture());
 
         User updatedUser = userRepository.save(user);
@@ -119,6 +121,7 @@ public class UserService {
                 user.getName(),
                 user.getAllergens(),
                 user.getSkinType(),
+                user.isHasAcne(),
                 user.getPicture()
         );
     }
@@ -130,6 +133,7 @@ public class UserService {
                 user.getName(),
                 user.getAllergens(),
                 user.getSkinType(),
+                user.isHasAcne(),
                 user.getPicture(),
                 user.getPurchases() != null ? user.getPurchases().size() : 0,
                 user.getRatings() != null ? user.getRatings().size() : 0,
