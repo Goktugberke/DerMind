@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity, FlatList, Modal, StatusBar, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { PurchasedProductCard } from '@components/PurchasedProductCard';
 import { theme } from '@constants/theme';
-import { ListFilter, X, Check, SlidersHorizontal } from 'lucide-react-native';
+import { SlidersHorizontal } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { PageHeader } from '@components/PageHeader';
 import { SearchBar } from '@components/SearchBar';
 import { FilterActions } from '@components/FilterActions';
+import { SortModal } from '@components/SortModal';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -92,8 +93,6 @@ export const ProductsScreen = () => {
         <Text style={styles.subtitle}>Track your skincare journey</Text>
       </View>
 
-
-
       {/* ARAMA VE SIRALAMA */}
       <View style={styles.searchRow}>
         <View style={styles.searchWrapper}>
@@ -108,7 +107,7 @@ export const ProductsScreen = () => {
         <TouchableOpacity
           style={[
             styles.toggleButton,
-            showFilterRow && { backgroundColor: theme.colors.primary } // Açıkken rengi değişsin
+            showFilterRow && { backgroundColor: theme.colors.primary }
           ]}
           onPress={toggleFilter}
         >
@@ -148,42 +147,14 @@ export const ProductsScreen = () => {
         showsVerticalScrollIndicator={false}
       />
 
-      {/* SIRALAMA MODAL'I */}
-      <Modal
+      <SortModal
         visible={isSortModalVisible}
-        transparent={true}
-        animationType="fade"
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Sort</Text>
-              <TouchableOpacity onPress={() => setSortModalVisible(false)}>
-                <X size={24} color={theme.colors.text} />
-              </TouchableOpacity>
-            </View>
-
-            {sortOptions.map((option) => (
-              <TouchableOpacity
-                key={option.id}
-                style={styles.sortOption}
-                onPress={() => {
-                  setSelectedSort(option.id);
-                  setSortModalVisible(false);
-                }}
-              >
-                <Text style={[
-                  styles.optionText,
-                  selectedSort === option.id && { color: theme.colors.secondary, fontWeight: 'bold' }
-                ]}>
-                  {option.label}
-                </Text>
-                {selectedSort === option.id && <Check size={20} color={theme.colors.secondary} />}
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setSortModalVisible(false)}
+        options={sortOptions}
+        selectedOption={selectedSort}
+        onSelect={(id) => setSelectedSort(id)}
+        theme={theme}
+      />
     </SafeAreaView>
   );
 };
@@ -240,47 +211,9 @@ const styles = StyleSheet.create({
     // Senin FilterActions zaten paddingHorizontal: 15 içerdiği için 
     // buraya ekstra padding gerekmez, ama istersen animasyon ekleyebilirsin.
   },
-  sortIconButton: {
-    width: 50,
-    height: 50,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: theme.colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   listPadding: {
     paddingTop: 15,
     paddingBottom: 100
-  },
-  // Modal Stilleri
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 25,
-    width: '85%',
-    padding: 20,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15
-  },
-  modalTitle: { fontSize: 20, fontWeight: 'bold' },
-  sortOption: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9'
   },
   optionText: { fontSize: 16, color: '#475569' }
 });

@@ -1,70 +1,101 @@
-import React from 'react';
-import { Text, StyleSheet, View, TouchableOpacity } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useState, useEffect } from 'react';
+import { Text, StyleSheet, View, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate } from 'react-native-reanimated';
 import { PageHeader } from '@components/PageHeader';
 import { SearchBar } from '@components/SearchBar';
 import { FilterActions } from '@components/FilterActions';
+import { SortModal } from '@components/SortModal';
 import { ProductCard } from '@components/ProductCard';
 import { theme } from '@constants/theme';
 import { authService, productService } from '@services/api';
 
-const initialProducts = [
-  { id: '1', brand: 'Nivea', name: 'Sun Cream', volume: 40, generalScore: '7.3', aiScore: '8.5', price: '24.95', image: 'https://images.unsplash.com/photo-1556229010-6c3f2c9ca5f8?q=80&w=400&auto=format&fit=crop' },
-  { id: '2', brand: 'Bioderma', name: 'Sun Cream', volume: 50, generalScore: '9.1', aiScore: '8.9', price: '55.10', image: 'https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?q=80&w=400&auto=format&fit=crop' },
-  { id: '3', brand: 'La Roche', name: 'Moisturizer', volume: 75, generalScore: '8.2', aiScore: '2.0', price: '32.50', image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?q=80&w=400&auto=format&fit=crop' },
-  { id: '4', brand: 'Vichy', name: 'Tonic', volume: 200, generalScore: '3.8', aiScore: '7.4', price: '41.00', image: 'https://images.unsplash.com/photo-1612817288484-6f916006741a?q=80&w=400&auto=format&fit=crop' },
-  { id: '5', brand: 'Garnier', name: 'Face Wash', volume: 150, generalScore: '7.0', aiScore: '7.9', price: '18.90', image: 'https://loremflickr.com/400/400/skincare,cosmetics' },
-  { id: '6', brand: 'Cerave', name: 'Cleanser', volume: 236, generalScore: '9.3', aiScore: '9.5', price: '64.00', image: 'https://images.unsplash.com/photo-1608848461970-4909a5a5195b?q=80&w=400&auto=format&fit=crop' },
-  { id: '7', brand: 'Nivea', name: 'Sun Cream', volume: 40, generalScore: '4.3', aiScore: '8.5', price: '24.95' },
-  { id: '8', brand: 'Bioderma', name: 'Sun Cream', volume: 50, generalScore: '9.1', aiScore: '8.9', price: '55.10' },
-  { id: '9', brand: 'La Roche', name: 'Moisturizer', volume: 75, generalScore: '8.2', aiScore: '2.0', price: '32.50' },
-  { id: '10', brand: 'Vichy', name: 'Tonic', volume: 200, generalScore: '7.8', aiScore: '8.4', price: '41.00' },
-  { id: '11', brand: 'Garnier', name: 'Face Wash', volume: 150, generalScore: '7.0', aiScore: '7.9', price: '18.90' },
-  { id: '12', brand: 'Cerave', name: 'Cleanser', volume: 236, generalScore: '9.3', aiScore: '9.5', price: '64.00' },
-];
-
 const HEADER_SCROLL_DISTANCE = 110;
 
 export const HomeScreen = ({ navigation }: any) => {
-  const [searchQuery, setSearchQuery] = React.useState('');
-  const [userName, setUserName] = React.useState('Kullanıcı');
-  const [products, setProducts] = React.useState(initialProducts);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [userName, setUserName] = useState('Kullanıcı');
+  const [products, setProducts] = useState<any[]>([]);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSortModalVisible, setSortModalVisible] = useState(false);
+  const [selectedSort, setSelectedSort] = useState('newest');
+
   const headerAnimValue = useSharedValue(0);
   const scrollY = useSharedValue(0);
   const insets = useSafeAreaInsets();
 
-  React.useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [userRes, prodRes] = await Promise.all([
-          authService.getCurrentUser().catch(() => null),
-          productService.getAllProducts().catch(() => null)
-        ]);
+  const sortOptions = [
+    { id: 'priceLowHigh', label: 'Price: Low to High' },
+    { id: 'priceHighLow', label: 'Price: High to Low' },
+  ];
 
-        if (userRes && userRes.data && userRes.data.name) {
-          setUserName(userRes.data.name.split(' ')[0]); // Kullanıcının adının ilk kelimesini al
-        }
-
-        if (prodRes && prodRes.data && Array.isArray(prodRes.data)) {
-          const apiProducts = prodRes.data.map((p: any) => ({
-            id: p.id ? p.id.toString() : Math.random().toString(),
-            brand: p.brand || 'Ürün Markası',
-            name: p.name || 'Ürün Adı',
-            volume: 50,
-            generalScore: p.qualityScore ? p.qualityScore.toString() : '0.0',
-            aiScore: p.qualityScore ? p.qualityScore.toString() : '0.0',
-            price: p.price ? p.price.toString() : '0.00',
-            image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?q=80&w=400&auto=format&fit=crop'
-          }));
-          setProducts(apiProducts.length > 0 ? apiProducts : initialProducts);
-        }
-      } catch (error) {
-        console.log('Error fetching home data:', error);
+  const loadProducts = async (pageNumber: number, currentQuery: string) => {
+    if (isLoading || (!hasMore && pageNumber !== 0)) return;
+    setIsLoading(true);
+    try {
+      const fetchCall = currentQuery.trim().length > 0 
+        ? productService.searchProducts(currentQuery, pageNumber, 15)
+        : productService.getAllProducts(pageNumber, 15);
+      
+      const prodRes = await fetchCall.catch(() => null);
+      if (!prodRes) {
+        setIsLoading(false);
+        return;
       }
-    };
-    fetchData();
+      const productsList = prodRes?.data?.content || (Array.isArray(prodRes?.data) ? prodRes.data : []);
+      const totalPages = prodRes?.data?.totalPages || 1;
+
+      if (productsList.length > 0) {
+        const apiProducts = productsList.map((p: any) => ({
+          id: p.id ? p.id.toString() : Math.random().toString(),
+          brand: p.brand != null ? p.brand : 'null',
+          name: p.name != null ? p.name : 'null',
+          volume: p.volume != null ? p.volume : 'null',
+          generalScore: p.qualityScore != null ? p.qualityScore.toString() : 'null',
+          aiScore: p.baseScore != null ? p.baseScore.toString() : 'null',
+          price: p.price != null ? p.price.toString() : 'null',
+          image: p.image || null
+        }));
+
+        if (pageNumber === 0) {
+          setProducts(apiProducts);
+        } else {
+          setProducts(prev => [...prev, ...apiProducts]);
+        }
+
+        if (pageNumber + 1 >= totalPages) {
+          setHasMore(false);
+        }
+      } else {
+        if (pageNumber === 0) setProducts([]);
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.log('Error fetching products:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    authService.getCurrentUser().then(userRes => {
+      if (userRes && userRes.data && userRes.data.name) {
+        setUserName(userRes.data.name.split(' ')[0]);
+      }
+    }).catch(() => null);
   }, []);
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      setPage(0);
+      setHasMore(true);
+      loadProducts(0, searchQuery);
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
 
   // const onScroll = useAnimatedScrollHandler((event) => {
   //   scrollY.value = event.contentOffset.y;
@@ -123,10 +154,8 @@ export const HomeScreen = ({ navigation }: any) => {
     };
   });
 
-  // ListHeaderComponent is no longer needed since we use padding in contentContainerStyle
-
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
 
       <View style={[styles.floatingHeaderGroup, { paddingTop: insets.top }]}>
         <View style={styles.fixedHeaderContainer}>
@@ -143,7 +172,10 @@ export const HomeScreen = ({ navigation }: any) => {
           </Animated.View>
 
           <Animated.View style={[animatedFilterStyle, { overflow: 'hidden' }]}>
-            <FilterActions onSort={() => { }} onFilter={() => { }} />
+            <FilterActions
+              onSort={() => setSortModalVisible(true)}
+              onFilter={() => console.log("Filtreleme açıldı")}
+            />
           </Animated.View>
         </Animated.View>
       </View>
@@ -163,7 +195,7 @@ export const HomeScreen = ({ navigation }: any) => {
             reviewsCount: Math.floor(Math.random() * 500) + 50,
             price: item.price,
             aiMatch: {
-              score: Math.floor(Math.random() * 20) + 80, // Random 80-99
+              score: Math.floor(Math.random() * 20) + 80,
               explanation: 'Highly recommended for your skin profile. Contains no known allergens for you and provides excellent hydration.'
             },
             analysis: {
@@ -181,8 +213,26 @@ export const HomeScreen = ({ navigation }: any) => {
         })} />}
         contentContainerStyle={[styles.listPadding, { paddingTop: insets.top + HEADER_SCROLL_DISTANCE + 115 }]}
         showsVerticalScrollIndicator={false}
+        onEndReached={() => {
+          if (!isLoading && hasMore) {
+            const nextPage = page + 1;
+            setPage(nextPage);
+            loadProducts(nextPage, searchQuery);
+          }
+        }}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={isLoading ? <ActivityIndicator size="small" color={theme.colors.primary} style={{ margin: 20 }} /> : null}
       />
-    </View>
+
+      <SortModal
+        visible={isSortModalVisible}
+        onClose={() => setSortModalVisible(false)}
+        options={sortOptions}
+        selectedOption={selectedSort}
+        onSelect={(id) => setSelectedSort(id)}
+        theme={theme}
+      />
+    </SafeAreaView>
   );
 };
 
@@ -201,7 +251,6 @@ const styles = StyleSheet.create({
   fixedHeaderContainer: {
     backgroundColor: '#ffffff',
     zIndex: 20,
-    // Gölgeyi sadece en alta veriyoruz ki bütünlük bozulmasın
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
@@ -209,15 +258,14 @@ const styles = StyleSheet.create({
   },
   stickyWrapper: {
     zIndex: 10,
-    // paddingTop: 15, 
-    backgroundColor: '#ffffff', // Yapıştığında arkası beyaz olsun
-    borderBottomLeftRadius: 24, // Orijinal görüntünü korur
+    backgroundColor: '#ffffff',
+    borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 }, // SADECE AŞAĞI
+    shadowOffset: { width: 0, height: 12 },
     shadowRadius: 10,
     elevation: 5,
-    overflow: 'visible', // önemli
+    overflow: 'visible',
 
   },
   welcomeText: {

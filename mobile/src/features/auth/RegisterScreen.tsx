@@ -89,7 +89,6 @@ export const RegisterScreen = ({ navigation }: any) => {
         picture: googleUser?.photo,
         uid: userCredential.user.uid
       });
-      navigation.navigate('Home');
 
     } catch (error) {
       console.error('Google Register Error:', error);
@@ -118,7 +117,6 @@ export const RegisterScreen = ({ navigation }: any) => {
       };
 
       await authService.register(userData);
-      navigation.navigate('Home');
 
     } catch (error: any) {
       console.error("Kayıt Hatası:", error);
