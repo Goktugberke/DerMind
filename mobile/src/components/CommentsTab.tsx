@@ -1,53 +1,38 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { theme } from '@constants/theme';
 import { Star, SlidersHorizontal, ArrowUpDown } from 'lucide-react-native';
 import { StarRating } from '@components/StarRating';
-import { ratingsService } from '@services/api';
+import { useGetProductRatings } from '@services/api';
 
 const SORT_OPTIONS = ['Most Recent', 'Highest Rated', 'Lowest Rated'];
 const FILTER_OPTIONS = ['All', '5★', '4★', '3★', '≤2★'];
+
+interface Rating {
+    id: number;
+    userName: string;
+    rating: number;
+    createdAt: string;
+    comment: string;
+    helpful: number;
+}
 
 export const CommentsTab = ({ productId }: { productId: string }) => {
     const [activeSort, setActiveSort] = useState('Most Recent');
     const [activeFilter, setActiveFilter] = useState('All');
     const [showSortDropdown, setShowSortDropdown] = useState(false);
-    const [comments, setComments] = useState<any[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [overallRating, setOverallRating] = useState(0);
 
-    useEffect(() => {
-        const fetchRatings = async () => {
-            try {
-                setIsLoading(true);
-                setError(null);
-                const response = await ratingsService.getProductRatings(productId);
-                const ratings = response.data || [];
-                setComments(ratings);
+    // Use TanStack Query hook
+    const { data: ratings = [], isLoading, error } = useGetProductRatings(productId);
 
-                // Calculate overall rating
-                if (ratings.length > 0) {
-                    const avgRating = ratings.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / ratings.length;
-                    setOverallRating(Math.round(avgRating * 10) / 10);
-                } else {
-                    setOverallRating(0);
-                }
-            } catch (err) {
-                console.error('Failed to fetch ratings:', err);
-                setError('Failed to load comments. Please try again.');
-                setComments([]);
-            } finally {
-                setIsLoading(false);
-            }
-        };
+    // Calculate overall rating
+    const overallRating = useMemo(() => {
+        if (ratings.length === 0) return 0;
+        const avgRating = ratings.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / ratings.length;
+        return Math.round(avgRating * 10) / 10;
+    }, [ratings]);
 
-        if (productId) {
-            fetchRatings();
-        }
-    }, [productId]);
-
-    const totalReviews = comments.length;
+    const totalReviews = ratings.length;
 
     return (
         <View style={styles.container}>
@@ -119,24 +104,31 @@ export const CommentsTab = ({ productId }: { productId: string }) => {
                 </View>
             )}
 
+            {/* Loading State */}
+            {isLoading && (
+                <View style={styles.centerContainer}>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                </View>
+            )}
+
             {/* Error State */}
             {error && !isLoading && (
                 <View style={styles.errorContainer}>
-                    <Text style={styles.errorText}>{error}</Text>
+                    <Text style={styles.errorText}>Failed to load comments. Please try again.</Text>
                 </View>
             )}
 
             {/* Empty State */}
-            {!isLoading && !error && comments.length === 0 && (
+            {!isLoading && !error && ratings.length === 0 && (
                 <View style={styles.centerContainer}>
-                    <Text style={styles.emptyText}>No comments yet.</Text>
+                    <Text style={styles.emptyText}>Henüz yorum yok</Text>
                 </View>
             )}
 
             {/* Comments List */}
-            {!isLoading && !error && comments.length > 0 && (
+            {!isLoading && !error && ratings.length > 0 && (
                 <View style={styles.commentsList}>
-                    {comments.map((comment, index) => (
+                    {ratings.map((comment: Rating, index: number) => (
                         <View key={comment.id}>
                             <View style={styles.commentItem}>
                                 {/* Avatar & User */}
@@ -162,7 +154,7 @@ export const CommentsTab = ({ productId }: { productId: string }) => {
                                 {comment.helpful && <Text style={styles.helpfulText}>👍 {comment.helpful} found this helpful</Text>}
                             </View>
 
-                            {index !== comments.length - 1 && <View style={styles.commentDivider} />}
+                            {index !== ratings.length - 1 && <View style={styles.commentDivider} />}
                         </View>
                     ))}
                 </View>

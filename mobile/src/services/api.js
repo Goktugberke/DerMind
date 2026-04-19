@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { Platform } from 'react-native';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getAuth, getIdToken } from '@react-native-firebase/auth';
 import { API_URL_ANDROID, API_URL_IOS } from '@env';
 
@@ -59,6 +60,158 @@ export const favoriteService = {
 
 export const ratingsService = {
   getProductRatings: (productId) => api.get(`/api/ratings/product/${productId}`),
+};
+
+// ============ TanStack Query Hooks ============
+
+// Products
+export const useGetAllProducts = (page = 0, size = 15) => {
+  return useQuery({
+    queryKey: ['products', page, size],
+    queryFn: () => productService.getAllProducts(page, size).then(res => res.data),
+  });
+};
+
+export const useSearchProducts = (query, page = 0, size = 15, enabled = true) => {
+  return useQuery({
+    queryKey: ['searchProducts', query, page, size],
+    queryFn: () => productService.searchProducts(query, page, size).then(res => res.data),
+    enabled: !!query && enabled,
+  });
+};
+
+export const useGetProductById = (id, enabled = true) => {
+  return useQuery({
+    queryKey: ['product', id],
+    queryFn: () => productService.getProductById(id).then(res => res.data),
+    enabled: !!id && enabled,
+  });
+};
+
+// Auth
+export const useGetCurrentUser = (enabled = true) => {
+  return useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => authService.getCurrentUser().then(res => res.data),
+    enabled,
+  });
+};
+
+export const useRegister = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userData) => authService.register(userData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+    },
+  });
+};
+
+export const useFirebaseLogin = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (firebaseData) => authService.firebaseLogin(firebaseData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+    },
+  });
+};
+
+// Favorites
+export const useGetFavorites = (enabled = true) => {
+  return useQuery({
+    queryKey: ['favorites'],
+    queryFn: () => favoriteService.getFavorites().then(res => res.data),
+    enabled,
+  });
+};
+
+export const useCheckFavorite = (productId, enabled = true) => {
+  return useQuery({
+    queryKey: ['favorite', productId],
+    queryFn: () => favoriteService.checkFavorite(productId).then(res => res.data),
+    enabled: !!productId && enabled,
+  });
+};
+
+export const useAddFavorite = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (productId) => favoriteService.addFavorite(productId),
+    onSuccess: (_, productId) => {
+      queryClient.invalidateQueries({ queryKey: ['favorite', productId] });
+      queryClient.invalidateQueries({ queryKey: ['favorites'] });
+    },
+  });
+};
+
+export const useRemoveFavorite = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (productId) => favoriteService.removeFavorite(productId),
+    onSuccess: (_, productId) => {
+      queryClient.invalidateQueries({ queryKey: ['favorite', productId] });
+      queryClient.invalidateQueries({ queryKey: ['favorites'] });
+    },
+  });
+};
+
+// Cart
+export const useGetCart = (enabled = true) => {
+  return useQuery({
+    queryKey: ['cart'],
+    queryFn: () => cartService.getCart().then(res => res.data),
+    enabled,
+  });
+};
+
+export const useAddToCart = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ productId, quantity }) => cartService.addItem(productId, quantity),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
+    },
+  });
+};
+
+export const useUpdateCartQuantity = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ productId, quantity }) => cartService.updateQuantity(productId, quantity),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
+    },
+  });
+};
+
+export const useRemoveFromCart = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (productId) => cartService.removeItem(productId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
+    },
+  });
+};
+
+export const useClearCart = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => cartService.clearCart(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
+    },
+  });
+};
+
+// Ratings
+export const useGetProductRatings = (productId, enabled = true) => {
+  return useQuery({
+    queryKey: ['ratings', productId],
+    queryFn: () => ratingsService.getProductRatings(productId).then(res => res.data),
+    enabled: !!productId && enabled,
+  });
 };
 
 export default api;
