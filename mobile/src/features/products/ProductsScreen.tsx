@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity, FlatList, Modal, StatusBar, LayoutAnimation, Platform, UIManager } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity, FlatList, Modal, StatusBar, LayoutAnimation, Platform, UIManager, ActivityIndicator } from 'react-native';
 import { PurchasedProductCard } from '@components/PurchasedProductCard';
 import { theme } from '@constants/theme';
 import { SlidersHorizontal } from 'lucide-react-native';
@@ -8,6 +8,8 @@ import { PageHeader } from '@components/PageHeader';
 import { SearchBar } from '@components/SearchBar';
 import { FilterActions } from '@components/FilterActions';
 import { SortModal } from '@components/SortModal';
+import { getAuth } from '@react-native-firebase/auth';
+import { purchaseService } from '@services/api';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -19,14 +21,41 @@ export const ProductsScreen = () => {
   const [selectedSort, setSelectedSort] = useState('newest');
   const navigation = useNavigation<any>();
   const [showFilterRow, setShowFilterRow] = useState(false);
+  
+  const [purchases, setPurchases] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Backend'den (GET /api/purchases/user/{userId}) gelecek örnek veri
-  const dummyPurchases = [
-    { id: '1', brand: 'La Roche Posay', name: 'Effaclar Gel', orderStatus: 'TESLİM EDİLDİ', price: '250', date: '2024-02-10', image: 'https://images.unsplash.com/photo-1556229010-6c3f2c9ca5f8?q=80&w=400&auto=format&fit=crop' },
-    { id: '2', brand: 'CeraVe', name: 'Moisturizing Cream', orderStatus: 'YOLDA', price: '320', date: '2024-02-15', image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?q=80&w=400&auto=format&fit=crop' },
-    { id: '3', brand: 'Vichy', name: 'Mineral 89', orderStatus: 'TESLİM EDİLDİ', price: '450', date: '2024-01-20', image: 'https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?q=80&w=400&auto=format&fit=crop' },
-
-  ];
+  useEffect(() => {
+    const fetchPurchases = async () => {
+      try {
+        setIsLoading(true);
+        const user = getAuth().currentUser;
+        if (user) {
+          const res = await purchaseService.getPurchasesByUser(user.uid);
+          if (res.data && Array.isArray(res.data)) {
+            const apiPurchases = res.data.map((p: any) => ({
+              id: p.id ? p.id.toString() : Math.random().toString(),
+              brand: p.productBrand != null ? p.productBrand : 'null',
+              name: p.productName != null ? p.productName : 'null',
+              orderStatus: p.orderStatus != null ? p.orderStatus : 'null',
+              price: p.totalPrice != null ? p.totalPrice.toString() : 'null',
+              date: p.purchasedAt != null ? p.purchasedAt : 'null',
+              image: p.image || null
+            }));
+            setPurchases(apiPurchases);
+          } else {
+             setPurchases([]);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching purchases:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchPurchases();
+  }, []);
 
   const sortOptions = [
     { id: 'newest', label: 'Date: Newest' },
@@ -49,7 +78,7 @@ export const ProductsScreen = () => {
 
   const getProcessedData = () => {
     // 1. Önce Arama Filtresi
-    let filtered = dummyPurchases.filter(item =>
+    let filtered = purchases.filter(item =>
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.brand.toLowerCase().includes(searchQuery.toLowerCase())
     );
@@ -129,23 +158,35 @@ export const ProductsScreen = () => {
       )}
 
       {/* ÜRÜN LİSTESİ */}
-      <FlatList
-        data={processedData}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <PurchasedProductCard
-            item={item}
-            onRate={() => {
-              navigation.navigate('RateScreen', { product: item });
-            }}
-            onStartStreak={() => {
-              navigation.navigate('StartRoutine', { product: item });
-            }}
-          />
-        )}
-        contentContainerStyle={styles.listPadding}
-        showsVerticalScrollIndicator={false}
-      />
+      {isLoading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={processedData}
+          keyExtractor={(item) => item.id}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyTitle}>No products found</Text>
+              <Text style={styles.emptySubtitle}>You don't have any products down here yet.</Text>
+            </View>
+          }
+          renderItem={({ item }) => (
+            <PurchasedProductCard
+              item={item}
+              onRate={() => {
+                navigation.navigate('RateScreen', { product: item });
+              }}
+              onStartStreak={() => {
+                navigation.navigate('StartRoutine', { product: item });
+              }}
+            />
+          )}
+          contentContainerStyle={styles.listPadding}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
 
       <SortModal
         visible={isSortModalVisible}
@@ -215,5 +256,23 @@ const styles = StyleSheet.create({
     paddingTop: 15,
     paddingBottom: 100
   },
-  optionText: { fontSize: 16, color: '#475569' }
+  optionText: { fontSize: 16, color: '#475569' },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 50,
+    paddingHorizontal: 20,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: theme.colors.gray,
+    textAlign: 'center',
+  }
 });

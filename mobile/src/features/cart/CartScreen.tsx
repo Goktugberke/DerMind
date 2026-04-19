@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  ActivityIndicator,
 } from 'react-native';
 import {
   ShoppingBag, Trash2, Plus, Minus, ChevronUp, ChevronDown,
@@ -20,6 +21,7 @@ import {
 import { theme } from '@constants/theme';
 import { PageHeader } from '@components/PageHeader';
 import { CustomButton } from '@components/CustomButton'; // İŞTE BURADA!
+import { cartService } from '@services/api';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -31,16 +33,50 @@ const dummyAddresses = [
 ];
 
 export const CartScreen = ({ navigation }: any) => {
-  const [cartItems, setCartItems] = useState([
-    { id: '1', name: 'Effaclar Gel', brand: 'La Roche Posay', price: 250.00, quantity: 1, image: 'https://via.placeholder.com/100' },
-    { id: '2', name: 'Moisturizing Cream', brand: 'CeraVe', price: 320.00, quantity: 1, image: 'https://via.placeholder.com/100' },
-  ]);
+  const [cartItems, setCartItems] = useState<any[]>([]);
+  const [isLoadingMain, setIsLoadingMain] = useState(true);
 
   const [selectedAddress, setSelectedAddress] = useState(dummyAddresses[0]);
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false); // Ödeme yükleniyor durumu için
+
+  const loadCart = async () => {
+    try {
+      setIsLoadingMain(true);
+      const res = await cartService.getCart();
+      if (res.data && Array.isArray(res.data)) {
+        const mapped = res.data.map((item: any) => ({
+          id: item.product?.id?.toString() || item.id?.toString(),
+          productId: item.product?.id,
+          name: item.product?.name || 'Unknown Product',
+          brand: item.product?.brand || 'Unknown Brand',
+          price: item.product?.price || 0,
+          quantity: item.quantity,
+          image: item.product?.image || null
+        }));
+        setCartItems(mapped);
+      } else {
+        setCartItems([]);
+      }
+    } catch (error) {
+      console.error('Error fetching cart:', error);
+    } finally {
+      setIsLoadingMain(false);
+    }
+  };
+
+  useEffect(() => {
+    const focusListener = navigation.addListener('focus', () => {
+      loadCart();
+    });
+    return focusListener;
+  }, [navigation]);
+
+  useEffect(() => {
+    loadCart();
+  }, []);
 
   // --- HESAPLAMALAR ---
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -54,18 +90,38 @@ export const CartScreen = ({ navigation }: any) => {
   };
 
   // --- ACTIONS ---
-  const handleUpdateQuantity = (id: string, type: 'inc' | 'dec') => {
-    setCartItems(prev => prev.map(item => {
-      if (item.id === id) {
-        const newQty = type === 'inc' ? item.quantity + 1 : item.quantity - 1;
-        return { ...item, quantity: Math.max(1, newQty) };
+  const handleUpdateQuantity = async (id: string, type: 'inc' | 'dec') => {
+    const item = cartItems.find(i => i.id === id);
+    if (!item) return;
+
+    let newQty = type === 'inc' ? item.quantity + 1 : item.quantity - 1;
+    newQty = Math.max(1, newQty);
+    if (newQty === item.quantity) return;
+
+    try {
+      setCartItems(prev => prev.map(i => i.id === id ? { ...i, quantity: newQty } : i));
+      if (item.productId) {
+        await cartService.updateQuantity(item.productId, newQty);
       }
-      return item;
-    }));
+    } catch (err) {
+      console.error('Error updating quantity:', err);
+      loadCart(); // revert mapping on error by refetching API
+    }
   };
 
-  const handleRemoveItem = (id: string) => {
-    setCartItems(prev => prev.filter(item => item.id !== id));
+  const handleRemoveItem = async (id: string) => {
+    const item = cartItems.find(i => i.id === id);
+    if (!item) return;
+
+    try {
+      setCartItems(prev => prev.filter(i => i.id !== id));
+      if (item.productId) {
+        await cartService.removeItem(item.productId);
+      }
+    } catch (err) {
+      console.error('Error removing item:', err);
+      loadCart(); // revert on error
+    }
   };
 
   const handleApplyCoupon = () => {
@@ -120,7 +176,11 @@ export const CartScreen = ({ navigation }: any) => {
         align="center"
       />
 
-      {cartItems.length > 0 ? (
+      {isLoadingMain ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      ) : cartItems.length > 0 ? (
         <>
           <FlatList
             data={cartItems}
@@ -128,7 +188,11 @@ export const CartScreen = ({ navigation }: any) => {
             ListHeaderComponent={<AddressSection />}
             renderItem={({ item }) => (
               <View style={styles.cartCard}>
-                <Image source={{ uri: item.image }} style={styles.productImage} />
+                {item.image && item.image !== 'null' ? (
+                  <Image source={{ uri: item.image }} style={styles.productImage} />
+                ) : (
+                  <View style={[styles.productImage, { backgroundColor: '#f0f0f0' }]} />
+                )}
                 <View style={styles.detailsContainer}>
                   <Text style={styles.brandText}>{item.brand}</Text>
                   <Text style={styles.nameText}>{item.name}</Text>

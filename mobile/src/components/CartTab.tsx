@@ -1,23 +1,35 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { theme } from '@constants/theme';
 import { Minus, Plus, ShoppingCart, Check, Truck, RotateCcw, Shield } from 'lucide-react-native';
+import { cartService } from '@services/api';
 
 interface CartTabProps {
+    productId: string;
     price: string;
     productName?: string;
 }
 
-export const CartTab = ({ price, productName = 'This Product' }: CartTabProps) => {
+export const CartTab = ({ productId, price, productName = 'This Product' }: CartTabProps) => {
     const [quantity, setQuantity] = useState(1);
     const [added, setAdded] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
 
     const priceNum = parseFloat(price);
     const totalPrice = (priceNum * quantity).toFixed(2);
 
-    const handleAddToCart = () => {
-        setAdded(true);
-        setTimeout(() => setAdded(false), 2500);
+    const handleAddToCart = async () => {
+        if (isProcessing) return;
+        setIsProcessing(true);
+        try {
+            await cartService.addItem(productId, quantity);
+            setAdded(true);
+            setTimeout(() => setAdded(false), 2500);
+        } catch (error) {
+            console.error("Failed to add to cart:", error);
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
     return (
@@ -87,12 +99,15 @@ export const CartTab = ({ price, productName = 'This Product' }: CartTabProps) =
                 onPress={handleAddToCart}
                 activeOpacity={0.85}
             >
-                {added
-                    ? <Check size={20} color="#FFF" strokeWidth={3} />
-                    : <ShoppingCart size={20} color="#FFF" strokeWidth={2.5} />
-                }
+                {isProcessing ? (
+                    <ActivityIndicator color="#FFF" />
+                ) : added ? (
+                    <Check size={20} color="#FFF" strokeWidth={3} />
+                ) : (
+                    <ShoppingCart size={20} color="#FFF" strokeWidth={2.5} />
+                )}
                 <Text style={styles.addButtonText}>
-                    {added ? 'Added to Cart!' : 'Add to Cart'}
+                    {isProcessing ? 'Adding...' : added ? 'Added to Cart!' : 'Add to Cart'}
                 </Text>
             </TouchableOpacity>
 
