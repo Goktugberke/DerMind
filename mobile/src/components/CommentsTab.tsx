@@ -1,55 +1,53 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { theme } from '@constants/theme';
 import { Star, SlidersHorizontal, ArrowUpDown } from 'lucide-react-native';
 import { StarRating } from '@components/StarRating';
-
-// --- Dummy Data ---
-const DUMMY_COMMENTS = [
-    {
-        id: '1',
-        user: 'Selin K.',
-        rating: 9,
-        date: 'Feb 20, 2025',
-        text: 'Great product! My skin feels much softer and the SPF protection is no joke. Definitely repurchasing.',
-        helpful: 14,
-    },
-    {
-        id: '2',
-        user: 'Ayşe D.',
-        rating: 6,
-        date: 'Jan 14, 2025',
-        text: 'It\'s okay for the price. A bit greasy but the vitamin C effect is visible after a few weeks of use.',
-        helpful: 7,
-    },
-    {
-        id: '3',
-        user: 'Mert B.',
-        rating: 8,
-        date: 'Dec 5, 2024',
-        text: 'Works well for combination skin. Doesn\'t clog pores and blends nicely under makeup. Recommend!',
-        helpful: 21,
-    },
-    {
-        id: '4',
-        user: 'Zeynep A.',
-        rating: 3,
-        date: 'Nov 18, 2024',
-        text: 'Broke me out unfortunately. Might work for others but was too heavy for my sensitive skin.',
-        helpful: 3,
-    },
-];
+import { ratingsService } from '@services/api';
 
 const SORT_OPTIONS = ['Most Recent', 'Highest Rated', 'Lowest Rated'];
 const FILTER_OPTIONS = ['All', '5★', '4★', '3★', '≤2★'];
 
-export const CommentsTab = () => {
+export const CommentsTab = ({ productId }: { productId: string }) => {
     const [activeSort, setActiveSort] = useState('Most Recent');
     const [activeFilter, setActiveFilter] = useState('All');
     const [showSortDropdown, setShowSortDropdown] = useState(false);
+    const [comments, setComments] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [overallRating, setOverallRating] = useState(0);
 
-    const overallRating = 6.5;
-    const totalReviews = DUMMY_COMMENTS.length;
+    useEffect(() => {
+        const fetchRatings = async () => {
+            try {
+                setIsLoading(true);
+                setError(null);
+                const response = await ratingsService.getProductRatings(productId);
+                const ratings = response.data || [];
+                setComments(ratings);
+
+                // Calculate overall rating
+                if (ratings.length > 0) {
+                    const avgRating = ratings.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / ratings.length;
+                    setOverallRating(Math.round(avgRating * 10) / 10);
+                } else {
+                    setOverallRating(0);
+                }
+            } catch (err) {
+                console.error('Failed to fetch ratings:', err);
+                setError('Failed to load comments. Please try again.');
+                setComments([]);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        if (productId) {
+            fetchRatings();
+        }
+    }, [productId]);
+
+    const totalReviews = comments.length;
 
     return (
         <View style={styles.container}>
@@ -114,36 +112,61 @@ export const CommentsTab = () => {
                 </View>
             )}
 
+            {/* Loading State */}
+            {isLoading && (
+                <View style={styles.centerContainer}>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                </View>
+            )}
+
+            {/* Error State */}
+            {error && !isLoading && (
+                <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>{error}</Text>
+                </View>
+            )}
+
+            {/* Empty State */}
+            {!isLoading && !error && comments.length === 0 && (
+                <View style={styles.centerContainer}>
+                    <Text style={styles.emptyText}>No comments yet.</Text>
+                </View>
+            )}
+
             {/* Comments List */}
-            <View style={styles.commentsList}>
-                {DUMMY_COMMENTS.map((comment, index) => (
-                    <View key={comment.id}>
-                        <View style={styles.commentItem}>
-                            {/* Avatar & User */}
-                            <View style={styles.commentHeader}>
-                                <View style={styles.avatar}>
-                                    <Text style={styles.avatarText}>
-                                        {comment.user.charAt(0)}
-                                    </Text>
+            {!isLoading && !error && comments.length > 0 && (
+                <View style={styles.commentsList}>
+                    {comments.map((comment, index) => (
+                        <View key={comment.id}>
+                            <View style={styles.commentItem}>
+                                {/* Avatar & User */}
+                                <View style={styles.commentHeader}>
+                                    <View style={styles.avatar}>
+                                        <Text style={styles.avatarText}>
+                                            {(comment.userName || 'U').charAt(0).toUpperCase()}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.userInfo}>
+                                        <Text style={styles.userName}>{comment.userName || 'Anonymous'}</Text>
+                                        <Text style={styles.commentDate}>
+                                            {comment.createdAt ? new Date(comment.createdAt).toLocaleDateString() : 'Date not available'}
+                                        </Text>
+                                    </View>
+                                    <StarRating score={comment.rating} outOf={10} size={12} color="#FFB500" />
                                 </View>
-                                <View style={styles.userInfo}>
-                                    <Text style={styles.userName}>{comment.user}</Text>
-                                    <Text style={styles.commentDate}>{comment.date}</Text>
-                                </View>
-                                <StarRating score={comment.rating} outOf={10} size={12} color="#FFB500" />
+
+                                {/* Comment Text */}
+                                {comment.comment && <Text style={styles.commentText}>{comment.comment}</Text>}
+
+                                {/* Helpful */}
+                                {comment.helpful && <Text style={styles.helpfulText}>👍 {comment.helpful} found this helpful</Text>}
                             </View>
 
-                            {/* Comment Text */}
-                            <Text style={styles.commentText}>{comment.text}</Text>
-
-                            {/* Helpful */}
-                            <Text style={styles.helpfulText}>👍 {comment.helpful} found this helpful</Text>
+                            {index !== comments.length - 1 && <View style={styles.commentDivider} />}
                         </View>
-
-                        {index !== DUMMY_COMMENTS.length - 1 && <View style={styles.commentDivider} />}
-                    </View>
-                ))}
-            </View>
+                    ))}
+                </View>
+            )}
         </View>
     );
 };
@@ -151,6 +174,27 @@ export const CommentsTab = () => {
 const styles = StyleSheet.create({
     container: {
         paddingTop: 5,
+    },
+    centerContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 40,
+    },
+    errorContainer: {
+        backgroundColor: '#FFE5E5',
+        borderRadius: 8,
+        padding: 12,
+        marginVertical: 12,
+    },
+    errorText: {
+        fontSize: 13,
+        color: '#D32F2F',
+        textAlign: 'center',
+    },
+    emptyText: {
+        fontSize: 14,
+        color: theme.colors.gray,
+        textAlign: 'center',
     },
     ratingHeader: {
         flexDirection: 'row',

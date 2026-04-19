@@ -35,10 +35,10 @@ export const HomeScreen = ({ navigation }: any) => {
     if (isLoading || (!hasMore && pageNumber !== 0)) return;
     setIsLoading(true);
     try {
-      const fetchCall = currentQuery.trim().length > 0 
+      const fetchCall = currentQuery.trim().length > 0
         ? productService.searchProducts(currentQuery, pageNumber, 15)
         : productService.getAllProducts(pageNumber, 15);
-      
+
       const prodRes = await fetchCall.catch(() => null);
       if (!prodRes) {
         setIsLoading(false);
@@ -52,6 +52,8 @@ export const HomeScreen = ({ navigation }: any) => {
           id: p.id ? p.id.toString() : Math.random().toString(),
           brand: p.brand != null ? p.brand : 'null',
           name: p.name != null ? p.name : 'null',
+          category: p.category || '', // Bunu ekle
+          secondaryCategory: p.secondaryCategory || '',
           volume: p.volume != null ? p.volume : 'null',
           generalScore: p.qualityScore != null ? p.qualityScore.toString() : 'null',
           aiScore: p.baseScore != null ? p.baseScore.toString() : 'null',
@@ -187,28 +189,14 @@ export const HomeScreen = ({ navigation }: any) => {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <ProductCard item={item} onPress={() => navigation.navigate('ProductDetail', {
           product: {
+            id: item.id,
             brand: item.brand,
             name: item.name,
+            category: item.category,
+            secondaryCategory: item.secondaryCategory,
             image: item.image,
-            description: 'Advanced daily UV fluid with Antioxidant Vitamin C. High protection.', // Mock till actual data
-            rating: parseFloat(item.generalScore),
-            reviewsCount: Math.floor(Math.random() * 500) + 50,
             price: item.price,
-            aiMatch: {
-              score: Math.floor(Math.random() * 20) + 80,
-              explanation: 'Highly recommended for your skin profile. Contains no known allergens for you and provides excellent hydration.'
-            },
-            analysis: {
-              score: parseFloat(item.aiScore),
-              safeCount: 13,
-              mediumCount: 3,
-              riskyCount: 10,
-            },
-            ingredients: [
-              { name: 'AQUA / WATER', subName: 'Pure Water', tag: 'Solvent', severity: 'safe' },
-              { name: 'ALCOHOL DENAT.', subName: 'Denatured Alcohol', tag: 'Solvent', severity: 'medium' },
-              { name: 'PHENOXYETHANOL', subName: 'Preservative', tag: 'Antimicrobial', severity: 'risky' },
-            ]
+            rating: parseFloat(item.generalScore) || 0,
           }
         })} />}
         contentContainerStyle={[styles.listPadding, { paddingTop: insets.top + HEADER_SCROLL_DISTANCE + 115 }]}

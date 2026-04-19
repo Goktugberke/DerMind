@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   SafeAreaView,
   View,
@@ -9,12 +9,14 @@ import {
   Modal,
   StatusBar,
   Image,
-  Dimensions
+  Dimensions,
+  ActivityIndicator
 } from 'react-native';
 import { PageHeader } from '@components/PageHeader';
 import { SearchBar } from '@components/SearchBar';
 import { theme } from '@constants/theme';
 import { X, Check, Heart, ShoppingCart, Ghost, SlidersHorizontal } from 'lucide-react-native';
+import { favoriteService, cartService } from '@services/api';
 
 const { width } = Dimensions.get('window');
 const COLUMN_WIDTH = (width - 50) / 2; // Yanlardaki boşlukları düşüp 2'ye bölüyoruz
@@ -24,13 +26,41 @@ export const FavoritesScreen = ({ navigation }: any) => {
   const [isSortModalVisible, setSortModalVisible] = useState(false);
   const [selectedSort, setSelectedSort] = useState('newest');
 
-  // Dummy Favori Verisi
-  const [favorites, setFavorites] = useState([
-    { id: '1', brand: 'Nivea', name: 'Sun Cream', price: '24.95', image: 'https://images.unsplash.com/photo-1612817288484-6f916006741a?q=80&w=400&auto=format&fit=crop' },
-    { id: '2', brand: 'Bioderma', name: 'Sebium Foaming Gel', price: '55.10', image: 'https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?q=80&w=400&auto=format&fit=crop' },
-    { id: '3', brand: 'La Roche', name: 'Effaclar Duo', price: '32.50', image: 'https://images.unsplash.com/photo-1556229010-6c3f2c9ca5f8?q=80&w=400&auto=format&fit=crop' },
-    { id: '4', brand: 'Cerave', name: 'Hydrating Cleanser', price: '64.00', image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?q=80&w=400&auto=format&fit=crop' },
-  ]);
+  const [favorites, setFavorites] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const loadFavorites = async () => {
+    try {
+      setIsLoading(true);
+      const res = await favoriteService.getFavorites();
+      if (res.data) {
+        const mapped = res.data.map((fav: any) => ({
+          date: fav.createdAt, // to match sorting
+          id: fav.product?.id?.toString(), // use string id for keyExtractor and navigation
+          brand: fav.product?.brand || 'Unknown',
+          name: fav.product?.name || 'Product',
+          price: fav.product?.price || '0',
+          image: fav.product?.image || null
+        }));
+        setFavorites(mapped);
+      }
+    } catch(err) {
+      console.error('Error fetching favorites:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const focusListener = navigation.addListener('focus', () => {
+      loadFavorites();
+    });
+    return focusListener;
+  }, [navigation]);
+
+  useEffect(() => {
+    loadFavorites();
+  }, []);
 
   const sortOptions = [
     { id: 'newest', label: 'Date: Newest' },
@@ -38,16 +68,28 @@ export const FavoritesScreen = ({ navigation }: any) => {
     { id: 'priceHighLow', label: 'Price: High to Low' },
   ];
 
-  // API Bağlantısı İçin Not: Favoriden çıkarma
-  const handleRemoveFavorite = (id: string) => {
-    // API: DELETE /api/favorites/{productId}
-    setFavorites(prev => prev.filter(item => item.id !== id));
+  const handleRemoveFavorite = async (id: string) => {
+    try {
+      setFavorites(prev => prev.filter(item => item.id !== id));
+      await favoriteService.removeFavorite(id);
+    } catch(err) {
+      console.error(err);
+      loadFavorites(); 
+    }
   };
 
-  // API Bağlantısı İçin Not: Sepete ekleme
-  const handleAddToCart = (item: any) => {
-    // API: POST /api/cart/add { productId: item.id }
-    console.log(`${item.name} sepete eklendi`);
+  const [addingIds, setAddingIds] = useState<string[]>([]);
+  
+  const handleAddToCart = async (item: any) => {
+    if (addingIds.includes(item.id)) return;
+    setAddingIds(prev => [...prev, item.id]);
+    try {
+      await cartService.addItem(item.id, 1);
+    } catch(err) {
+      console.error(err);
+    } finally {
+      setAddingIds(prev => prev.filter(id => id !== item.id));
+    }
   };
 
   // Arama filtresi (Frontend tarafında basit filtreleme)
@@ -59,26 +101,40 @@ export const FavoritesScreen = ({ navigation }: any) => {
   }, [searchQuery, favorites]);
 
   // --- ÜRÜN KARTI BİLEŞENİ ---
-  const FavoriteCard = ({ item }: any) => (
-    <View style={styles.card}>
-      <TouchableOpacity style={styles.heartButton} onPress={() => handleRemoveFavorite(item.id)}>
-        <Heart size={20} color="#FF4D4D" fill="#FF4D4D" />
+  const FavoriteCard = ({ item }: any) => {
+    const isAdding = addingIds.includes(item.id);
+    return (
+      <TouchableOpacity 
+        style={styles.card} 
+        activeOpacity={0.9} 
+        onPress={() => navigation.navigate('ProductDetail', { product: item })}
+      >
+        <TouchableOpacity style={styles.heartButton} onPress={() => handleRemoveFavorite(item.id)}>
+          <Heart size={20} color="#FF4D4D" fill="#FF4D4D" />
+        </TouchableOpacity>
+
+        {item.image && item.image !== 'null' ? (
+          <Image source={{ uri: item.image }} style={styles.productImage} />
+        ) : (
+          <View style={[styles.productImage, { backgroundColor: '#f0f0f0' }]} />
+        )}
+
+        <View style={styles.cardDetails}>
+          <Text style={styles.brandText}>{item.brand}</Text>
+          <Text style={styles.nameText} numberOfLines={1}>{item.name}</Text>
+          <Text style={styles.priceText}>{item.price} TL</Text>
+        </View>
+
+        <TouchableOpacity 
+          style={[styles.addToCartBtn, isAdding && { backgroundColor: '#34C759' }]} 
+          onPress={() => handleAddToCart(item)}
+        >
+          {isAdding ? <Check size={18} color="white" /> : <ShoppingCart size={18} color="white" />}
+          <Text style={styles.addToCartText}>{isAdding ? 'Added' : 'Add'}</Text>
+        </TouchableOpacity>
       </TouchableOpacity>
-
-      <Image source={{ uri: item.image }} style={styles.productImage} />
-
-      <View style={styles.cardDetails}>
-        <Text style={styles.brandText}>{item.brand}</Text>
-        <Text style={styles.nameText} numberOfLines={1}>{item.name}</Text>
-        <Text style={styles.priceText}>{item.price} TL</Text>
-      </View>
-
-      <TouchableOpacity style={styles.addToCartBtn} onPress={() => handleAddToCart(item)}>
-        <ShoppingCart size={18} color="white" />
-        <Text style={styles.addToCartText}>Add</Text>
-      </TouchableOpacity>
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -110,7 +166,11 @@ export const FavoritesScreen = ({ navigation }: any) => {
       </View>
 
       {/* 3. LİSTE VEYA BOŞ DURUM */}
-      {favorites.length > 0 ? (
+      {isLoading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      ) : favorites.length > 0 ? (
         <FlatList
           data={filteredData}
           keyExtractor={(item) => item.id}

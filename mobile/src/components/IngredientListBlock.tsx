@@ -60,7 +60,7 @@ export const IngredientListBlock = ({ ingredients }: IngredientListBlockProps) =
 
                 {/* Footer Action */}
                 <View style={styles.footerActionRow}>
-                    <Text style={styles.footerText}>View All Ingredients (25)</Text>
+                    <Text style={styles.footerText}>View All Ingredients</Text>
                 </View>
             </View>
         </View>
@@ -203,7 +203,6 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         color: theme.colors.text,
-        marginLeft: 40, // push center slightly
     },
     cameraButton: {
         width: 44,

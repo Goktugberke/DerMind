@@ -8,11 +8,15 @@ export const PurchasedProductCard = ({ item, onRate, onStartStreak }: any) => {
     <View style={styles.card}>
       {/* Ürün Görseli ve Bilgisi */}
       <View style={styles.mainInfo}>
-        <Image
-          source={{ uri: item.image }}
-          style={styles.productImage}
-          resizeMode="contain"
-        />
+        {item.image && item.image !== 'null' ? (
+          <Image
+            source={{ uri: item.image }}
+            style={styles.productImage}
+            resizeMode="contain"
+          />
+        ) : (
+          <View style={[styles.productImage, { backgroundColor: '#f0f0f0' }]} />
+        )}
         <View style={styles.textContainer}>
           <Text style={styles.brand}>{item.brand}</Text>
           <Text style={styles.productName}>{item.name}</Text>
