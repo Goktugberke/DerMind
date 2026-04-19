@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAuth, signInWithEmailAndPassword, signInWithCredential, GoogleAuthProvider } from '@react-native-firebase/auth';
+import { getAuth, signInWithEmailAndPassword, signInWithCredential, GoogleAuthProvider, signOut } from '@react-native-firebase/auth';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { View, Text, Image, StyleSheet, TouchableOpacity, KeyboardAvoidingView, ScrollView, Platform, Alert } from 'react-native';
 import { theme } from '@constants/theme';
@@ -92,7 +92,7 @@ export const LoginScreen = ({ navigation }: any) => {
 
         console.log('Google login successful, state will update automatically');
       } catch (backendError) {
-        await auth.signOut();
+        await signOut(auth);
         Alert.alert("Login Failed", "Database sync failed. Please try again.");
       }
     } catch (error) {
