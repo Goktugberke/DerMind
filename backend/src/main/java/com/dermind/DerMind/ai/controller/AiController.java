@@ -8,6 +8,7 @@ import com.dermind.DerMind.security.CustomOAuth2UserService;
 import com.dermind.DerMind.user.model.User;
 import com.dermind.DerMind.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -40,6 +41,9 @@ public class AiController {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final CustomOAuth2UserService oauth2UserService;
+
+    @Value("${ai.server.url}")
+    private String aiServerUrl;
 
     // ─────────────────────────────────────────────
     // GET /api/ai/score/{productId}
@@ -189,7 +193,7 @@ public class AiController {
         boolean healthy = aiServerClient.isHealthy();
         return ResponseEntity.ok(Map.of(
                 "ai_server_status", healthy ? "UP" : "DOWN",
-                "ai_server_url", "http://localhost:8000"
+                "ai_server_url", aiServerUrl
         ));
     }
 

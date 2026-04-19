@@ -86,8 +86,11 @@ public class StreakController {
      * POST /api/streaks/{id}/use
      */
     @PostMapping("/{id}/use")
-    public ResponseEntity<StreakResponseDTO> recordUsage(@PathVariable Long id) {
-        StreakResponseDTO updatedStreak = streakService.recordUsage(id);
+    public ResponseEntity<StreakResponseDTO> recordUsage(
+            @AuthenticationPrincipal OidcUser principal,
+            @PathVariable Long id) {
+        String userId = getUserIdFromPrincipal(principal);
+        StreakResponseDTO updatedStreak = streakService.recordUsage(userId, id);
         return ResponseEntity.ok(updatedStreak);
     }
 

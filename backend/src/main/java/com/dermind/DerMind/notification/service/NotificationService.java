@@ -71,6 +71,27 @@ public class NotificationService {
         return notificationRepository.countByUserIdAndIsReadFalse(userId);
     }
 
+    // 5. Tüm bildirimleri okundu işaretle
+    @Transactional
+    public void markAllAsRead(String userId) {
+        List<Notification> unread = notificationRepository.findByUserIdAndIsReadFalse(userId);
+        unread.forEach(n -> n.setRead(true));
+        notificationRepository.saveAll(unread);
+    }
+
+    // 6. Bildirimi sil (sahiplik kontrolü ile)
+    @Transactional
+    public void deleteNotification(String userId, Long notificationId) {
+        Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Notification", "id", notificationId));
+
+        if (!notification.getUser().getId().equals(userId)) {
+            throw new UnauthorizedAccessException("Bu bildirime erişim yetkiniz yok.");
+        }
+
+        notificationRepository.delete(notification);
+    }
+
     private NotificationResponseDTO mapToDTO(Notification notification) {
         return NotificationResponseDTO.builder()
                 .id(notification.getId())

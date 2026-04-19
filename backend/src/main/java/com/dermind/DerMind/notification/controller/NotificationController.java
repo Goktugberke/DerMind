@@ -42,6 +42,22 @@ public class NotificationController {
         return ResponseEntity.ok().build();
     }
 
+    // Tüm bildirimleri okundu işaretle
+    @PutMapping("/read-all")
+    public ResponseEntity<Void> markAllAsRead(@AuthenticationPrincipal OidcUser principal) {
+        String userId = getUserId(principal);
+        notificationService.markAllAsRead(userId);
+        return ResponseEntity.ok().build();
+    }
+
+    // Bildirimi sil
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteNotification(@AuthenticationPrincipal OidcUser principal, @PathVariable Long id) {
+        String userId = getUserId(principal);
+        notificationService.deleteNotification(userId, id);
+        return ResponseEntity.noContent().build();
+    }
+
     private String getUserId(OidcUser principal) {
         if (principal == null) {
             throw new UserNotAuthenticatedException("Giriş yapmalısınız.");
