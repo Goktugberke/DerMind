@@ -5,7 +5,7 @@ import { theme } from '@constants/theme';
 import { MessageSquareText, ArrowLeft, MoreVertical, ShoppingCart } from 'lucide-react-native';
 
 import { ProductInfoCard } from '@components/ProductInfoCard';
-import { favoriteService, productService } from '@services/api';
+import { useGetProductById, useCheckFavorite, useAddFavorite, useRemoveFavorite } from '@services/api';
 import { AnalysisChartCard } from '@components/AnalysisChartCard';
 import { IngredientListBlock, IngredientDetails } from '@components/IngredientListBlock';
 import { AiMatchCard } from '@components/AiMatchCard';
@@ -18,69 +18,45 @@ export const ProductDetailScreen = ({ navigation, route }: any) => {
     const [activeTab, setActiveTab] = useState('ingredients');
 
     const initialProduct = route?.params?.product;
-    const [product, setProduct] = useState<any>(initialProduct);
+    const productId = initialProduct?.id;
+
+    // Query hooks
+    const { data: productData, isLoading: isLoadingProduct } = useGetProductById(productId);
+    const { data: isFavData } = useCheckFavorite(productId);
+    const addFavorite = useAddFavorite();
+    const removeFavorite = useRemoveFavorite();
+
     const [isFavorite, setIsFavorite] = useState(false);
-    const [isLoadingDetails, setIsLoadingDetails] = useState(true);
 
     useEffect(() => {
-        const fetchDetails = async () => {
-            if (!initialProduct.id) {
-                setIsLoadingDetails(false);
-                return;
-            }
-            try {
-                // Fetch Favorite Status
-                const favRes = await favoriteService.checkFavorite(initialProduct.id);
-                setIsFavorite(favRes.data === true);
+        setIsFavorite(isFavData === true);
+    }, [isFavData]);
 
-                // Fetch Deep Product Details
-                const detRes = await productService.getProductById(initialProduct.id);
-                if (detRes.data) {
-                    const pd = detRes.data;
+    // Merge initial product with fetched data
+    const product = {
+        ...initialProduct,
+        ...productData,
+    };
 
-                    // Parse ingredients comma separated string
-                    let parsedIngredients = initialProduct.ingredients;
-                    if (pd.ingredients && typeof pd.ingredients === 'string' && pd.ingredients.trim()) {
-                        parsedIngredients = pd.ingredients.split(',').map((ing: string) => ({
-                            name: ing.trim().toUpperCase(),
-                            subName: ing.trim(),
-                            tag: 'Ingredient',
-                            severity: 'safe' // Default fallback visually
-                        }));
-                    }
+    // Parse ingredients
+    let parsedIngredients = initialProduct?.ingredients;
+    if (productData?.ingredients && typeof productData.ingredients === 'string' && productData.ingredients.trim()) {
+        parsedIngredients = productData.ingredients.split(',').map((ing: string) => ({
+            name: ing.trim().toUpperCase(),
+            subName: ing.trim(),
+            tag: 'Ingredient',
+            severity: 'safe'
+        }));
+    }
 
-                    setProduct((current: any) => ({
-                        ...current,
-                        ...pd,
-                        category: pd.category || current.category,
-                        secondaryCategory: pd.secondaryCategory || current.secondaryCategory,
-                        rating: pd.averageUserRating || current.rating,
-                        reviewsCount: pd.totalRatings || current.reviewsCount,
-                        ingredients: parsedIngredients,
-                    }));
-                }
-            } catch (err) {
-                console.error('Failed to fetch details:', err);
-            } finally {
-                setIsLoadingDetails(false);
-            }
-        };
-        fetchDetails();
-    }, [initialProduct.id]);
-
-    const handleToggleFavorite = async () => {
-        if (!product.id) return;
+    const handleToggleFavorite = () => {
         const newStatus = !isFavorite;
         setIsFavorite(newStatus); // optimistic
-        try {
-            if (newStatus) {
-                await favoriteService.addFavorite(product.id);
-            } else {
-                await favoriteService.removeFavorite(product.id);
-            }
-        } catch (err) {
-            console.error(err);
-            setIsFavorite(!newStatus); // revert
+        
+        if (newStatus) {
+            addFavorite.mutate(productId);
+        } else {
+            removeFavorite.mutate(productId);
         }
     };
 
@@ -113,13 +89,13 @@ export const ProductDetailScreen = ({ navigation, route }: any) => {
                     name={product?.name}
                     imageUrl={product?.image}
                     description={getCategoryDisplay()}
-                    rating={product?.rating || 0}
-                    reviewsCount={product?.reviewsCount || 0}
+                    rating={product?.rating || product?.averageUserRating || 0}
+                    reviewsCount={product?.reviewsCount || product?.totalRatings || 0}
                     isFavorite={isFavorite}
                     onToggleFavorite={handleToggleFavorite}
                 />
 
-                {isLoadingDetails && (
+                {isLoadingProduct && (
                     <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginVertical: 10 }} />
                 )}
 
