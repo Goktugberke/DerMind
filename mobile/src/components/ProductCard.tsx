@@ -20,11 +20,15 @@ export const ProductCard = ({ item, onPress }: any) => {
       activeOpacity={0.7} // Tıklandığındaki şeffaflık efekti (0 ile 1 arası)
     >
       {/* Sol taraf: Ürün Fotoğrafı */}
-      <Image
-        source={{ uri: item.image }}
-        style={styles.productImage}
-        resizeMode="contain"
-      />
+      {item.image && item.image !== 'null' ? (
+        <Image
+          source={{ uri: item.image }}
+          style={styles.productImage}
+          resizeMode="contain"
+        />
+      ) : (
+        <View style={[styles.productImage, { backgroundColor: '#f0f0f0' }]} />
+      )}
 
       {/* Orta taraf: Ürün Bilgileri */}
       <View style={styles.infoContainer}>

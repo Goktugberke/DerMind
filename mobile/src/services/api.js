@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { Platform } from 'react-native';
-import { getAuth } from '@react-native-firebase/auth';
+import { getAuth, getIdToken } from '@react-native-firebase/auth';
 import { API_URL_ANDROID, API_URL_IOS } from '@env';
 
 const BASE_URL = Platform.OS === 'android' ? API_URL_ANDROID : API_URL_IOS;
@@ -14,7 +14,7 @@ api.interceptors.request.use(async (config) => {
   const user = getAuth().currentUser;
 
   if (user) {
-    const idToken = await user.getIdToken();
+    const idToken = await getIdToken(user);
     config.headers.Authorization = `Bearer ${idToken}`;
   }
 
@@ -33,8 +33,8 @@ export const authService = {
 };
 
 export const productService = {
-  getAllProducts: () => api.get('/api/products'),
-  searchProducts: (q) => api.get(`/api/products/search?q=${q}`),
+  getAllProducts: (page = 0, size = 15) => api.get(`/api/products?page=${page}&size=${size}`),
+  searchProducts: (query, page = 0, size = 15) => api.get(`/api/products/search?query=${query}&page=${page}&size=${size}`),
 };
 
 export default api;
