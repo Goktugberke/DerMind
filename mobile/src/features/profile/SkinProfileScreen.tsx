@@ -1,17 +1,32 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, SafeAreaView, TextInput, Switch } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, ScrollView, SafeAreaView, TextInput, Switch, Alert, ActivityIndicator } from 'react-native';
+import { getAuth } from '@react-native-firebase/auth';
 import { PageHeader } from '@components/PageHeader';
 import { CustomButton } from '@components/CustomButton';
 import { SkinTypeCard } from '@components/SkinTypeCard';
 import { ConcernChip } from '@components/ConcernChip';
 import { Droplets, Wind, Zap, ShieldAlert, Sun, Sparkles, User, AlertCircle, Baby } from 'lucide-react-native';
 import { theme } from '@constants/theme';
+import { useUpdateUserProfile, useGetCurrentUser } from '@services/api';
 
 export const SkinProfileScreen = () => {
     const [age, setAge] = useState('24');
     const [selectedType, setSelectedType] = useState('combination');
     const [concerns, setConcerns] = useState(['Acne', 'Spots']);
     const [isPregnancyMode, setIsPregnancyMode] = useState(false);
+    const [allergens, setAllergens] = useState('');
+
+    const authInstance = getAuth();
+    const updateMutation = useUpdateUserProfile();
+    const { data: currentUser, isLoading: isLoadingUser } = useGetCurrentUser();
+
+    // Load user data when page opens or when currentUser data arrives
+    useEffect(() => {
+        if (currentUser) {
+            if (currentUser.skinType) setSelectedType(currentUser.skinType);
+            if (currentUser.allergens) setAllergens(currentUser.allergens);
+        }
+    }, [currentUser]);
 
     const skinTypes = [
         { id: 'oily', title: 'Oily', description: 'Excess sebum', icon: <Droplets size={24} color={theme.colors.primary} /> },
@@ -24,6 +39,29 @@ export const SkinProfileScreen = () => {
 
     const toggleConcern = (val: string) => {
         setConcerns(prev => prev.includes(val) ? prev.filter(c => c !== val) : [...prev, val]);
+    };
+
+    const handleSaveProfile = async () => {
+        try {
+            if (!authInstance.currentUser?.uid) {
+                Alert.alert('Error', 'User not authenticated');
+                return;
+            }
+
+            await updateMutation.mutateAsync({
+                userId: authInstance.currentUser.uid,
+                profileData: {
+                    skinType: selectedType,
+                    allergens: allergens.trim() || undefined,
+                    name: authInstance.currentUser.displayName || 'User',
+                    picture: authInstance.currentUser.photoURL || '',
+                }
+            });
+
+            Alert.alert('Success', 'Skin profile saved successfully!');
+        } catch (error) {
+            Alert.alert('Error', error instanceof Error ? error.message : 'Failed to save profile');
+        }
     };
 
     return (
@@ -83,6 +121,8 @@ export const SkinProfileScreen = () => {
                         style={styles.safetyInput}
                         placeholder="e.g., Peanuts, Fragrance, Alcohol"
                         placeholderTextColor="#94A3B8"
+                        value={allergens}
+                        onChangeText={setAllergens}
                     />
 
                     <View style={styles.toggleRow}>
@@ -106,7 +146,15 @@ export const SkinProfileScreen = () => {
             </ScrollView>
 
             <View style={styles.footer}>
-                <CustomButton title="Save Skin Profile" onPress={() => console.log('Profile Saved')} />
+                {updateMutation.isPending ? (
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                ) : (
+                    <CustomButton 
+                        title="Save Skin Profile" 
+                        onPress={handleSaveProfile}
+                        disabled={updateMutation.isPending}
+                    />
+                )}
             </View>
         </SafeAreaView>
     );

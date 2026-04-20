@@ -1,0 +1,275 @@
+import axios from 'axios';
+import { Platform } from 'react-native';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getAuth, getIdToken } from '@react-native-firebase/auth';
+
+import type { User, UserProfileData, UpdateUserProfilePayload, Product, CartItem, Favorite, Rating } from '../types/user';
+
+console.log('API Module Loading - Platform:', Platform.OS);
+const BASE_URL = Platform.OS === 'android' ? 'http://10.0.2.2:8080' : 'http://localhost:8080';
+console.log('BASE_URL set to:', BASE_URL);
+
+const api = axios.create({
+  baseURL: BASE_URL,
+  timeout: 15000,
+});
+
+api.interceptors.request.use(async (config) => {
+  const user = getAuth().currentUser;
+
+  if (user) {
+    const idToken = await getIdToken(user);
+    config.headers.Authorization = `Bearer ${idToken}`;
+    console.log('Firebase token injected for:', user.email);
+  } else {
+    console.log('No Firebase user, request without token');
+  }
+
+  return config;
+});
+
+api.interceptors.response.use(
+  (response) => {
+    console.log('API Response Success:', response.status, response.config.url);
+    return response;
+  },
+  (error) => {
+    console.error('API Response Error:', error.response?.status, error.response?.data || error.message, 'URL:', error.config?.url);
+    return Promise.reject(error);
+  }
+);
+
+export const authService = {
+  // Standart Kayıt (POST /api/users)
+  register: (userData: User & { password?: string }) => api.post<User>('/api/users', userData),
+
+  // Google/Firebase Senkronizasyonu (POST /api/users/firebase)
+  firebaseLogin: (firebaseData: Record<string, string>) => api.post<User>('/api/users/firebase', firebaseData),
+
+  // Kullanıcı Detayı Çekme (GET /api/users/me)
+  getCurrentUser: () => api.get<User>('/api/users/me'),
+};
+
+export const productService = {
+  getAllProducts: (page: number = 0, size: number = 15) => api.get<any>(`/api/products?page=${page}&size=${size}`),
+  searchProducts: (query: string, page: number = 0, size: number = 15) => api.get<any>(`/api/products/search?query=${query}&page=${page}&size=${size}`),
+  getProductById: (id: number) => api.get<Product>(`/api/products/${id}`),
+};
+
+export const purchaseService = {
+  getPurchasesByUser: (userId: string) => api.get<any>(`/api/purchases/user/${userId}`),
+};
+
+export const cartService = {
+  getCart: () => api.get<CartItem[]>('/api/cart'),
+  addItem: (productId: number, quantity: number = 1) => api.post<CartItem>('/api/cart/add', { productId, quantity }),
+  updateQuantity: (productId: number, quantity: number) => api.put<CartItem>(`/api/cart/item/${productId}?quantity=${quantity}`),
+  removeItem: (productId: number) => api.delete<void>(`/api/cart/item/${productId}`),
+  clearCart: () => api.delete<void>('/api/cart')
+};
+
+export const favoriteService = {
+  getFavorites: () => api.get<Favorite[]>('/api/favorites/my-favorites'),
+  addFavorite: (productId: number | string) => api.post<Favorite>(`/api/favorites/${productId}`),
+  removeFavorite: (productId: number | string) => api.delete<void>(`/api/favorites/${productId}`),
+  checkFavorite: (productId: number | string) => api.get<boolean>(`/api/favorites/check/${productId}`),
+};
+
+export const ratingsService = {
+  getProductRatings: (productId: number) => api.get<Rating[]>(`/api/ratings/product/${productId}`),
+};
+
+export const profileService = {
+  // Profil bilgisini güncelle (PUT /api/users/{id})
+  updateUserProfile: (userId: string, profileData: UserProfileData) => api.put<User>(`/api/users/${userId}`, profileData),
+
+  // Kullanıcı detayını getir (GET /api/users/{id})
+  getUserById: (userId: string) => api.get<User>(`/api/users/${userId}`),
+};
+
+// ============ TanStack Query Hooks ============
+
+// Products
+export const useGetAllProducts = (page = 0, size = 15) => {
+  return useQuery<any, Error>({
+    queryKey: ['products', page, size],
+    queryFn: () => productService.getAllProducts(page, size).then(res => res.data),
+  });
+};
+
+export const useSearchProducts = (query: string, page = 0, size = 15, enabled = true) => {
+  return useQuery<any, Error>({
+    queryKey: ['searchProducts', query, page, size],
+    queryFn: () => productService.searchProducts(query, page, size).then(res => res.data),
+    enabled: !!query && enabled,
+  });
+};
+
+export const useGetProductById = (id: number, enabled = true) => {
+  return useQuery<Product, Error>({
+    queryKey: ['product', id],
+    queryFn: () => productService.getProductById(id).then(res => res.data),
+    enabled: !!id && enabled,
+  });
+};
+
+// Auth
+export const useGetCurrentUser = (enabled = true) => {
+  return useQuery<User, Error>({
+    queryKey: ['currentUser'],
+    queryFn: async () => {
+      try {
+        console.log('Fetching current user...');
+        const res = await authService.getCurrentUser();
+        console.log('Current user fetched successfully:', res.data);
+        return res.data;
+      } catch (error) {
+        console.error('Error fetching current user:', error);
+        throw error;
+      }
+    },
+    enabled,
+    retry: 1,
+    staleTime: 5 * 60 * 1000, // 5 dakika cache'de tut
+  });
+};
+
+export const useRegister = () => {
+  const queryClient = useQueryClient();
+  return useMutation<User, Error, User & { password?: string }>({
+    mutationFn: (userData) => authService.register(userData).then(res => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+    },
+  });
+};
+
+export const useFirebaseLogin = () => {
+  const queryClient = useQueryClient();
+  return useMutation<User, Error, Record<string, string>>({
+    mutationFn: (firebaseData) => authService.firebaseLogin(firebaseData).then(res => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+    },
+  });
+};
+
+// Favorites
+export const useGetFavorites = (enabled = true) => {
+  return useQuery<Favorite[], Error>({
+    queryKey: ['favorites'],
+    queryFn: () => favoriteService.getFavorites().then(res => res.data),
+    enabled,
+  });
+};
+
+export const useCheckFavorite = (productId: number | string, enabled = true) => {
+  return useQuery<boolean, Error>({
+    queryKey: ['favorite', productId],
+    queryFn: () => favoriteService.checkFavorite(productId).then(res => res.data),
+    enabled: !!productId && enabled,
+  });
+};
+
+export const useAddFavorite = () => {
+  const queryClient = useQueryClient();
+  return useMutation<Favorite, Error, number | string>({
+    mutationFn: (productId) => favoriteService.addFavorite(productId).then(res => res.data),
+    onSuccess: (_, productId) => {
+      queryClient.invalidateQueries({ queryKey: ['favorite', productId] });
+      queryClient.invalidateQueries({ queryKey: ['favorites'] });
+    },
+  });
+};
+
+export const useRemoveFavorite = () => {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, number | string>({
+    mutationFn: (productId) => favoriteService.removeFavorite(productId).then(res => res.data),
+    onSuccess: (_, productId) => {
+      queryClient.invalidateQueries({ queryKey: ['favorite', productId] });
+      queryClient.invalidateQueries({ queryKey: ['favorites'] });
+    },
+  });
+};
+
+// Cart
+export const useGetCart = (enabled = true) => {
+  return useQuery<CartItem[], Error>({
+    queryKey: ['cart'],
+    queryFn: () => cartService.getCart().then(res => res.data),
+    enabled,
+  });
+};
+
+export const useAddToCart = () => {
+  const queryClient = useQueryClient();
+  return useMutation<CartItem, Error, { productId: number; quantity: number }>({
+    mutationFn: ({ productId, quantity }) => cartService.addItem(productId, quantity).then(res => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
+    },
+  });
+};
+
+export const useUpdateCartQuantity = () => {
+  const queryClient = useQueryClient();
+  return useMutation<CartItem, Error, { productId: number; quantity: number }>({
+    mutationFn: ({ productId, quantity }) => cartService.updateQuantity(productId, quantity).then(res => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
+    },
+  });
+};
+
+export const useRemoveFromCart = () => {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, number>({
+    mutationFn: (productId) => cartService.removeItem(productId).then(res => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
+    },
+  });
+};
+
+export const useClearCart = () => {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, void>({
+    mutationFn: () => cartService.clearCart().then(res => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
+    },
+  });
+};
+
+// Ratings
+export const useGetProductRatings = (productId: number, enabled = true) => {
+  return useQuery<Rating[], Error>({
+    queryKey: ['ratings', productId],
+    queryFn: () => ratingsService.getProductRatings(productId).then(res => res.data),
+    enabled: !!productId && enabled,
+  });
+};
+
+// Profile
+export const useGetUserById = (userId: string, enabled = true) => {
+  return useQuery<User, Error>({
+    queryKey: ['user', userId],
+    queryFn: () => profileService.getUserById(userId).then(res => res.data),
+    enabled: !!userId && enabled,
+  });
+};
+
+export const useUpdateUserProfile = () => {
+  const queryClient = useQueryClient();
+  return useMutation<User, Error, UpdateUserProfilePayload>({
+    mutationFn: (payload: UpdateUserProfilePayload) => 
+      profileService.updateUserProfile(payload.userId, payload.profileData).then(res => res.data),
+    onSuccess: (_, payload) => {
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+      queryClient.invalidateQueries({ queryKey: ['user', payload.userId] });
+    },
+  });
+};
+
+export default api;

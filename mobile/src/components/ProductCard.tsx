@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
     marginLeft: 15,
   },
   brand: { fontSize: 16, fontWeight: 'bold', color: theme.colors.text },
-  productName: { fontSize: 16, fontWeight: '700', color: theme.colors.gray },
+  productName: { fontSize: 14, fontWeight: '700', color: theme.colors.gray },
   starRow: {
     flexDirection: 'row',
     marginTop: 5,
