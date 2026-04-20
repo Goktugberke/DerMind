@@ -29,11 +29,8 @@ export const RootNavigator = () => {
 
   const [initializing, setInitializing] = useState(true);
   const [user, setUser] = useState<FirebaseAuthTypes.User | null>(null);
-
-  function handleAuthStateChanged(userState: FirebaseAuthTypes.User | null) {
-    setUser(userState);
-    if (initializing) setInitializing(false);
-  }
+  // Backend kaydı tamamlanana kadar navigate’i bloke et
+  const [isRegistering, setIsRegistering] = useState(false);
 
   useEffect(() => {
     const authInstance = getAuth(getApp());
@@ -46,7 +43,7 @@ export const RootNavigator = () => {
     return () => unsubscribe();
   }, []);
 
-  if (initializing) {
+  if (initializing || isRegistering) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
         <ActivityIndicator size="large" color="#D81B60" />
@@ -76,7 +73,10 @@ export const RootNavigator = () => {
         /* KULLANICI GİRİŞ YAPMAMIŞSA: Sadece Giriş Ekranlarını göster */
         <>
           <Stack.Screen name="Login" component={LoginScreen} />
-          <Stack.Screen name="Register" component={RegisterScreen} />
+          <Stack.Screen
+            name="Register"
+            children={(props) => <RegisterScreen {...props} setIsRegistering={setIsRegistering} />}
+          />
           <Stack.Screen
             name="ForgotPassword"
             component={ForgotPasswordScreen}

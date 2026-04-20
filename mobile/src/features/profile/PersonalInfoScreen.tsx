@@ -1,24 +1,42 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, SafeAreaView, Image, TouchableOpacity, Switch, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, ScrollView, SafeAreaView, Image, TouchableOpacity, Switch, Alert, ActivityIndicator } from 'react-native';
+import { getAuth } from '@react-native-firebase/auth';
 import { PageHeader } from '@components/PageHeader';
 import { CustomInput } from '@components/CustomInput';
 import { CustomButton } from '@components/CustomButton';
 import { ProfileMenuItem } from '@components/ProfileMenuItem';
 import { User, Mail, Phone, Lock, Bell, AlertTriangle, Trash2, ShieldCheck } from 'lucide-react-native';
 import { theme } from '@constants/theme';
+import { useUpdateUserProfile, useGetCurrentUser } from '@services/api';
 
 export const PersonalInfoScreen = () => {
 
     const [marketingEmails, setMarketingEmails] = useState(true);
+    const authInstance = getAuth();
+    const updateMutation = useUpdateUserProfile();
+    
+    // Fetch current user data
+    const { data: currentUserData, isLoading: isLoadingUser } = useGetCurrentUser(!!authInstance.currentUser?.uid);
 
     const [form, setForm] = useState({
-        fullName: 'Ayşe Yılmaz',
-        email: 'test@3.com',
+        fullName: authInstance.currentUser?.displayName || 'User',
+        email: authInstance.currentUser?.email || 'test@example.com',
         phone: '+90 555 555 55 55',
         currentPassword: '',
         newPassword: '',
         confirmPassword: '',
     });
+
+    // Update form when currentUserData changes
+    useEffect(() => {
+        if (currentUserData) {
+            setForm(prev => ({
+                ...prev,
+                fullName: currentUserData.name || prev.fullName,
+                email: currentUserData.email || prev.email,
+            }));
+        }
+    }, [currentUserData]);
 
     const handleInputChange = (name: string, value: string) => {
         setForm(prev => ({
@@ -26,6 +44,70 @@ export const PersonalInfoScreen = () => {
             [name]: value // Sadece değişen alanı güncelle
         }));
     };
+
+    const handleSavePersonalInfo = async () => {
+        try {
+            if (!authInstance.currentUser?.uid) {
+                Alert.alert('Error', 'User not authenticated');
+                return;
+            }
+
+            // Validate inputs
+            if (!form.fullName.trim()) {
+                Alert.alert('Error', 'Full name is required');
+                return;
+            }
+
+            await updateMutation.mutateAsync({
+                userId: authInstance.currentUser.uid,
+                profileData: {
+                    name: form.fullName,
+                    allergens: undefined,
+                    skinType: currentUserData?.skinType || undefined,
+                    picture: authInstance.currentUser.photoURL || '',
+                }
+            });
+
+            Alert.alert('Success', 'Personal information saved successfully!');
+        } catch (error) {
+            Alert.alert('Error', error instanceof Error ? error.message : 'Failed to save personal info');
+        }
+    };
+
+    const handleDeleteAccount = () => {
+        Alert.alert(
+            'Delete Account',
+            'Are you sure you want to delete your account? This action cannot be undone.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            if (authInstance.currentUser) {
+                                // TODO: Call backend DELETE /api/users/{id} endpoint
+                                await authInstance.currentUser.delete();
+                                Alert.alert('Success', 'Account deleted successfully');
+                            }
+                        } catch (error) {
+                            Alert.alert('Error', error instanceof Error ? error.message : 'Failed to delete account');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    if (isLoadingUser) {
+        return (
+            <SafeAreaView style={styles.safeArea}>
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.safeArea}>
@@ -36,9 +118,12 @@ export const PersonalInfoScreen = () => {
                 {/* PROFIL FOTO VE ISIM */}
                 <View style={styles.profileSection}>
                     <View style={styles.avatarWrapper}>
-                        <Image source={{ uri: 'https://i.pravatar.cc/300' }} style={styles.avatar} />
+                        <Image 
+                            source={{ uri: authInstance.currentUser?.photoURL || 'https://i.pravatar.cc/300' }} 
+                            style={styles.avatar} 
+                        />
                     </View>
-                    <Text style={styles.name}>Sarah Johnson</Text>
+                    <Text style={styles.name}>{form.fullName}</Text>
                 </View>
 
                 {/* ACCOUNT DETAILS */}
@@ -67,40 +152,6 @@ export const PersonalInfoScreen = () => {
                     leftIcon={<Phone size={18} color={theme.colors.secondary} />}
                 />
 
-                {/* SECURITY */}
-                <Text style={[styles.sectionTitle, { marginTop: 20 }]}>SECURITY</Text>
-                <CustomInput
-                    label="Current Password"
-                    placeholder="••••••••"
-                    value={form.currentPassword}
-                    onChangeText={(text) => handleInputChange('currentPassword', text)}
-                    isPassword={true}
-                    leftIcon={<Lock size={18} color={theme.colors.secondary} />}
-                />
-                <CustomInput
-                    label="New Password"
-                    placeholder="Minimum 8 characters"
-                    value={form.newPassword}
-                    isPassword={true}
-                    onChangeText={(text) => handleInputChange('newPassword', text)}
-                    keyboardType="email-address"
-                    leftIcon={<Lock size={18} color={theme.colors.secondary} />}
-                />
-                <CustomInput
-                    label="Confirm New Password"
-                    placeholder="Repeat new password"
-                    value={form.confirmPassword}
-                    isPassword={true}
-                    onChangeText={(text) => handleInputChange('confirmPassword', text)}
-                    keyboardType="email-address"
-                    leftIcon={<Lock size={18} color={theme.colors.secondary} />}
-                />
-
-                <CustomButton
-                    title="Save Password"
-                    onPress={() => Alert.alert("Success", "Password updated!")}
-                />
-
                 {/* PREFERENCES */}
                 <Text style={[styles.sectionTitle, { marginTop: 30 }]}>PREFERENCES</Text>
                 <View style={styles.card}>
@@ -119,6 +170,19 @@ export const PersonalInfoScreen = () => {
                     />
                 </View>
 
+                {/* SAVE BUTTON */}
+                <View style={{ marginTop: 20 }}>
+                    {updateMutation.isPending ? (
+                        <ActivityIndicator size="large" color={theme.colors.primary} />
+                    ) : (
+                        <CustomButton
+                            title="Save Personal Information"
+                            onPress={handleSavePersonalInfo}
+                            disabled={updateMutation.isPending}
+                        />
+                    )}
+                </View>
+
                 {/* DANGER ZONE */}
                 <Text style={[styles.sectionTitle, { color: '#DC2626', marginTop: 30 }]}>DANGER ZONE</Text>
                 <View style={styles.dangerCard}>
@@ -129,7 +193,7 @@ export const PersonalInfoScreen = () => {
                     <Text style={styles.dangerDesc}>
                         Once you delete your account, there is no going back. All your skincare routines and purchase history will be permanently removed.
                     </Text>
-                    <TouchableOpacity style={styles.deleteBtn}>
+                    <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteAccount}>
                         <Trash2 size={18} color="#FFF" />
                         <Text style={styles.deleteBtnText}>Delete Account</Text>
                     </TouchableOpacity>

@@ -8,7 +8,8 @@ import { FilterActions } from '@components/FilterActions';
 import { SortModal } from '@components/SortModal';
 import { ProductCard } from '@components/ProductCard';
 import { theme } from '@constants/theme';
-import { authService, productService } from '@services/api';
+import { authService, productService, useGetCurrentUser } from '@services/api';
+import { getAuth } from '@react-native-firebase/auth';
 
 const HEADER_SCROLL_DISTANCE = 110;
 
@@ -25,6 +26,9 @@ export const HomeScreen = ({ navigation }: any) => {
   const headerAnimValue = useSharedValue(0);
   const scrollY = useSharedValue(0);
   const insets = useSafeAreaInsets();
+  
+  // Get current user from DB - with error handling for new registrations
+  const { data: currentUser, error: userError, isLoading: userLoading } = useGetCurrentUser();
 
   const sortOptions = [
     { id: 'priceLowHigh', label: 'Price: Low to High' },
@@ -82,12 +86,21 @@ export const HomeScreen = ({ navigation }: any) => {
   };
 
   useEffect(() => {
-    authService.getCurrentUser().then(userRes => {
-      if (userRes && userRes.data && userRes.data.name) {
-        setUserName(userRes.data.name.split(' ')[0]);
+    if (currentUser?.name) {
+      // Backend'den gelen isim
+      setUserName(currentUser.name.split(' ')[0]);
+    } else if (userError) {
+      // Backend başarısız — Firebase displayName'i kullan
+      const firebaseUser = getAuth().currentUser;
+      if (firebaseUser?.displayName) {
+        setUserName(firebaseUser.displayName.split(' ')[0]);
+      } else if (firebaseUser?.email) {
+        // DisplayName yoksa email'den @ öncesini al
+        setUserName(firebaseUser.email.split('@')[0]);
       }
-    }).catch(() => null);
-  }, []);
+      console.warn('Could not load user profile - using Firebase name. Error:', userError);
+    }
+  }, [currentUser, userError]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {

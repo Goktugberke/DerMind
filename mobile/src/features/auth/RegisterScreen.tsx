@@ -9,7 +9,7 @@ import { authService } from '@services/api';
 
 const auth = getAuth();
 
-export const RegisterScreen = ({ navigation }: any) => {
+export const RegisterScreen = ({ navigation, setIsRegistering }: { navigation: any; setIsRegistering?: (v: boolean) => void }) => {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -84,9 +84,9 @@ export const RegisterScreen = ({ navigation }: any) => {
 
       await authService.firebaseLogin({
         token: idToken,
-        email: googleUser?.email,
-        name: googleUser?.name,
-        picture: googleUser?.photo,
+        email: googleUser?.email ?? '',
+        name: googleUser?.name ?? '',
+        picture: googleUser?.photo ?? '',
         uid: userCredential.user.uid
       });
 
@@ -102,9 +102,12 @@ export const RegisterScreen = ({ navigation }: any) => {
     }
 
     try {
+      // Backend kaydı tamamlanana kadar navigate’i bloke et
+      setIsRegistering?.(true);
 
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const { uid } = userCredential.user;
+      // onAuthStateChanged bu noktada tetiklendi ama isRegistering=true olduğu için navigate olmaz
 
       const userData = {
         id: uid,
@@ -117,11 +120,14 @@ export const RegisterScreen = ({ navigation }: any) => {
       };
 
       await authService.register(userData);
-
+      // Backend kaydı tamam — artık navigate edilebilir
     } catch (error: any) {
       console.error("Kayıt Hatası:", error);
       const msg = error.code ? "Firebase: " + error.message : "Backend: Bağlantı hatası";
       Alert.alert("Hata", msg);
+    } finally {
+      // Başarılı veya hatalı kayıt sonrası bloku kaldır
+      setIsRegistering?.(false);
     }
   };
 
