@@ -13,6 +13,7 @@ public class UserDetailDTO {
     private String name;
     private String allergens;
     private String skinType;
+    private boolean hasAcne;
     private String picture;
     private int totalPurchases;
     private int totalRatings;

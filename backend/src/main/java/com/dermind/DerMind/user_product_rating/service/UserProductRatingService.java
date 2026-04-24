@@ -1,5 +1,8 @@
 package com.dermind.DerMind.user_product_rating.service;
 
+import com.dermind.DerMind.common.enums.PaymentStatus;
+import com.dermind.DerMind.error.BusinessException;
+import com.dermind.DerMind.error.ResourceNotFoundException;
 import com.dermind.DerMind.product.model.Product;
 import com.dermind.DerMind.product.repository.ProductRepository;
 import com.dermind.DerMind.purchase.repository.PurchaseRepository;
@@ -27,20 +30,20 @@ public class UserProductRatingService {
     @Transactional
     public RatingResponseDTO createRating(RatingCreateDTO dto) {
         User user = userRepository.findById(dto.getUserId())
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + dto.getUserId()));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", dto.getUserId()));
 
         Product product = productRepository.findById(dto.getProductId())
-                .orElseThrow(() -> new RuntimeException("Product not found with id: " + dto.getProductId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", dto.getProductId()));
 
         // Kullanıcı bu ürünü daha önce puanlamış mı kontrol et
         if (ratingRepository.findByUserIdAndProductId(dto.getUserId(), dto.getProductId()).isPresent()) {
-            throw new RuntimeException("User has already rated this product");
+            throw new BusinessException("Bu ürünü zaten puanladınız.");
         }
 
         // Doğrulanmış satın alma kontrolü
         boolean verifiedPurchase = purchaseRepository.findByUserId(dto.getUserId()).stream()
                 .anyMatch(p -> p.getProduct().getId().equals(dto.getProductId())
-                        && "COMPLETED".equals(p.getPaymentStatus()));
+                        && PaymentStatus.COMPLETED == p.getPaymentStatus());
 
         // Kişiselleştirilmiş puan hesaplama (basit versiyon)
         Double personalizedRating = calculatePersonalizedRating(user, product, dto.getRating());
@@ -67,7 +70,7 @@ public class UserProductRatingService {
     @Transactional(readOnly = true)
     public RatingResponseDTO getRatingById(Long id) {
         UserProductRating rating = ratingRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Rating not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Rating", "id", id));
         return mapToResponseDTO(rating);
     }
 
@@ -110,7 +113,7 @@ public class UserProductRatingService {
     @Transactional(readOnly = true)
     public ProductRatingStatsDTO getProductRatingStats(Long productId) {
         Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new RuntimeException("Product not found with id: " + productId));
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productId));
 
         List<UserProductRating> ratings = ratingRepository.findByProductId(productId);
 
@@ -129,7 +132,7 @@ public class UserProductRatingService {
     @Transactional
     public RatingResponseDTO updateRating(Long id, RatingUpdateDTO dto) {
         UserProductRating rating = ratingRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Rating not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Rating", "id", id));
 
         if (dto.getRating() != null) {
             rating.setRating(dto.getRating());
@@ -167,7 +170,7 @@ public class UserProductRatingService {
     @Transactional
     public void deleteRating(Long id) {
         if (!ratingRepository.existsById(id)) {
-            throw new RuntimeException("Rating not found with id: " + id);
+            throw new ResourceNotFoundException("Rating", "id", id);
         }
         ratingRepository.deleteById(id);
     }

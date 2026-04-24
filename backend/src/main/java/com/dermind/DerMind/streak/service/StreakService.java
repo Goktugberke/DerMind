@@ -3,6 +3,7 @@ package com.dermind.DerMind.streak.service;
 import com.dermind.DerMind.common.enums.UsageFrequency;
 import com.dermind.DerMind.error.BusinessException;
 import com.dermind.DerMind.error.ResourceNotFoundException;
+import com.dermind.DerMind.error.UnauthorizedAccessException;
 import com.dermind.DerMind.product.model.Product;
 import com.dermind.DerMind.product.repository.ProductRepository;
 import com.dermind.DerMind.streak.dto.*;
@@ -33,7 +34,7 @@ public class StreakService {
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 
         Product product = productRepository.findById(dto.getProductId())
-                .orElseThrow(() -> new RuntimeException("Product not found with id: " + dto.getProductId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", dto.getProductId()));
 
         // Aynı kullanıcı ve ürün için seri zaten var mı kontrol et
         if (streakRepository.findByUserIdAndProductId(userId, dto.getProductId()).isPresent()) {
@@ -59,7 +60,7 @@ public class StreakService {
     @Transactional(readOnly = true)
     public StreakResponseDTO getStreakById(Long id) {
         Streak streak = streakRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Streak not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Streak", "id", id));
         return mapToResponseDTO(streak);
     }
 
@@ -95,7 +96,7 @@ public class StreakService {
     @Transactional
     public StreakResponseDTO updateStreak(Long id, StreakUpdateDTO dto) {
         Streak streak = streakRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Streak not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Streak", "id", id));
 
         if (dto.getUsageFrequency() != null) {
             streak.setUsageFrequency(dto.getUsageFrequency());
@@ -112,9 +113,13 @@ public class StreakService {
     }
 
     @Transactional
-    public StreakResponseDTO recordUsage(Long streakId) {
+    public StreakResponseDTO recordUsage(String userId, Long streakId) {
         Streak streak = streakRepository.findById(streakId)
-                .orElseThrow(() -> new RuntimeException("Streak not found with id: " + streakId));
+                .orElseThrow(() -> new ResourceNotFoundException("Streak", "id", streakId));
+
+        if (!streak.getUser().getId().equals(userId)) {
+            throw new UnauthorizedAccessException("Bu seri size ait değil.");
+        }
 
         LocalDate today = LocalDate.now();
         LocalDate lastUsed = streak.getLastUsedDate();
@@ -161,7 +166,7 @@ public class StreakService {
     @Transactional
     public void deleteStreak(Long id) {
         if (!streakRepository.existsById(id)) {
-            throw new RuntimeException("Streak not found with id: " + id);
+            throw new ResourceNotFoundException("Streak", "id", id);
         }
         streakRepository.deleteById(id);
     }

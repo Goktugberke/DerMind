@@ -1,5 +1,6 @@
 package com.dermind.DerMind.product.service;
 
+import com.dermind.DerMind.error.ResourceNotFoundException;
 import com.dermind.DerMind.product.dto.*;
 import com.dermind.DerMind.product.model.Product;
 import com.dermind.DerMind.product.repository.ProductRepository;
@@ -31,7 +32,7 @@ public class ProductService {
     // ID ile ürün getir
     public ProductDetailDTO getProductById(Long id) {
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
         return convertToDetailDTO(product);
     }
 
@@ -43,6 +44,13 @@ public class ProductService {
         product.setBrand(dto.getBrand());
         product.setIngredients(dto.getIngredients());
         product.setQualityScore(dto.getQualityScore());
+        product.setSephoraProductId(dto.getSephoraProductId());
+        product.setPrice(dto.getPrice());
+        product.setPriceUsd(dto.getPriceUsd());
+        product.setCategory(dto.getCategory());
+        product.setSecondaryCategory(dto.getSecondaryCategory());
+        product.setSephoraRating(dto.getSephoraRating());
+        product.setBaseScore(dto.getBaseScore());
 
         Product savedProduct = productRepository.save(product);
         return convertToResponseDTO(savedProduct);
@@ -52,7 +60,7 @@ public class ProductService {
     @Transactional
     public ProductResponseDTO updateProduct(Long id, ProductUpdateDTO dto) {
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
 
         if (dto.getName() != null) product.setName(dto.getName());
         if (dto.getBrand() != null) product.setBrand(dto.getBrand());
@@ -67,7 +75,7 @@ public class ProductService {
     @Transactional
     public void deleteProduct(Long id) {
         if (!productRepository.existsById(id)) {
-            throw new RuntimeException("Product not found with id: " + id);
+            throw new ResourceNotFoundException("Product", "id", id);
         }
         productRepository.deleteById(id);
     }
@@ -125,7 +133,7 @@ public class ProductService {
     // Kullanıcıya özel ürün önerileri
     public List<ProductRecommendationDTO> getRecommendationsForUser(String userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 
         List<Product> allProducts = productRepository.findAll();
         List<ProductRecommendationDTO> recommendations = new ArrayList<>();

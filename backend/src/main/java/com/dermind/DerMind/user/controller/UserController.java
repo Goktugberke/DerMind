@@ -1,6 +1,5 @@
 package com.dermind.DerMind.user.controller;
 
-import com.dermind.DerMind.user.model.User;
 import com.dermind.DerMind.user.dto.*;
 import com.dermind.DerMind.user.service.UserService;
 import jakarta.validation.Valid;
@@ -54,8 +53,8 @@ public class UserController {
      * LOGIN OLAN KULLANICI
      */
     @GetMapping("/me")
-    public ResponseEntity<User> getCurrentUser(@AuthenticationPrincipal OidcUser principal) {
-        User user = userService.getUserByProviderId(principal.getSubject());
+    public ResponseEntity<UserDetailDTO> getCurrentUser(@AuthenticationPrincipal OidcUser principal) {
+        UserDetailDTO user = userService.getUserById(principal.getSubject());
         return ResponseEntity.ok(user);
     }
 
@@ -63,8 +62,8 @@ public class UserController {
      * GOOGLE SUB İLE USER BUL
      */
     @GetMapping("/provider/{providerId}")
-    public ResponseEntity<User> getByProviderId(@PathVariable String providerId) {
-        User user = userService.getUserByProviderId(providerId);
+    public ResponseEntity<UserDetailDTO> getByProviderId(@PathVariable String providerId) {
+        UserDetailDTO user = userService.getUserById(providerId);
         return ResponseEntity.ok(user);
     }
     /**
@@ -156,11 +155,6 @@ public class UserController {
         return ResponseEntity.ok(users);
     }
 
-    @GetMapping("/home")
-    public ResponseEntity<String> homePage() {
-        return ResponseEntity.ok("Oturum açma başarılı! Ana sayfaya hoş geldiniz.");
-    }
-
     @GetMapping("/auth-info")
     public Map<String, Object> getAuthInfo(@AuthenticationPrincipal OAuth2User principal) {
         Map<String, Object> authInfo = new HashMap<>();
@@ -178,9 +172,6 @@ public class UserController {
                 authInfo.put("email", oidcUser.getAttribute("email"));
                 authInfo.put("name", oidcUser.getAttribute("name"));
                 authInfo.put("picture", oidcUser.getAttribute("picture"));
-
-                authInfo.put("idToken", oidcUser.getIdToken().getTokenValue());
-                authInfo.put("tokenExpiresAt", oidcUser.getIdToken().getExpiresAt());
 
                 authInfo.put("allClaims", oidcUser.getClaims());
 

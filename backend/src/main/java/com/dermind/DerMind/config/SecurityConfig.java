@@ -24,7 +24,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorizeRequests ->
                         authorizeRequests
                                 .requestMatchers("/", "/login", "/oauth2/**").permitAll()
-                                .requestMatchers("/api/sms/send").permitAll()
+                                .requestMatchers("/api/ai/health").permitAll()  // AI server sağlık kontrolü herkese açık
                                 .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2Login ->

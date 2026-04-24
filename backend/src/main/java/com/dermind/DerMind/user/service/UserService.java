@@ -1,5 +1,7 @@
 package com.dermind.DerMind.user.service;
 
+import com.dermind.DerMind.error.BusinessException;
+import com.dermind.DerMind.error.ResourceNotFoundException;
 import com.dermind.DerMind.user.dto.*;
 import com.dermind.DerMind.user.model.User;
 import com.dermind.DerMind.user.repository.UserRepository;
@@ -27,19 +29,19 @@ public class UserService {
     // ID ile kullanıcı getir
     public UserDetailDTO getUserById(String id) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
         return convertToDetailDTO(user);
     }
 
     public User getUserByProviderId(String providerId) {
         return userRepository.findByProviderId(providerId)
-                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı: " + providerId));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "providerId", providerId));
     }
 
     // Email ile kullanıcı getir
     public UserResponseDTO getUserByEmail(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
         return convertToResponseDTO(user);
     }
 
@@ -48,7 +50,7 @@ public class UserService {
     public UserResponseDTO createUser(UserCreateDto dto) {
         // Email kontrolü
         if (userRepository.existsByEmail(dto.getEmail())) {
-            throw new RuntimeException("User already exists with email: " + dto.getEmail());
+            throw new BusinessException("Bu e-posta ile zaten bir kullanıcı mevcut: " + dto.getEmail());
         }
 
         User user = new User();
@@ -57,6 +59,7 @@ public class UserService {
         user.setName(dto.getName());
         user.setAllergens(dto.getAllergens());
         user.setSkinType(dto.getSkinType());
+        user.setHasAcne(dto.isHasAcne());
         user.setPicture(dto.getPicture());
 
         User savedUser = userRepository.save(user);
@@ -67,11 +70,12 @@ public class UserService {
     @Transactional
     public UserResponseDTO updateUser(String id, UserUpdateDto dto) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
 
         if (dto.getName() != null) user.setName(dto.getName());
         if (dto.getAllergens() != null) user.setAllergens(dto.getAllergens());
         if (dto.getSkinType() != null) user.setSkinType(dto.getSkinType());
+        if (dto.getHasAcne() != null) user.setHasAcne(dto.getHasAcne());
         if (dto.getPicture() != null) user.setPicture(dto.getPicture());
 
         User updatedUser = userRepository.save(user);
@@ -82,7 +86,7 @@ public class UserService {
     @Transactional
     public void deleteUser(String id) {
         if (!userRepository.existsById(id)) {
-            throw new RuntimeException("User not found with id: " + id);
+            throw new ResourceNotFoundException("User", "id", id);
         }
         userRepository.deleteById(id);
     }
@@ -119,6 +123,7 @@ public class UserService {
                 user.getName(),
                 user.getAllergens(),
                 user.getSkinType(),
+                user.isHasAcne(),
                 user.getPicture()
         );
     }
@@ -130,6 +135,7 @@ public class UserService {
                 user.getName(),
                 user.getAllergens(),
                 user.getSkinType(),
+                user.isHasAcne(),
                 user.getPicture(),
                 user.getPurchases() != null ? user.getPurchases().size() : 0,
                 user.getRatings() != null ? user.getRatings().size() : 0,

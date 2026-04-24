@@ -34,12 +34,7 @@ public class ProductController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<ProductDetailDTO> getProductById(@PathVariable Long id) {
-        try {
-            ProductDetailDTO product = productService.getProductById(id);
-            return ResponseEntity.ok(product);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        return ResponseEntity.ok(productService.getProductById(id));
     }
 
     /**
@@ -47,13 +42,8 @@ public class ProductController {
      * POST /api/products
      */
     @PostMapping
-    public ResponseEntity<?> createProduct(@Valid @RequestBody ProductCreateDTO dto) {
-        try {
-            ProductResponseDTO createdProduct = productService.createProduct(dto);
-            return ResponseEntity.status(HttpStatus.CREATED).body(createdProduct);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+    public ResponseEntity<ProductResponseDTO> createProduct(@Valid @RequestBody ProductCreateDTO dto) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(productService.createProduct(dto));
     }
 
     /**
@@ -61,15 +51,10 @@ public class ProductController {
      * PUT /api/products/{id}
      */
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateProduct(
+    public ResponseEntity<ProductResponseDTO> updateProduct(
             @PathVariable Long id,
             @Valid @RequestBody ProductUpdateDTO dto) {
-        try {
-            ProductResponseDTO updatedProduct = productService.updateProduct(id, dto);
-            return ResponseEntity.ok(updatedProduct);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        return ResponseEntity.ok(productService.updateProduct(id, dto));
     }
 
     /**
@@ -78,12 +63,8 @@ public class ProductController {
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
-        try {
-            productService.deleteProduct(id);
-            return ResponseEntity.noContent().build();
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        productService.deleteProduct(id);
+        return ResponseEntity.noContent().build();
     }
 
     /**
@@ -154,13 +135,8 @@ public class ProductController {
      * GET /api/products/recommendations/{userId}
      */
     @GetMapping("/recommendations/{userId}")
-    public ResponseEntity<?> getRecommendationsForUser(@PathVariable String userId) {
-        try {
-            List<ProductRecommendationDTO> recommendations =
-                    productService.getRecommendationsForUser(userId);
-            return ResponseEntity.ok(recommendations);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+    public ResponseEntity<List<ProductRecommendationDTO>> getRecommendationsForUser(
+            @PathVariable String userId) {
+        return ResponseEntity.ok(productService.getRecommendationsForUser(userId));
     }
 }

@@ -43,6 +43,9 @@ public class User {
     @Column(name = "skin_type")
     private String skinType;
 
+    @Column(name = "has_acne")
+    private boolean hasAcne = false;
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     private List<Purchase> purchases = new ArrayList<>();
 

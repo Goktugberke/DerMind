@@ -72,9 +72,14 @@ public class PurchaseService {
     }
 
     @Transactional(readOnly = true)
-    public PurchaseDetailDTO getPurchaseDetailById(Long id) {
+    public PurchaseDetailDTO getPurchaseDetailById(String currentUserId, Long id) {
         Purchase purchase = purchaseRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Purchase", "id", id));
+
+        if (!purchase.getUser().getId().equals(currentUserId)) {
+            throw new UnauthorizedAccessException("Bu siparişi görüntüleme yetkiniz yok.");
+        }
+
         return mapToDetailDTO(purchase);
     }
 

@@ -2,7 +2,6 @@ package com.dermind.DerMind.scheduler;
 
 import com.dermind.DerMind.common.enums.NotificationType;
 import com.dermind.DerMind.notification.service.NotificationService;
-import com.dermind.DerMind.product.model.Product;
 import com.dermind.DerMind.purchase.repository.PurchaseRepository;
 import com.dermind.DerMind.streak.model.Streak;
 import com.dermind.DerMind.streak.repository.StreakRepository;
@@ -48,9 +47,9 @@ public class NotificationScheduler {
     public void sendPersonalizedMorningReminders() {
         log.info("🌅 Kişiselleştirilmiş sabah bildirimleri hazırlanıyor...");
 
-        List<User> activeUsers = userRepository.findAll().stream()
-                .filter(this::isActiveUser)
-                .toList();
+        LocalDate streakSince = LocalDate.now().minusDays(7);
+        LocalDateTime purchaseSince = LocalDateTime.now().minusDays(7);
+        List<User> activeUsers = userRepository.findActiveUsers(streakSince, purchaseSince);
 
         int sentCount = 0;
         for (User user : activeUsers) {
@@ -83,9 +82,9 @@ public class NotificationScheduler {
     public void sendPersonalizedEveningReminders() {
         log.info("🌙 Kişiselleştirilmiş akşam bildirimleri hazırlanıyor...");
 
-        List<User> activeUsers = userRepository.findAll().stream()
-                .filter(this::isActiveUser)
-                .toList();
+        LocalDate streakSince = LocalDate.now().minusDays(7);
+        LocalDateTime purchaseSince = LocalDateTime.now().minusDays(7);
+        List<User> activeUsers = userRepository.findActiveUsers(streakSince, purchaseSince);
 
         int sentCount = 0;
         for (User user : activeUsers) {
@@ -125,7 +124,7 @@ public class NotificationScheduler {
             try {
                 if (isStreakInDanger(streak)) {
                     User user = userRepository.findById(streak.getUser().getId()).orElse(null);
-                    if (user != null && isActiveUser(user)) {
+                    if (user != null) {
                         String message = generateStreakWarningMessage(streak);
                         notificationService.createNotification(
                                 user.getId(),
@@ -154,9 +153,9 @@ public class NotificationScheduler {
     public void sendWeeklySummary() {
         log.info("📊 Haftalık özet raporları hazırlanıyor...");
 
-        List<User> activeUsers = userRepository.findAll().stream()
-                .filter(this::isActiveUser)
-                .toList();
+        LocalDate streakSince = LocalDate.now().minusDays(7);
+        LocalDateTime purchaseSince = LocalDateTime.now().minusDays(7);
+        List<User> activeUsers = userRepository.findActiveUsers(streakSince, purchaseSince);
 
         int sentCount = 0;
         for (User user : activeUsers) {
@@ -228,30 +227,6 @@ public class NotificationScheduler {
     }
 
     // ============== YARDIMCI METODLAR ==============
-
-    /**
-     * Kullanıcının aktif olup olmadığını kontrol eder
-     * Son 7 gün içinde aktivite göstermiş mi?
-     */
-    private boolean isActiveUser(User user) {
-        try {
-            LocalDateTime weekAgo = LocalDateTime.now().minusDays(7);
-
-            // Son 7 günde streak kaydı var mı?
-            boolean hasRecentStreak = streakRepository.findByUserId(user.getId()).stream()
-                    .anyMatch(s -> s.getLastUsedDate() != null &&
-                            s.getLastUsedDate().isAfter(weekAgo.toLocalDate()));
-
-            // Son 7 günde satın alma var mı?
-            boolean hasRecentPurchase = purchaseRepository.findByUserId(user.getId()).stream()
-                    .anyMatch(p -> p.getCreatedAt().isAfter(weekAgo));
-
-            return hasRecentStreak || hasRecentPurchase;
-        } catch (Exception e) {
-            log.warn("⚠️ Kullanıcı {} aktiflik kontrolü başarısız: {}", user.getId(), e.getMessage());
-            return false; // Hata durumunda spam önlemek için false dön
-        }
-    }
 
     /**
      * Kullanıcıya özel sabah mesajı üretir

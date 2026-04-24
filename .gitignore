@@ -52,3 +52,11 @@ build/
 
 # macOS
 .DS_Store
+
+# AI Server — data ve model dosyaları
+ai-server/models/
+ai-server/datasets/
+ai-server/*.csv
+ai-server/__pycache__/
+ai-server/.coverage
+ai-server/.env
