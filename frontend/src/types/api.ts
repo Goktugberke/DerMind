@@ -253,6 +253,7 @@ export const productApi = {
   },
   getTopQualityProducts: async (limit = 10) => (await apiClient.get<ProductDetailDTO[]>(`/api/products/top/quality?limit=${limit}`)).data,
   getRecommendationsForUser: async (userId: string) => (await apiClient.get<ProductRecommendationDTO[]>(`/api/products/recommendations/${userId}`)).data,
+  getSimilarProducts: async (id: number) => (await apiClient.get<ProductResponseDTO[]>(`/api/products/${id}/similar`)).data,
 };
 
 export const streakApi = {

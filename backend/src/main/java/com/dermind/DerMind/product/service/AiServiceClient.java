@@ -2,6 +2,8 @@ package com.dermind.DerMind.product.service;
 
 import com.dermind.DerMind.product.dto.ai.AiScoreRequest;
 import com.dermind.DerMind.product.dto.ai.AiScoreResponse;
+import com.dermind.DerMind.product.dto.ai.AiRecommendRequest;
+import com.dermind.DerMind.product.dto.ai.AiRecommendResponse;
 import com.dermind.DerMind.product.dto.ai.AiUserProfile;
 import com.dermind.DerMind.user.model.User;
 import lombok.RequiredArgsConstructor;
@@ -57,6 +59,19 @@ public class AiServiceClient {
             log.error("Exception occurred while calling AI server: {}. StackTrace: {}", e.getMessage(), e.getStackTrace()[0]);
         }
 
+        return null;
+    }
+
+    public AiRecommendResponse getRecommendations(AiRecommendRequest request) {
+        if (request == null) return null;
+        
+        String url = "http://localhost:8000/recommend";
+        try {
+            log.info("Sending recommend request to AI server at: {}", url);
+            return restTemplate.postForObject(url, request, AiRecommendResponse.class);
+        } catch (Exception e) {
+            log.error("Exception occurred while calling AI server /recommend: {}", e.getMessage());
+        }
         return null;
     }
 }

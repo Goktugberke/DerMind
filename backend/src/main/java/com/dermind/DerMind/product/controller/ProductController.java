@@ -45,6 +45,20 @@ public class ProductController {
     }
 
     /**
+     * Get similar products
+     * GET /api/products/{id}/similar
+     */
+    @GetMapping("/{id}/similar")
+    public ResponseEntity<List<ProductResponseDTO>> getSimilarProducts(@PathVariable Long id) {
+        try {
+            List<ProductResponseDTO> similarProducts = productService.getSimilarProducts(id);
+            return ResponseEntity.ok(similarProducts);
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    /**
      * Create new product
      * POST /api/products
      */

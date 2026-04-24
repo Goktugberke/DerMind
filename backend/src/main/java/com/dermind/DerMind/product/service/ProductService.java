@@ -161,6 +161,63 @@ public class ProductService {
                 .collect(Collectors.toList());
     }
 
+    public List<ProductResponseDTO> getSimilarProducts(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new RuntimeException("Product not found with id: " + productId));
+
+        String userEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = null;
+        if (userEmail != null && !userEmail.equals("anonymousUser")) {
+            currentUser = userRepository.findByEmail(userEmail).orElse(null);
+        }
+
+        List<String> userAllergies = java.util.Collections.emptyList();
+        String skinType = "normal";
+        boolean hasAcne = false;
+
+        if (currentUser != null) {
+            if (currentUser.getAllergens() != null && !currentUser.getAllergens().isBlank()) {
+                userAllergies = java.util.Arrays.asList(currentUser.getAllergens().split(","));
+            }
+            if (currentUser.getSkinType() != null) {
+                skinType = currentUser.getSkinType().toLowerCase();
+            }
+        }
+
+        com.dermind.DerMind.product.dto.ai.AiUserProfile aiProfile = com.dermind.DerMind.product.dto.ai.AiUserProfile.builder()
+                .skin_type(skinType)
+                .has_acne(hasAcne)
+                .allergies(userAllergies)
+                .build();
+
+        com.dermind.DerMind.product.dto.ai.AiRecommendRequest request = com.dermind.DerMind.product.dto.ai.AiRecommendRequest.builder()
+                .user(aiProfile)
+                .category(product.getCategory())
+                .secondary_category(product.getSecondaryCategory())
+                .top_k(6) // Request 6 in case the product itself is returned
+                .build();
+
+        com.dermind.DerMind.product.dto.ai.AiRecommendResponse response = aiServiceClient.getRecommendations(request);
+
+        List<ProductResponseDTO> similarProducts = new ArrayList<>();
+        if (response != null && response.getRecommendations() != null) {
+            for (com.dermind.DerMind.product.dto.ai.AiRecommendation aiRec : response.getRecommendations()) {
+                if (aiRec.getProduct_id().equals(product.getSephoraProductId())) continue;
+
+                productRepository.findBySephoraProductId(aiRec.getProduct_id()).ifPresent(p -> {
+                    ProductResponseDTO dto = convertToResponseDTO(p);
+                    // Use similarity score as personalScore for this specific view if needed,
+                    // but for now we just return the DTO
+                    dto.setPersonalScore(aiRec.getSimilarity());
+                    similarProducts.add(dto);
+                });
+
+                if (similarProducts.size() >= 5) break;
+            }
+        }
+        return similarProducts;
+    }
+
     private ProductRecommendationDTO analyzeProductForUser(Product product, User user) {
         double matchScore = 100.0;
         StringBuilder reason = new StringBuilder();
