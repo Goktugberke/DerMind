@@ -11,6 +11,7 @@ import com.dermind.DerMind.purchase.model.Purchase;
 import com.dermind.DerMind.purchase.repository.PurchaseRepository;
 import com.dermind.DerMind.user.model.User;
 import com.dermind.DerMind.user.repository.UserRepository;
+import com.dermind.DerMind.mail.service.MailServiceClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +28,7 @@ public class PurchaseService {
     private final PurchaseRepository purchaseRepository;
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
+    private final MailServiceClient mailServiceClient;
 
     @Transactional
     public PurchaseResponseDTO createPurchase(String userId, PurchaseCreateDTO dto) {
@@ -53,7 +55,14 @@ public class PurchaseService {
                 .build();
 
         Purchase savedPurchase = purchaseRepository.save(purchase);
-        return mapToResponseDTO(savedPurchase);
+        PurchaseResponseDTO responseDTO = mapToResponseDTO(savedPurchase);
+        
+        // Send confirmation email asychronously or catch the exception so it doesn't rollback
+        if (user.getEmail() != null) {
+            mailServiceClient.sendOrderConfirmationMail(user.getEmail(), responseDTO);
+        }
+
+        return responseDTO;
     }
 
     @Transactional(readOnly = true)

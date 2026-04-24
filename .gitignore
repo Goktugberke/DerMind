@@ -71,3 +71,6 @@ all_api_endpoints.txt
 
 # mock data
 mock_data.sql
+
+# Mail Server
+mail-server/src/main/resources/PropertiesReader.java

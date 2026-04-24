@@ -4,6 +4,7 @@ import com.dermind.DerMind.common.enums.OrderStatus;
 import com.dermind.DerMind.error.UserNotAuthenticatedException;
 import com.dermind.DerMind.purchase.dto.*;
 import com.dermind.DerMind.purchase.service.PurchaseService;
+import com.dermind.DerMind.user.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -23,6 +24,7 @@ import java.util.Map;
 public class PurchaseController {
 
     private final PurchaseService purchaseService;
+    private final UserService userService;
 
     /**
      * Create new purchase
@@ -30,7 +32,7 @@ public class PurchaseController {
      */
     @PostMapping
     public ResponseEntity<?> createPurchase(
-            @AuthenticationPrincipal OidcUser principal,
+            @AuthenticationPrincipal Object principal,
             @Valid @RequestBody PurchaseCreateDTO dto) {
         try {
             // Token'dan userId'yi alıyoruz
@@ -88,8 +90,12 @@ public class PurchaseController {
      * GET /api/purchases/user/{userId}
      */
     @GetMapping("/user/{userId}")
-    public ResponseEntity<List<PurchaseResponseDTO>> getPurchasesByUserId(@PathVariable String userId) {
-        List<PurchaseResponseDTO> purchases = purchaseService.getPurchasesByUserId(userId);
+    public ResponseEntity<List<PurchaseResponseDTO>> getPurchasesByUserId(
+            @AuthenticationPrincipal Object principal,
+            @PathVariable String userId) {
+        String authenticatedUserId = getUserIdFromPrincipal(principal);
+        // We use the authenticated user's ID for security
+        List<PurchaseResponseDTO> purchases = purchaseService.getPurchasesByUserId(authenticatedUserId);
         return ResponseEntity.ok(purchases);
     }
 
@@ -168,10 +174,21 @@ public class PurchaseController {
         }
     }
 
-    private String getUserIdFromPrincipal(OidcUser principal) {
+    private String getUserIdFromPrincipal(Object principal) {
         if (principal == null) {
             throw new UserNotAuthenticatedException("Bu işlemi gerçekleştirmek için giriş yapmalısınız.");
         }
-        return principal.getSubject();
+        if (principal instanceof org.springframework.security.core.userdetails.UserDetails) {
+            String email = ((org.springframework.security.core.userdetails.UserDetails) principal).getUsername();
+            return userService.getUserByEmail(email).getId();
+        }
+        if (principal instanceof OidcUser) {
+            String providerId = ((OidcUser) principal).getSubject();
+            // Google login logic uses providerId or prefixed ID depending on your implementation
+            // Let's match FavoriteController's logic for consistency
+            return "google_" + providerId;
+        }
+        throw new UserNotAuthenticatedException(
+                "Desteklenmeyen kimlik doğrulama türü: " + principal.getClass().getName());
     }
 }
