@@ -6,7 +6,7 @@ export const theme = {
 
     // Neutral colors
     background: '#F8F8F8',
-    deepbackground: '#E0E0E0',
+    deepbackground: '#f4f4f4',
     white: '#FFFFFF',
     text: '#2D3436',
     gray: '#636E72',

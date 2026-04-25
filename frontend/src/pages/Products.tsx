@@ -1,56 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { useAppDispatch } from '../store/hooks';
-import { addToCart } from '../store/slices/cartSlice';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { addToCartAsync } from '../store/slices/cartSlice';
 import type { Product } from '../store/slices/cartSlice';
 import SearchBar from '../components/SearchBar';
 import ProductFilters from '../components/ProductFilters';
+import { productApi, favoriteApi } from '../types/api';
+import type { ProductResponseDTO, PageResponse } from '../types/api';
 
-// Mock data - gerçek projede API'den gelecek
-const mockProducts: Product[] = [
-  {
-    id: '1',
-    name: 'Yüz Temizleme Jeli',
-    price: 149.99,
-    description: 'Hassas ciltler için özel formül',
-    rating: 4.5,
-  },
-  {
-    id: '2',
-    name: 'Nemlendirici Krem',
-    price: 199.99,
-    description: '24 saat nemlendirme garantisi',
-    rating: 4.8,
-  },
-  {
-    id: '3',
-    name: 'Güneş Koruyucu SPF 50',
-    price: 179.99,
-    description: 'UVA/UVB koruması',
-    rating: 4.7,
-  },
-  {
-    id: '4',
-    name: 'Göz Çevresi Kremi',
-    price: 249.99,
-    description: 'Kırışıklık önleyici',
-    rating: 4.6,
-  },
-  {
-    id: '5',
-    name: 'Tonik',
-    price: 129.99,
-    description: 'Gözenek sıkılaştırıcı',
-    rating: 4.4,
-  },
-  {
-    id: '6',
-    name: 'Serum C Vitamini',
-    price: 299.99,
-    description: 'Parlaklık ve canlılık',
-    rating: 4.9,
-  },
-];
+// Convert ProductResponseDTO to Product (for cart)
+const convertToProduct = (dto: ProductResponseDTO): Product => {
+  const mockPrice = dto.price || (100 + (parseInt(dto.id.toString(), 10) * 12345 % 400));
+
+  return {
+    id: dto.id.toString(),
+    name: dto.name,
+    brand: dto.brand,
+    price: mockPrice,
+    description: dto.ingredients || '',
+    rating: dto.qualityScore || 0,
+    category: dto.category,
+    image: dto.imageUrl,
+  };
+};
 
 interface FilterOptions {
   minPrice: number;
@@ -58,52 +30,175 @@ interface FilterOptions {
   minRating: number;
   category: string;
   skinType: string;
+  sortBy: 'rating-desc' | 'rating-asc' | 'price-desc' | 'price-asc';
 }
 
 const Products = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const searchQuery = searchParams.get('search') || '';
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>(mockProducts);
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
+  const [products, setProducts] = useState<Product[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const [filters, setFilters] = useState<FilterOptions>({
     minPrice: 0,
     maxPrice: 1000,
     minRating: 0,
     category: '',
     skinType: '',
+    sortBy: 'rating-desc',
   });
+  
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const pageRef = useRef(0);
+  const loader = useRef<HTMLDivElement>(null);
+  
   const dispatch = useAppDispatch();
+  const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+
+  // Map sortBy to backend sort string
+  const getSortString = (sortBy: string) => {
+    switch (sortBy) {
+      case 'rating-desc': return 'qualityScore,desc';
+      case 'rating-asc': return 'qualityScore,asc';
+      case 'price-desc': return 'price,desc';
+      case 'price-asc': return 'price,asc';
+      default: return 'qualityScore,desc';
+    }
+  };
+
+  // Reset when sort or search or filters change
+  useEffect(() => {
+    setProducts([]);
+    pageRef.current = 0;
+    setHasMore(true);
+    const query = searchParams.get('search') || '';
+    setSearchQuery(query);
+  }, [searchParams, filters.sortBy, filters.minPrice, filters.maxPrice, filters.minRating]);
+
+  // Fetch products from API
+  const fetchProducts = useCallback(async (pageNum: number, isInitial = false) => {
+    if (!hasMore && !isInitial) return;
+
+    try {
+      if (isInitial) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
+      
+      setError(null);
+      
+      const response: PageResponse<ProductResponseDTO> = await productApi.filterProducts({
+        query: searchQuery,
+        minPrice: filters.minPrice > 0 ? filters.minPrice : undefined,
+        maxPrice: filters.maxPrice < 1000 ? filters.maxPrice : undefined,
+        minQuality: filters.minRating > 0 ? filters.minRating * 2 : undefined, // Convert 5-star back to 0-10
+        page: pageNum,
+        size: 12,
+        sort: getSortString(filters.sortBy)
+      });
+
+      const convertedProducts = response.content.map(convertToProduct);
+      
+      if (isInitial) {
+        setProducts(convertedProducts);
+      } else {
+        setProducts(prev => [...prev, ...convertedProducts]);
+      }
+      
+      setHasMore(response.number + 1 < response.totalPages);
+    } catch (err) {
+      setError('Ürünler yüklenirken bir hata oluştu');
+      console.error('Error fetching products:', err);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [searchQuery, filters, hasMore]);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchProducts(0, true);
+  }, [fetchProducts, searchQuery, filters.sortBy, filters.minPrice, filters.maxPrice, filters.minRating]);
+
+  // Loader Intersection Observer
+  const handleObserver = useCallback((entries: IntersectionObserverEntry[]) => {
+    const target = entries[0];
+    if (target.isIntersecting && hasMore && !loading && !loadingMore) {
+      pageRef.current += 1;
+      fetchProducts(pageRef.current);
+    }
+  }, [hasMore, loading, loadingMore, fetchProducts]);
 
   useEffect(() => {
-    let filtered = [...mockProducts];
+    const loadingRef = loader.current;
+    const option = {
+      root: null,
+      rootMargin: '20px',
+      threshold: 0
+    };
+    const observer = new IntersectionObserver(handleObserver, option);
+    if (loadingRef) observer.observe(loadingRef);
+    
+    return () => {
+      if (loadingRef) observer.unobserve(loadingRef);
+    };
+  }, [handleObserver]);
 
-    // Arama filtresi
-    if (searchQuery) {
-      filtered = filtered.filter((product) =>
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.description?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+  // Fetch Favorites
+  useEffect(() => {
+    const fetchFavorites = async () => {
+      if (isAuthenticated) {
+        try {
+          const favs = await favoriteApi.getMyFavorites();
+          setFavoriteIds(new Set(favs.map(f => f.product.id.toString())));
+        } catch (err) {
+          console.error('Error fetching favorites:', err);
+        }
+      } else {
+        setFavoriteIds(new Set());
+      }
+    };
+    fetchFavorites();
+  }, [isAuthenticated]);
+
+  const toggleFavorite = async (productId: string | number) => {
+    if (!isAuthenticated) {
+      alert('Favorilere eklemek için giriş yapmalısınız');
+      return;
     }
 
-    // Fiyat filtresi
-    if (filters.minPrice > 0) {
-      filtered = filtered.filter((product) => product.price >= filters.minPrice);
+    const idStr = productId.toString();
+    const isFav = favoriteIds.has(idStr);
+    try {
+      if (isFav) {
+        await favoriteApi.removeFavorite(productId);
+        setFavoriteIds(prev => {
+          const next = new Set(prev);
+          next.delete(idStr);
+          return next;
+        });
+      } else {
+        await favoriteApi.addFavorite(productId);
+        setFavoriteIds(prev => {
+          const next = new Set(prev);
+          next.add(idStr);
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error('Error toggling favorite:', err);
     }
-    if (filters.maxPrice < 1000) {
-      filtered = filtered.filter((product) => product.price <= filters.maxPrice);
-    }
+  };
 
-    // Puan filtresi
-    if (filters.minRating > 0) {
-      filtered = filtered.filter(
-        (product) => (product.rating || 0) >= filters.minRating
-      );
-    }
-
-    // Kategori filtresi (mock - gerçek projede ürünlerde kategori olacak)
-    // Şimdilik sadece isim bazlı filtreleme yapıyoruz
-
-    setFilteredProducts(filtered);
-  }, [searchQuery, filters]);
+  // Server-side filtering is used now, client-side filtering removed
+  useEffect(() => {
+    setFilteredProducts(products);
+  }, [products]);
 
   const handleSearch = (query: string) => {
     if (query.trim()) {
@@ -124,49 +219,105 @@ const Products = () => {
       minRating: 0,
       category: '',
       skinType: '',
+      sortBy: 'rating-desc',
     });
   };
+
+  if (loading && products.length === 0) {
+    return (
+      <div className="products-page">
+        <div className="container">
+          <p>Ürünler yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="products-page">
+        <div className="container">
+          <div className="error-message">{error}</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="products-page">
       <div className="container">
         <div className="products-header">
           <h1>Ürünler</h1>
-          <div className="products-search">
-            <SearchBar onSearch={handleSearch} />
+          <div className="products-controls" style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div className="products-search" style={{ flex: 1, minWidth: '250px' }}>
+              <SearchBar onSearch={handleSearch} initialValue={searchQuery} />
+            </div>
+            <div className="products-sort">
+              <select 
+                className="filter-select"
+                style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                value={filters.sortBy}
+                onChange={(e) => handleFilterChange({...filters, sortBy: e.target.value as FilterOptions['sortBy']})}
+              >
+                <option value="rating-desc">Puan (Yüksekten Düşüğe)</option>
+                <option value="rating-asc">Puan (Düşükten Yükseğe)</option>
+                <option value="price-desc">Fiyat (Yüksekten Düşüğe)</option>
+                <option value="price-asc">Fiyat (Düşükten Yükseğe)</option>
+              </select>
+            </div>
           </div>
         </div>
 
         <ProductFilters
           filters={filters}
-          onFilterChange={handleFilterChange}
+          onFilterChange={(newFilters) => handleFilterChange(newFilters as FilterOptions)}
           onReset={handleFilterReset}
         />
 
         {filteredProducts.length === 0 ? (
           <div className="no-products">
-            <p>Aradığınız kriterlere uygun ürün bulunamadı.</p>
+            <p>Aradığınız kriterlere uygun ürün bulunamadı. Filtreleri temizlemeyi deneyin.</p>
           </div>
         ) : (
           <div className="products-grid">
             {filteredProducts.map((product) => (
-              <div key={product.id} className="product-card">
+              <div 
+                key={product.id} 
+                className="product-card"
+              >
                 <Link to={`/products/${product.id}`} className="product-link">
                   <div className="product-image">
                     {product.image ? (
-                      <img src={product.image} alt={product.name} />
+                      <img 
+                        src={product.image} 
+                        alt={product.name} 
+                        loading="lazy"
+                      />
                     ) : (
                       <div className="product-placeholder">📦</div>
+                    )}
+                    {isAuthenticated && (
+                      <button 
+                        className={`add-favorite-btn ${favoriteIds.has(String(product.id)) ? 'active' : ''}`}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          toggleFavorite(product.id);
+                        }}
+                      >
+                        {favoriteIds.has(String(product.id)) ? '❤️' : '🤍'}
+                      </button>
                     )}
                   </div>
                   <div className="product-info">
                     <h3 className="product-name">{product.name}</h3>
+                    {product.brand && <p className="product-brand" style={{ fontSize: '0.85em', color: '#666' }}>{product.brand}</p>}
                     {product.description && (
-                      <p className="product-description">{product.description}</p>
+                      <p className="product-description" style={{ maxHeight: '40px', overflow: 'hidden' }}>{product.description}</p>
                     )}
-                    {product.rating && (
+                    {product.rating !== undefined && (
                       <div className="product-rating">
-                        {'⭐'.repeat(Math.floor(product.rating))} {product.rating}
+                        {'⭐'.repeat(Math.round(product.rating / 2))} {(product.rating / 2).toFixed(1)}
                       </div>
                     )}
                   </div>
@@ -175,7 +326,7 @@ const Products = () => {
                   <span className="product-price">{product.price.toFixed(2)} ₺</span>
                   <button
                     className="btn btn-primary btn-sm"
-                    onClick={() => dispatch(addToCart(product))}
+                    onClick={() => dispatch(addToCartAsync(product))}
                   >
                     Sepete Ekle
                   </button>
@@ -184,10 +335,15 @@ const Products = () => {
             ))}
           </div>
         )}
+        
+        {/* Infinite Scroll Loader */}
+        <div ref={loader} className="scroll-loader" style={{ height: '50px', display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '20px' }}>
+          {loadingMore && <p>Daha fazla ürün yükleniyor...</p>}
+          {!hasMore && products.length > 0 && <p>Tüm ürünler yüklendi.</p>}
+        </div>
       </div>
     </div>
   );
 };
 
 export default Products;
-

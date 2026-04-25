@@ -60,3 +60,13 @@ ai-server/*.csv
 ai-server/__pycache__/
 ai-server/.coverage
 ai-server/.env
+ai-server/allChat.txt
+ai-server/bitirme fikir.txt
+ai-server/*.pdf
+
+# Firebase
+firebase-service-account.json
+
+# Misc
+all_api_endpoints.txt
+mock_data.sql

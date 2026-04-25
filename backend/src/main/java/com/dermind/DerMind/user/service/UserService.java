@@ -14,9 +14,23 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class UserService {
+public class UserService implements org.springframework.security.core.userdetails.UserDetailsService {
 
     private final UserRepository userRepository;
+
+    @Override
+    public org.springframework.security.core.userdetails.UserDetails loadUserByUsername(String email)
+            throws org.springframework.security.core.userdetails.UsernameNotFoundException {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException(
+                        "User not found: " + email));
+
+        return org.springframework.security.core.userdetails.User
+                .withUsername(user.getEmail())
+                .password("") // Token tabanlı sistemde şifre boş bırakılır
+                .authorities("USER")
+                .build();
+    }
 
     // Tüm kullanıcıları getir
     public List<UserResponseDTO> getAllUsers() {
@@ -128,6 +142,30 @@ public class UserService {
         );
     }
 
+    // Google Login İşlemi
+    @Transactional
+    public UserResponseDTO handleGoogleLogin(String email, String name, String picture, String providerId) {
+        User user = userRepository.findByEmail(email).orElse(null);
+
+        if (user == null) {
+            user = new User();
+            user.setId("google_" + providerId);
+            user.setEmail(email);
+            user.setName(name);
+            user.setPicture(picture);
+            user.setProvider("google");
+            user.setProviderId(providerId);
+        } else {
+            user.setName(name);
+            user.setPicture(picture);
+            user.setProvider("google");
+            user.setProviderId(providerId);
+        }
+
+        User savedUser = userRepository.save(user);
+        return convertToResponseDTO(savedUser);
+    }
+
     private UserDetailDTO convertToDetailDTO(User user) {
         return new UserDetailDTO(
                 user.getId(),
@@ -140,7 +178,6 @@ public class UserService {
                 user.getPurchases() != null ? user.getPurchases().size() : 0,
                 user.getRatings() != null ? user.getRatings().size() : 0,
                 user.getStreaks() != null ? (int) user.getStreaks().stream()
-                        .filter(s -> s.getCurrentStreak() > 0).count() : 0
-        );
+                        .filter(s -> s.getCurrentStreak() > 0).count() : 0);
     }
 }

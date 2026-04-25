@@ -11,6 +11,7 @@ interface CustomInputProps {
   isPassword?: boolean;
   keyboardType?: KeyboardTypeOptions;
   error?: string;
+  leftIcon?: React.ReactNode;
 }
 
 export const CustomInput = ({
@@ -21,6 +22,7 @@ export const CustomInput = ({
   isPassword = false,
   keyboardType = 'default',
   error,
+  leftIcon,
 }: CustomInputProps) => {
   const [isSecure, setIsSecure] = useState(isPassword);
   const inputRef = useRef<TextInput>(null);
@@ -32,14 +34,20 @@ export const CustomInput = ({
   return (
     <View style={styles.container}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
-      
-      <Pressable 
+
+      <Pressable
         style={[
-          styles.inputWrapper, 
+          styles.inputWrapper,
           error ? { borderColor: 'red' } : {}
-        ]} 
+        ]}
         onPress={handlePress}
       >
+        {leftIcon && (
+          <View style={styles.leftIconWrapper}>
+            {leftIcon}
+          </View>
+        )}
+
         <TextInput
           ref={inputRef}
           style={styles.input}
@@ -53,10 +61,10 @@ export const CustomInput = ({
           autoCorrect={false}
           underlineColorAndroid="transparent"
         />
-        
+
         {isPassword && (
-          <TouchableOpacity 
-            onPress={() => setIsSecure(!isSecure)} 
+          <TouchableOpacity
+            onPress={() => setIsSecure(!isSecure)}
             style={styles.iconContainer}
           >
             {isSecure ? (
@@ -105,6 +113,11 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     padding: 10,
+  },
+  leftIconWrapper: {
+    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   errorText: {
     color: 'red',

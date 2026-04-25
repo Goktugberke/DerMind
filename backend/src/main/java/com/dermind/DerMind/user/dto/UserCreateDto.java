@@ -23,4 +23,3 @@ public class UserCreateDto {
     private boolean hasAcne = false;
     private String picture;
 }
-

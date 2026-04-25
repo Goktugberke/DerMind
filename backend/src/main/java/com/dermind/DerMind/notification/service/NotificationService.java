@@ -22,9 +22,11 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
 
-    // 1. Bildirim Oluştur (Bunu Controller'dan değil, diğer Servislerden çağıracaksın)
+    // 1. Bildirim Oluştur (Bunu Controller'dan değil, diğer Servislerden
+    // çağıracaksın)
     @Transactional
-    public void createNotification(String userId, String title, String message, NotificationType type, Long relatedEntityId) {
+    public void createNotification(String userId, String title, String message, NotificationType type,
+            Long relatedEntityId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 
@@ -39,7 +41,8 @@ public class NotificationService {
 
         notificationRepository.save(notification);
 
-        // NOT: Buraya ileride Firebase/OneSignal kodu ekleyerek telefona push bildirimi de atabilirsin.
+        // NOT: Buraya ileride Firebase/OneSignal kodu ekleyerek telefona push bildirimi
+        // de atabilirsin.
     }
 
     // 2. Kullanıcının Bildirimlerini Getir

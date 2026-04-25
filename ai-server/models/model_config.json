@@ -1,0 +1,126 @@
+{
+  "version": "2.0",
+  "scoring_features": [
+    "skin_dry",
+    "skin_oily",
+    "skin_combination",
+    "skin_normal",
+    "ingredient_count",
+    "banned_count",
+    "restricted_count",
+    "penalty_score",
+    "base_score",
+    "good_for_dry",
+    "good_for_oily",
+    "good_for_acne",
+    "good_for_sensitive",
+    "good_for_pigmentation",
+    "good_for_aging",
+    "good_for_uv",
+    "good_for_barrier",
+    "good_for_radiance",
+    "good_for_texture",
+    "good_for_dark_circles",
+    "avoid_dry",
+    "avoid_oily",
+    "avoid_sensitive",
+    "avoid_combination",
+    "avoid_pregnancy",
+    "avoid_barrier",
+    "is_recommended"
+  ],
+  "knn_features": [
+    "ingredient_count",
+    "banned_count",
+    "restricted_count",
+    "penalty_score",
+    "base_score",
+    "good_for_dry",
+    "good_for_oily",
+    "good_for_acne",
+    "good_for_sensitive",
+    "good_for_pigmentation",
+    "good_for_aging",
+    "good_for_uv",
+    "good_for_barrier",
+    "good_for_radiance",
+    "good_for_texture",
+    "good_for_dark_circles",
+    "avoid_dry",
+    "avoid_oily",
+    "avoid_sensitive",
+    "avoid_combination",
+    "avoid_pregnancy",
+    "avoid_barrier",
+    "rating",
+    "price_usd"
+  ],
+  "target": "target_score",
+  "coldstart_metrics": {
+    "mae": 0.3613,
+    "r2": 0.9184
+  },
+  "xgb_metrics": {
+    "mae": 0.3912,
+    "rmse": 0.5194,
+    "r2": 0.853
+  },
+  "rf_metrics": {
+    "mae": 0.4039,
+    "rmse": 0.5265,
+    "r2": 0.8489
+  },
+  "cv_r2_mean": 0.8386,
+  "cv_r2_std": 0.0166,
+  "best_model": "xgboost",
+  "shap_top_features": [
+    {
+      "name": "is_recommended",
+      "importance": 1.324
+    },
+    {
+      "name": "base_score",
+      "importance": 0.7798
+    },
+    {
+      "name": "penalty_score",
+      "importance": 0.2988
+    },
+    {
+      "name": "banned_count",
+      "importance": 0.1898
+    },
+    {
+      "name": "good_for_acne",
+      "importance": 0.119
+    },
+    {
+      "name": "good_for_oily",
+      "importance": 0.1095
+    },
+    {
+      "name": "skin_dry",
+      "importance": 0.0958
+    },
+    {
+      "name": "good_for_dry",
+      "importance": 0.0546
+    },
+    {
+      "name": "restricted_count",
+      "importance": 0.0413
+    },
+    {
+      "name": "skin_normal",
+      "importance": 0.0395
+    }
+  ],
+  "categories": [
+    "Bath & Body",
+    "Makeup",
+    "Skincare"
+  ],
+  "total_products": 4692,
+  "total_training_rows": 966157,
+  "total_synthetic_rows": 50000
+}

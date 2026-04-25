@@ -14,4 +14,11 @@ public class ProductResponseDTO {
     private String brand;
     private String ingredients;
     private Double qualityScore;
+    private Double baseScore;
+    private Double price;
+    private String sephoraProductId;
+    private String category;
+    private String secondaryCategory;
+    private Double sephoraRating;
+    private Double personalScore;
 }

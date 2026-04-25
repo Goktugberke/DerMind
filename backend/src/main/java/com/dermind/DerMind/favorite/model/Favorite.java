@@ -4,16 +4,16 @@ import com.dermind.DerMind.product.model.Product;
 import com.dermind.DerMind.user.model.User;
 import jakarta.persistence.*;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
 @Getter
 @Setter
+@NoArgsConstructor
 @Entity
-@Table(name = "favorites",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "product_id"}))
+@Table(name = "favorites")
 public class Favorite {
 
     @Id
@@ -28,6 +28,11 @@ public class Favorite {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
-    @CreationTimestamp
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+    }
 }

@@ -4,6 +4,8 @@ import com.dermind.DerMind.product.dto.*;
 import com.dermind.DerMind.product.service.ProductService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,8 +25,8 @@ public class ProductController {
      * GET /api/products
      */
     @GetMapping
-    public ResponseEntity<List<ProductResponseDTO>> getAllProducts() {
-        List<ProductResponseDTO> products = productService.getAllProducts();
+    public ResponseEntity<Page<ProductResponseDTO>> getAllProducts(Pageable pageable) {
+        Page<ProductResponseDTO> products = productService.getAllProducts(pageable);
         return ResponseEntity.ok(products);
     }
 
@@ -72,8 +74,8 @@ public class ProductController {
      * GET /api/products/brand/{brand}
      */
     @GetMapping("/brand/{brand}")
-    public ResponseEntity<List<ProductResponseDTO>> getProductsByBrand(@PathVariable String brand) {
-        List<ProductResponseDTO> products = productService.getProductsByBrand(brand);
+    public ResponseEntity<Page<ProductResponseDTO>> getProductsByBrand(@PathVariable String brand, Pageable pageable) {
+        Page<ProductResponseDTO> products = productService.getProductsByBrand(brand, pageable);
         return ResponseEntity.ok(products);
     }
 
@@ -82,8 +84,8 @@ public class ProductController {
      * GET /api/products/search/name?name={name}
      */
     @GetMapping("/search/name")
-    public ResponseEntity<List<ProductResponseDTO>> searchProductsByName(@RequestParam String name) {
-        List<ProductResponseDTO> products = productService.searchProductsByName(name);
+    public ResponseEntity<Page<ProductResponseDTO>> searchProductsByName(@RequestParam String name, Pageable pageable) {
+        Page<ProductResponseDTO> products = productService.searchProductsByName(name, pageable);
         return ResponseEntity.ok(products);
     }
 
@@ -92,8 +94,23 @@ public class ProductController {
      * GET /api/products/search?q={searchTerm}
      */
     @GetMapping("/search")
-    public ResponseEntity<List<ProductResponseDTO>> searchProducts(@RequestParam String q) {
-        List<ProductResponseDTO> products = productService.searchProducts(q);
+    public ResponseEntity<Page<ProductResponseDTO>> searchProducts(@RequestParam String query, Pageable pageable) {
+        Page<ProductResponseDTO> products = productService.searchProducts(query, pageable);
+        return ResponseEntity.ok(products);
+    }
+
+    /**
+     * Filter products with multiple criteria
+     * GET /api/products/filter?query={q}&minPrice={min}&maxPrice={max}&minQuality={quality}
+     */
+    @GetMapping("/filter")
+    public ResponseEntity<Page<ProductResponseDTO>> filterProducts(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) Double minPrice,
+            @RequestParam(required = false) Double maxPrice,
+            @RequestParam(required = false) Double minQuality,
+            Pageable pageable) {
+        Page<ProductResponseDTO> products = productService.filterProducts(query, minPrice, maxPrice, minQuality, pageable);
         return ResponseEntity.ok(products);
     }
 
@@ -102,10 +119,9 @@ public class ProductController {
      * GET /api/products/quality?min={minScore}
      */
     @GetMapping("/quality")
-    public ResponseEntity<List<ProductResponseDTO>> getProductsByMinQuality(
-            @RequestParam(defaultValue = "0.0") Double min) {
-        List<ProductResponseDTO> products = productService.getProductsByMinQuality(min);
-        return ResponseEntity.ok(products);
+    public ResponseEntity<Page<ProductResponseDTO>> getProductsByMinQuality(
+            @RequestParam(defaultValue = "0.0") Double min, Pageable pageable) {
+        return ResponseEntity.ok(productService.getProductsByMinQuality(min, pageable));
     }
 
     /**
