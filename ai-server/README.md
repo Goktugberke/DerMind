@@ -1,7 +1,7 @@
 # DerMind AI Server
 
-Yapay zeka destekli kişiselleştirilmiş kozmetik öneri ve puanlama sistemi.  
-**FastAPI · XGBoost · KNN · SHAP · Ollama / OpenAI**
+Yapay zeka destekli kişiselleştirilmiş kozmetik öneri ve puanlama sistemi.
+**FastAPI · XGBoost · KNN · SHAP · Ollama / OpenAI · OpenTelemetry**
 
 ---
 
@@ -13,9 +13,13 @@ Yapay zeka destekli kişiselleştirilmiş kozmetik öneri ve puanlama sistemi.
 4. [Kurulum (Docker Compose)](#kurulum-docker-compose)
 5. [API Endpointleri](#api-endpointleri)
 6. [Ortam Değişkenleri](#ortam-değişkenleri)
-7. [Model Performansı](#model-performansı)
-8. [Temel Kavramlar](#temel-kavramlar)
-9. [Dosya Yapısı](#dosya-yapısı)
+7. [Rate Limiting](#rate-limiting)
+8. [Distributed Tracing](#distributed-tracing-opentelemetry)
+9. [Allergen Text Matching](#allergen-text-matching)
+10. [Model Performansı](#model-performansı)
+11. [Temel Kavramlar](#temel-kavramlar)
+12. [Dosya Yapısı](#dosya-yapısı)
+13. [Testler](#testler)
 
 ---
 
@@ -26,24 +30,28 @@ Mobil / Frontend
       │
       ▼
 Spring Boot Backend (:8080)
-      │  POST /api/ai/score
+      │  GET  /api/ai/score/{productId}
       │  GET  /api/ai/recommend
       │  GET  /api/ai/explain/{id}
       │  GET  /api/ai/health
+      │  X-Internal-Key: <shared-secret>
       ▼
 FastAPI AI Server (:8000)            PostgreSQL (:5432)
-  ├── /score    → XGBoost                 ▲
-  ├── /recommend → KNN                    │
-  ├── /explain  → SHAP + LLM       Spring Boot JPA
-  └── /health   → sağlık               (ürünler, kullanıcılar)
+  ├── /score          → XGBoost            ▲
+  ├── /score/batch    → XGBoost x N        │
+  ├── /recommend      → KNN          Spring Boot JPA
+  ├── /explain        → SHAP + LLM      (ürünler, kullanıcılar,
+  ├── /explain/stream → SSE streaming    ratings, streaks)
+  ├── /metrics        → cache & LLM stats
+  └── /health         → sağlık + drift kontrolü
 ```
 
 **Veri akışı:**
 1. Kullanıcı mobil uygulamada bir ürüne tıklar.
-2. Mobil → Spring Boot `GET /api/ai/score/{productId}` çağırır.
-3. Spring Boot, `Product.sephoraProductId` ile AI sunucusuna `POST /score` atar.
-4. AI sunucusu XGBoost ile `base_score` ve `personal_score` üretir, döner.
-5. Spring Boot sonucu mobil uygulamaya iletir.
+2. Mobil → Spring Boot → AI server (`X-Internal-Key` header ile authenticate).
+3. AI server: XGBoost ile `personal_score`, allergen text matching ile `allergen_warnings`.
+4. Backend `UserProductRating.wouldRecommend` ortalamasını `is_recommended` olarak iletir → cold-start dışındaki kullanıcılarda model en güçlü feature'ı kullanır.
+5. Sonuç mobil uygulamaya akar.
 
 ---
 
@@ -52,18 +60,14 @@ FastAPI AI Server (:8000)            PostgreSQL (:5432)
 ### Docker Compose ile (önerilen)
 
 ```bash
-# Proje kökünden
 cd backend
 cp .env.example .env          # POSTGRES_USER, POSTGRES_PASSWORD doldur
 cd ../ai-server
 cp .env.example .env          # LLM ayarlarını doldur (varsayılan Ollama'dır)
 
-# Tüm sistemi tek komutla başlat (postgres + ai-server + backend + frontend)
 cd ../backend
 docker compose up --build
 ```
-
-Servisler sırasıyla şu adreslerde çalışır:
 
 | Servis | URL |
 |--------|-----|
@@ -80,7 +84,8 @@ Servisler sırasıyla şu adreslerde çalışır:
 ### Gereksinimler
 
 - Python 3.11+
-- `models/` klasöründe eğitilmiş model dosyaları (`xgboost_scoring_model.json`, `model_config.json` zorunlu)
+- `models/` klasöründe eğitilmiş model dosyaları (`xgboost_scoring_model.json`, `model_config.json`, `knn_recommender_model.pkl`, `shap_explainer.pkl`, `feature_scaler.pkl` zorunlu)
+- `dermind_knn_product_vectors.csv` (4.692 ürün) — repo ile birlikte gelir
 
 ### 1. Python Ortamı
 
@@ -105,10 +110,7 @@ cp .env.example .env
 ### 3. LLM Kurulumu (Ollama — Ücretsiz, Varsayılan)
 
 ```bash
-# Ollama yüklüyse modeli çek (tek seferlik ~4 GB)
 ollama pull llama3.1
-
-# Çalıştığını doğrula
 curl http://localhost:11434
 # → "Ollama is running"
 ```
@@ -119,31 +121,31 @@ LLM_PROVIDER=openai
 OPENAI_API_KEY=sk-...
 ```
 
-### 4. Model Eğitimi (isteğe bağlı — `models/` klasörü zaten doluysa atlayabilirsin)
+### 4. Model Eğitimi (isteğe bağlı)
 
 ```bash
-# models/ klasörü boşsa eğitimi çalıştır (~3-5 dakika)
+# Önce dataset'i üret (CosIng + Sephora + SkinCare merge, ingredients_text dahil)
+python build_dataset_v2.py
+
+# Modelleri eğit (~3-5 dakika)
 python train_models_v2.py --data-dir . --models-dir models
+
+# Hızlı test (RF ve CV atla)
+python train_models_v2.py --skip-rf --skip-cv
 ```
 
-Eğitim sonucunda `models/` klasöründe şu dosyalar oluşur:
-- `xgboost_scoring_model.json`
-- `random_forest_scoring_model.pkl`
-- `knn_recommender_model.pkl`
-- `shap_explainer.pkl`
-- `feature_scaler.pkl`
-- `model_config.json`
+> `train_models_v2.py` ve `app.py` artık ortak `features.py` modülünü import eder — feature listesi tek doğru kaynaktan gelir, eğitim ve inference uyumsuzluğu otomatik tespit edilir (drift WARN log).
 
 ### 5. Ürünleri Veritabanına Aktar (ilk kurulumda bir kez)
 
 ```bash
-# Spring Boot backend çalışıyorken:
+# Spring Boot backend çalışıyorken
 python seed_products.py
 
-# Önce dry-run ile kontrol et:
+# Önce dry-run ile kontrol et
 python seed_products.py --dry-run
 
-# JWT token gerekiyorsa:
+# Firebase token gerekiyorsa
 python seed_products.py --token "Bearer eyJhb..."
 ```
 
@@ -153,37 +155,36 @@ python seed_products.py --token "Bearer eyJhb..."
 uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Sunucu hazır olduğunda:
 ```
 INFO:     Application startup complete.
 ─── Tüm modeller hazır. ───
+LLM health: Ollama (llama3.1) @ http://localhost:11434 erişilebilir.
+Allergen matching: ingredients_text kolonu mevcut (4,692 ürün)
 ```
 
 ---
 
 ## Kurulum (Docker Compose)
 
-AI sunucusu tek başına da Docker ile çalıştırılabilir:
-
 ```bash
 cd ai-server
-
-# .env dosyasını oluştur
 cp .env.example .env
 
-# İmajı derle ve çalıştır
+# İmajı derle ve çalıştır (build-time guard eksik artefaktları açıkça raporlar)
 docker build -t dermind-ai .
 docker run -p 8000:8000 --env-file .env dermind-ai
 ```
 
-Tüm sistem için `backend/compose.yaml` kullanılması önerilir — bkz. [Hızlı Başlangıç](#hızlı-başlangıç).
+> **Not:** Dockerfile build-time'da `dermind_knn_product_vectors.csv`, `models/xgboost_scoring_model.json`, `models/model_config.json`, `models/knn_recommender_model.pkl`, `models/feature_scaler.pkl`, `models/shap_explainer.pkl` varlığını kontrol eder. Eksikse açık `FATAL: ... missing` mesajıyla erken patlar.
 
 ---
 
 ## API Endpointleri
 
-Sunucu: `http://localhost:8000`  
+Sunucu: `http://localhost:8000`
 Swagger UI: `http://localhost:8000/docs`
+
+> `INTERNAL_API_KEY` ayarlıysa tüm `/score`, `/score/batch`, `/recommend`, `/explain`, `/explain/stream` endpointleri `X-Internal-Key` header zorunludur.
 
 ---
 
@@ -191,15 +192,11 @@ Swagger UI: `http://localhost:8000/docs`
 
 Sunucu ve model sağlık kontrolü. Auth gerektirmez.
 
-```bash
-curl http://localhost:8000/health
-```
-
 ```json
 {
   "status": "ok",
   "model": "xgboost",
-  "version": "2.1",
+  "version": "2.2",
   "total_products": 4692,
   "xgb_r2": 0.853
 }
@@ -209,28 +206,40 @@ curl http://localhost:8000/health
 
 ### GET /metrics
 
-Uptime, cache istatistikleri, endpoint istek sayaçları.
+Uptime, cache istatistikleri, **LLM call/error counter'ları**, request sayaçları.
 
-```bash
-curl http://localhost:8000/metrics
+```json
+{
+  "uptime_seconds": 1820.4,
+  "cache": {
+    "size": 23, "maxsize": 500, "ttl_seconds": 3600,
+    "hits": 142, "misses": 88, "hit_rate_pct": 61.7
+  },
+  "llm": {
+    "provider": "ollama", "model": "llama3.1",
+    "calls": 88, "errors": 2, "error_rate_pct": 2.3
+  },
+  "request_counts": { "POST /score": 419, "POST /explain": 90 },
+  "model": { "total_products": 4692, "scoring_features": 28, "knn_features": 24 }
+}
 ```
 
 ---
 
 ### POST /score
 
-Bir ürün için `base_score` (kullanıcıdan bağımsız) ve `personal_score` (kullanıcıya özel) döner.
-
 ```bash
 curl -X POST http://localhost:8000/score \
   -H "Content-Type: application/json" \
+  -H "X-Internal-Key: <secret>" \
   -d '{
     "sephora_product_id": "P476416",
     "user": {
       "skin_type": "oily",
       "has_acne": true,
-      "allergies": ["paraben"]
-    }
+      "allergies": ["paraben", "fragrance"]
+    },
+    "is_recommended": 0.83
   }'
 ```
 
@@ -241,38 +250,37 @@ curl -X POST http://localhost:8000/score \
   "brand": "54 Thrones",
   "base_score": 5.4,
   "personal_score": 4.1,
-  "skin_type": "oily"
+  "skin_type": "oily",
+  "allergen_warnings": ["fragrance"]
 }
 ```
 
-`skin_type` geçerli değerler: `dry | oily | combination | normal`
+- `is_recommended` (opsiyonel, 0.0–1.0): Backend'in `UserProductRating.wouldRecommend` ortalaması. Verilmezse 0.5 (nötr) — cold-start.
+- `allergen_warnings`: Ürün ingredients metninde geçen kullanıcı allergen'leri.
+- `skin_type`: `dry | oily | combination | normal`
 
 ---
 
 ### POST /score/batch
 
-Birden fazla ürünü aynı anda puan. Maks 50 ürün.
+Maks 50 ürün, partial error desteği.
 
-```bash
-curl -X POST http://localhost:8000/score/batch \
-  -H "Content-Type: application/json" \
-  -d '{
-    "sephora_product_ids": ["P476416", "P123456", "P999001"],
-    "user": { "skin_type": "dry", "has_acne": false, "allergies": [] }
-  }'
+```json
+{
+  "results": [ { "product_id": "P476416", "personal_score": 4.1, ... } ],
+  "errors":  [ { "product_id": "INVALID", "error": "Ürün bulunamadı" } ]
+}
 ```
 
 ---
 
 ### POST /recommend
 
-Kullanıcı profiline göre KNN ile en uygun ürünleri önerir.
-
 ```bash
 curl -X POST http://localhost:8000/recommend \
   -H "Content-Type: application/json" \
   -d '{
-    "user": { "skin_type": "dry", "has_acne": false, "allergies": [] },
+    "user": { "skin_type": "dry", "has_acne": false, "allergies": ["paraben"] },
     "category": "Skincare",
     "secondary_category": "Moisturizers",
     "top_k": 5
@@ -283,83 +291,144 @@ curl -X POST http://localhost:8000/recommend \
 {
   "user_skin_type": "dry",
   "category_filter": "Moisturizers",
-  "recommendations": [
-    {
-      "product_id": "P123456",
-      "product_name": "Barrier Moisture Cream",
-      "brand": "COSRX",
-      "category": "Moisturizers",
-      "base_score": 8.2,
-      "similarity": 0.943,
-      "rating": 4.6,
-      "price_usd": 38.0
-    }
-  ]
+  "recommendations": [ { "product_id": "...", "similarity": 0.943, ... } ]
 }
 ```
 
-`category` ve `secondary_category` opsiyoneldir — verilmezse tüm kategorilerden öneri gelir.
+**Allergic kullanıcılar için 4 katmanlı filtre** (otomatik):
+1. **Text-level match** — ürün ingredients metninde allergen geçenleri çıkar (en sıkı)
+2. CosIng `banned=0 AND restricted=0`
+3. CosIng `banned=0`
+4. `penalty_score` median altı (son çare)
+
+**Performans:** Kategori veya allergy filtresi yoksa, startup'ta fit edilmiş `knn_model` yeniden kullanılır — istek başına refit yok.
 
 ---
 
 ### POST /explain
 
-SHAP ile puana etki eden faktörleri hesaplar, **Ollama (varsayılan) veya OpenAI** ile kullanıcıya doğal dilde açıklar.
-
-> İlk çağrıda LLM yanıt süresi 5–30 saniyedir. Aynı kombinasyon için ikinci çağrı anında döner (TTL cache).
-
-```bash
-curl -X POST http://localhost:8000/explain \
-  -H "Content-Type: application/json" \
-  -d '{
-    "sephora_product_id": "P476416",
-    "user": { "skin_type": "oily", "has_acne": true, "allergies": [] },
-    "language": "tr"
-  }'
-```
+SHAP ile puana etki eden faktörleri hesaplar, **Ollama veya OpenAI** ile doğal dilde açıklar. İlk çağrıda 5–30 saniye, cache hit'te anında.
 
 ```json
 {
   "product_id": "P476416",
-  "product_name": "AFRICAN Beauty Butter",
   "base_score": 5.4,
   "personal_score": 4.1,
   "language": "tr",
   "shap_factors": [
-    { "feature": "is_recommended", "effect": 1.32,  "direction": "ARTIRAN" },
-    { "feature": "penalty_score",  "effect": -0.51, "direction": "DÜŞÜREN" },
-    { "feature": "good_for_oily",  "effect": 0.43,  "direction": "ARTIRAN" }
+    { "feature": "is_recommended", "effect": 1.32, "direction": "ARTIRAN" },
+    { "feature": "penalty_score", "effect": -0.51, "direction": "DUSUREN" }
   ],
-  "explanation": "Bu ürün genel olarak kaliteli olsa da içindeki bazı kısıtlı maddeler yağlı cildinizde tahriş yapabilir.",
-  "cached": false
+  "explanation": "Bu ürün genel olarak kaliteli olsa da...",
+  "cached": false,
+  "llm_error": false
 }
 ```
 
-`language`: `tr` (Türkçe, varsayılan) | `en` (İngilizce)
+**Cache key**: `product_id + skin_type + has_acne + allergies + is_recommended + language` (1 saatlik TTL). LLM hatası **cache'lenmez** — ikinci çağrıda yeniden denenir.
 
-**Cache:** `product_id + skin_type + has_acne + language` kombinasyonu için LLM tekrar çağrılmaz (1 saatlik TTL).
+---
+
+### POST /explain/stream  *(yeni)*
+
+Server-Sent Events (text/event-stream) ile streaming. **TTFB ~300ms** (SHAP), tam yanıt ~30sn.
+
+```bash
+curl -N -X POST http://localhost:8000/explain/stream \
+  -H "Content-Type: application/json" \
+  -H "X-Internal-Key: <secret>" \
+  -d '{ "sephora_product_id": "P476416", "user": {...}, "language": "tr" }'
+```
+
+```
+data: {"type":"meta","product_id":"P476416","base_score":5.4,"shap_factors":[...]}
+
+data: {"type":"token","text":"Bu "}
+data: {"type":"token","text":"ürün "}
+data: {"type":"token","text":"yağlı "}
+...
+data: {"type":"done","cached":false,"llm_error":false}
+```
+
+**Event tipleri:**
+- `meta` — anında, SHAP factors + scores
+- `token` — LLM'den parça parça (cache hit'te tek event)
+- `done` — final flag'ler
+
+Frontend tarafında `EventSource` veya `fetch` + `ReadableStream` ile parse edilir.
 
 ---
 
 ## Ortam Değişkenleri
 
-`.env.example` dosyasından kopyala:
-
-```bash
-cp .env.example .env
-```
-
 | Değişken | Varsayılan | Açıklama |
 |----------|-----------|---------|
 | `LLM_PROVIDER` | `ollama` | `ollama` veya `openai` |
-| `OLLAMA_HOST` | `http://localhost:11434` | Docker içinde `http://host.docker.internal:11434` yap |
-| `OLLAMA_MODEL` | `llama3.1` | Çekilen model adı |
+| `OLLAMA_HOST` | `http://localhost:11434` | Docker içinde `http://host.docker.internal:11434` |
+| `OLLAMA_MODEL` | `llama3.1` | |
 | `OPENAI_API_KEY` | — | `LLM_PROVIDER=openai` ise zorunlu |
-| `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI model adı |
-| `INTERNAL_API_KEY` | — | Boş bırakılırsa auth devre dışı |
+| `OPENAI_MODEL` | `gpt-4o-mini` | |
+| `INTERNAL_API_KEY` | — | Boş bırakılırsa internal auth devre dışı |
 | `ALLOWED_ORIGINS` | `*` | Production'da backend URL'ini yaz |
-| `EXPLAIN_CACHE_TTL` | `3600` | Saniye cinsinden cache süresi |
+| `EXPLAIN_CACHE_TTL` | `3600` | Saniye |
 | `EXPLAIN_CACHE_MAX` | `500` | Maksimum cache girdisi |
+| `SHAP_EFFECT_THRESHOLD` | `0.01` | Bu altı SHAP etkisi response'tan çıkarılır |
+| `SCORE_RATE_LIMIT` | `60/minute` | slowapi formatı |
+| `RECOMMEND_RATE_LIMIT` | `30/minute` | |
+| `EXPLAIN_RATE_LIMIT` | `10/minute` | LLM = para; sıkı tut |
+| `OTEL_ENABLED` | `false` | OpenTelemetry tracing aktif/pasif |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4317` | gRPC OTLP collector |
+| `OTEL_SERVICE_NAME` | `dermind-ai-server` | Trace'lerde görünen servis adı |
+
+---
+
+## Rate Limiting
+
+Per-IP token bucket (slowapi). Limitler env üzerinden override edilebilir.
+
+| Endpoint | Default | Sebep |
+|----------|---------|-------|
+| `/score`, `/score/batch` | 60/dk | XGBoost ucuz |
+| `/recommend` | 30/dk | KNN orta |
+| `/explain`, `/explain/stream` | 10/dk | LLM = ücret/yük |
+
+Limit aşılırsa `429 Too Many Requests` döner.
+
+---
+
+## Distributed Tracing (OpenTelemetry)
+
+`OTEL_ENABLED=true` ile auto-instrument:
+
+- FastAPI HTTP request'leri (`http.server.duration`)
+- Çıkış HTTP çağrıları (`requests` library)
+- Özel span'lar: `xgb.predict`, `llm.chat.completions`
+
+Backend'in Spring Boot tarafı `micrometer-tracing-bridge-otel` ile aynı OTLP collector'a span gönderir → **cross-service trace ID propagation**: tek bir `traceId` ile mobil → backend → AI server → LLM yolculuğu görünür.
+
+```bash
+# Jaeger ile lokal test
+docker run -d -p 16686:16686 -p 4317:4317 jaegertracing/all-in-one:latest
+# .env
+OTEL_ENABLED=true
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+# Jaeger UI
+open http://localhost:16686
+```
+
+OpenTelemetry paketleri kurulu değilse `OTEL_ENABLED=true` olsa bile **graceful skip** — sunucu kalkar, sadece tracing kapalı kalır.
+
+---
+
+## Allergen Text Matching
+
+`build_dataset_v2.py`, `dermind_knn_product_vectors.csv`'ye `ingredients_text` kolonu (pipe-separated, lowercase) ekler. Bu sayede:
+
+- `/score` response'unda `allergen_warnings: ["paraben", ...]` döner
+- `/recommend` allergic kullanıcılar için ingredient-text-level filtre uygular
+- CosIng veritabanında olmayan ingredient'lar bile yakalanır (ör. "fragrance oil" → "fragrance" kullanıcı allergen'i ile match'lenir)
+
+`ingredients_text` kolonu yoksa text matching otomatik devre dışı kalır, CosIng tabanlı filtre devreye girer.
 
 ---
 
@@ -369,12 +438,12 @@ cp .env.example .env
 
 | Metrik | Değer |
 |--------|-------|
-| MAE | **0.3912** (10 üzerinden ortalama 0.39 puan hata) |
+| MAE | **0.3912** |
 | RMSE | **0.5194** |
-| R² | **0.8530** (varyansın %85'ini açıklıyor) |
-| 5-Fold CV R² | **0.8386 ± 0.017** (overfitting yok) |
-| 1 puan içinde | **%94.9** |
-| 0.5 puan içinde | **%72.5** |
+| R² | **0.8530** |
+| 5-Fold CV R² | **0.8386 ± 0.017** |
+| ±1 puan | **%94.9** |
+| ±0.5 puan | **%72.5** |
 
 ### En Etkili Özellikler (SHAP)
 
@@ -386,6 +455,8 @@ cp .env.example .env
 | 4 | banned_count | 0.1898 |
 | 5 | good_for_acne | 0.1190 |
 
+> Bu yüzden backend `UserProductRating.wouldRecommend` ortalamasını `is_recommended` olarak göndermek **kritik**. Cold-start kullanıcısı için 0.5 (nötr) kullanılır.
+
 ---
 
 ## Temel Kavramlar
@@ -395,21 +466,27 @@ cp .env.example .env
 **Base score** kullanıcıdan bağımsız ürün kalite puanı (1–10):
 
 ```
-base_score = (sephora_rating / 5) × 10 × 0.6   → Rating bileşeni (%60 ağırlık)
-           + min(faydali_madde / 10, 1) × 2      → Faydalı ingredient bonusu
-           - min(kacinilacak / 5, 1) × 1          → Kaçınılacak madde cezası
-           - min(penalty_score / 10, 1) × 2        → CosIng yasaklı madde cezası
+base_score = (sephora_rating / 5) × 10 × 0.6
+           + min(faydali_madde / 10, 1) × 2
+           - min(kacinilacak / 5, 1) × 1
+           - min(penalty_score / 10, 1) × 2
 ```
 
-**Personal score**, XGBoost'un kullanıcı profiliyle (cilt tipi, alerji, geçmiş) ürettiği kişisel puan. Base score üzerine ±2 puana kadar kayabilir.
+**Personal score**, XGBoost'un kullanıcı profiliyle (cilt tipi, akne, alerji, geçmiş tavsiye oranı) ürettiği kişisel puan. Base score üzerine ±2 puana kadar kayabilir.
 
 ### KNN Öneri Sistemi
 
-4.692 ürün 24 özellik ile vektörize edilmiştir (cilt tipi uyumluluğu, ingredient kategorileri, kalite metrikleri). Cosine similarity ile en yakın K ürün döner.
+4.692 ürün × 24 özellik (cilt tipi uyumluluğu, ingredient kategorileri, kalite metrikleri). Cosine similarity. Startup'ta fit edilir, no-filter durumda yeniden kullanılır.
 
 ### SHAP + LLM (Explainable AI)
 
-SHAP, her özelliğin son puana kaç puan kattığını sayısal olarak hesaplar. Bu değerler LLM'e gönderilerek kullanıcıya Türkçe/İngilizce doğal dil açıklaması üretilir.
+SHAP, her özelliğin son puana kaç puan kattığını sayısal olarak hesaplar. Bu değerler LLM'e gönderilerek kullanıcıya Türkçe/İngilizce doğal dil açıklaması üretilir. Streaming endpoint ile token-by-token akış mümkün.
+
+### Cold-Start Davranışı
+
+Yeni kullanıcı (henüz `UserProductRating` yok):
+- `is_recommended` → 0.5 (nötr)
+- KNN user vector → dataset median değerleri (`rating`, `price_usd`, `ingredient_count` median'larından türetilir, hardcoded sabit değil)
 
 ---
 
@@ -417,42 +494,50 @@ SHAP, her özelliğin son puana kaç puan kattığını sayısal olarak hesaplar
 
 ```
 ai-server/
-├── app.py                           ← FastAPI sunucusu (score, recommend, explain)
-├── train_models_v2.py               ← Model eğitim pipeline (XGBoost, KNN, SHAP)
-├── seed_products.py                 ← CSV ürünlerini Spring Boot backend'ine aktar
-├── .env.example                     ← Ortam değişkenleri şablonu
-├── .env                             ← Kendi ayarların (git'e commit etme)
-├── requirements.txt                 ← Python bağımlılıkları
-├── Dockerfile                       ← Docker imajı
+├── app.py                           ← FastAPI: score, recommend, explain, /stream, metrics
+├── features.py                      ← SCORING_FEATURES + KNN_FEATURES (tek doğru kaynak)
+├── train_models_v2.py               ← Eğitim pipeline (XGBoost + RF + KNN + SHAP + 5-fold CV)
+├── build_dataset_v2.py              ← Sephora + CosIng + SkinCare → CSV (ingredients_text dahil)
+├── seed_products.py                 ← CSV → Spring Boot backend POST /api/products
+├── .env.example                     ← Tüm env vars şablonu
+├── requirements.txt                 ← FastAPI + ML + slowapi + opentelemetry
+├── Dockerfile                       ← Build-time artefakt guard'ı dahil
 ├── pytest.ini                       ← Test ayarları
-├── TODO.md                          ← Yapılacaklar ve bilinen sorunlar
-├── dermind_knn_product_vectors.csv  ← 4,692 ürün vektörü (KNN için)
-├── dermind_ai_training_dataset.csv  ← 966K satır eğitim verisi
+├── TODO.md                          ← Yapılacaklar / bilinen sorunlar
+├── HAPPY_PATH_TEST.md               ← Manuel test rehberi
+├── dermind_knn_product_vectors.csv  ← 4,692 ürün vektörü + ingredients_text
 ├── tests/
-│   └── test_app.py                  ← 28 test (22 birim + 6 LLM)
+│   └── test_app.py                  ← 40+ test (unit + business invariants + cold-start)
 └── models/
-    ├── xgboost_scoring_model.json   ← Ana model (R²=0.853) — train_models_v2.py ile üret
-    ├── random_forest_scoring_model.pkl ← Baseline model
-    ├── knn_recommender_model.pkl    ← KNN öneri modeli
-    ├── shap_explainer.pkl           ← SHAP açıklayıcı
-    ├── feature_scaler.pkl           ← KNN normalizasyon
-    └── model_config.json            ← Metrikler + feature listesi (ZORUNLU)
+    ├── xgboost_scoring_model.json   ← Ana model (ZORUNLU)
+    ├── model_config.json            ← Metrikler + feature listesi (ZORUNLU)
+    ├── knn_recommender_model.pkl    ← Pre-fitted KNN
+    ├── shap_explainer.pkl
+    └── feature_scaler.pkl
 ```
-
-> `models/xgboost_scoring_model.json` ve `models/model_config.json` olmadan sunucu başlamaz.  
-> Üretmek için: `python train_models_v2.py --data-dir . --models-dir models`
 
 ---
 
 ## Testler
 
 ```bash
-# LLM gerektirmeyen 22 test (CI/CD için)
+# LLM gerektirmeyen testler (CI için)
 pytest tests/ -m "not llm" -v
 
-# Tüm testler (Ollama çalışıyor olmalı)
+# Tüm testler (Ollama gerek)
 pytest tests/ -v
 
-# Coverage raporu
+# Coverage
 pytest tests/ -m "not llm" --cov=app --cov-report=term-missing
 ```
+
+**Test kategorileri:**
+
+| Sınıf | Açıklama |
+|-------|----------|
+| `TestHealth`, `TestMetrics` | Endpoint shape testleri |
+| `TestScore`, `TestScoreBatch` | Validation + happy path |
+| `TestRecommend` | KNN response yapısı |
+| `TestExplain` | SHAP + LLM (cache, dil, hata davranışı) |
+| `TestBusinessInvariants` | Skin one-hot, allergy penalty, is_recommended pass-through, KNN reuse |
+| `TestColdStart` | Yeni kullanıcı (rating yok) senaryoları |

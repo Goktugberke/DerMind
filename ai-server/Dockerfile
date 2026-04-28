@@ -14,9 +14,17 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # copy source + model artifacts
-COPY app.py .
+COPY app.py features.py ./
 COPY dermind_knn_product_vectors.csv .
 COPY models/ models/
+
+# Build-time guard — eksik artefakt durumunda erken patla, sessizce build alma
+RUN test -f dermind_knn_product_vectors.csv || (echo "FATAL: dermind_knn_product_vectors.csv missing — run build_dataset_v2.py first" && exit 1) && \
+    test -f models/xgboost_scoring_model.json || (echo "FATAL: xgboost_scoring_model.json missing — run train_models_v2.py first" && exit 1) && \
+    test -f models/model_config.json || (echo "FATAL: model_config.json missing" && exit 1) && \
+    test -f models/knn_recommender_model.pkl || (echo "FATAL: knn_recommender_model.pkl missing" && exit 1) && \
+    test -f models/feature_scaler.pkl || (echo "FATAL: feature_scaler.pkl missing" && exit 1) && \
+    test -f models/shap_explainer.pkl || (echo "FATAL: shap_explainer.pkl missing" && exit 1)
 
 EXPOSE 8000
 

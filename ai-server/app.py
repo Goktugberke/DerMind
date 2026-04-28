@@ -3,11 +3,14 @@ DerMind AI Server — FastAPI
 ============================
 Endpoints:
   GET  /health         — Sunucu + model sağlık kontrolü
-  GET  /metrics        — Uptime, cache istatistikleri, request sayaçları
+  GET  /metrics        — Uptime, cache istatistikleri, LLM error rate
   POST /score          — Kişiselleştirilmiş puan tahmini
   POST /score/batch    — Çoklu ürün puanlama (maks 50)
-  POST /recommend      — KNN ürün önerisi
-  POST /explain        — SHAP XAI + LLM açıklaması
+  POST /recommend      — KNN ürün önerisi (allergen text-match filtre)
+  POST /explain        — SHAP XAI + LLM açıklaması (tek seferlik)
+  POST /explain/stream — SSE streaming SHAP + LLM (TTFB ~300ms)
+
+Tracing: OTEL_ENABLED=true ile OpenTelemetry / OTLP exporter aktif
 
 Çalıştırma:
   uvicorn app:app --host 0.0.0.0 --port 8000 --reload
@@ -21,6 +24,7 @@ import logging
 import threading
 import warnings
 import hashlib
+import asyncio
 
 import numpy as np
 import pandas as pd
@@ -35,10 +39,54 @@ from typing import Optional
 from cachetools import TTLCache
 from fastapi import FastAPI, HTTPException, Depends, Header, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from sklearn.neighbors import NearestNeighbors
 from dotenv import load_dotenv
 from openai import OpenAI
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+
+from features import (
+    SCORING_FEATURES as EXPECTED_SCORING_FEATURES,
+    KNN_FEATURES as EXPECTED_KNN_FEATURES,
+    SKIN_ONE_HOT,
+    VALID_SKIN_TYPES,
+)
+
+# ─────────────────────────────────────────────
+# OpenTelemetry — opsiyonel (paket yoksa devre dışı)
+# ─────────────────────────────────────────────
+OTEL_ENABLED = os.getenv("OTEL_ENABLED", "false").lower() == "true"
+OTEL_ENDPOINT = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
+OTEL_SERVICE_NAME = os.getenv("OTEL_SERVICE_NAME", "dermind-ai-server")
+
+_otel_tracer = None
+if OTEL_ENABLED:
+    try:
+        from opentelemetry import trace
+        from opentelemetry.sdk.resources import Resource
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+        from opentelemetry.instrumentation.requests import RequestsInstrumentor
+
+        resource = Resource(attributes={"service.name": OTEL_SERVICE_NAME})
+        provider = TracerProvider(resource=resource)
+        exporter = OTLPSpanExporter(endpoint=OTEL_ENDPOINT, insecure=True)
+        provider.add_span_processor(BatchSpanProcessor(exporter))
+        trace.set_tracer_provider(provider)
+        RequestsInstrumentor().instrument()
+        _otel_tracer = trace.get_tracer(__name__)
+        # FastAPI instrumentation aşağıda app oluşturulduktan sonra yapılır
+    except ImportError as exc:
+        OTEL_ENABLED = False
+        # logger henüz tanımlı değil — print ile uyar
+        print(f"[WARN] OpenTelemetry paketi yüklü değil ({exc}); tracing devre dışı.")
+    except Exception as exc:
+        OTEL_ENABLED = False
+        print(f"[WARN] OpenTelemetry başlatma hatası ({exc}); tracing devre dışı.")
 
 warnings.filterwarnings("ignore")
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -79,6 +127,14 @@ else:
 _CACHE_TTL      = int(os.getenv("EXPLAIN_CACHE_TTL", 3600))   # saniye, default 1 saat
 _CACHE_MAX_SIZE = int(os.getenv("EXPLAIN_CACHE_MAX", 500))
 
+# SHAP açıklaması için minimum etki eşiği (bu altı görmezden gelinir)
+SHAP_EFFECT_THRESHOLD = float(os.getenv("SHAP_EFFECT_THRESHOLD", 0.01))
+
+# /explain için rate limit (dakika başına istek)
+EXPLAIN_RATE_LIMIT     = os.getenv("EXPLAIN_RATE_LIMIT", "10/minute")
+SCORE_RATE_LIMIT       = os.getenv("SCORE_RATE_LIMIT", "60/minute")
+RECOMMEND_RATE_LIMIT   = os.getenv("RECOMMEND_RATE_LIMIT", "30/minute")
+
 _explain_cache: TTLCache = TTLCache(maxsize=_CACHE_MAX_SIZE, ttl=_CACHE_TTL)
 _cache_lock = threading.Lock()
 
@@ -97,6 +153,8 @@ _startup_time   = 0.0
 _request_counts: dict[str, int] = defaultdict(int)   # "METHOD /path" -> count
 _cache_hits     = 0
 _cache_misses   = 0
+_llm_errors     = 0
+_llm_calls      = 0
 _counts_lock    = threading.Lock()
 
 def _inc_request(method: str, path: str) -> None:
@@ -113,6 +171,16 @@ def _inc_cache_miss() -> None:
     with _counts_lock:
         _cache_misses += 1
 
+def _inc_llm_error() -> None:
+    global _llm_errors
+    with _counts_lock:
+        _llm_errors += 1
+
+def _inc_llm_call() -> None:
+    global _llm_calls
+    with _counts_lock:
+        _llm_calls += 1
+
 # ─────────────────────────────────────────────
 # GLOBAL MODEL HANDLES  (lifespan'da doldurulur)
 # ─────────────────────────────────────────────
@@ -128,11 +196,12 @@ knn_model        = None
 scaler           = None
 product_df       = None
 _product_index: dict[str, int] = {}   # product_id → row index (O(1) lookup)
+_dataset_medians: dict[str, float] = {}   # /recommend için "ortalama kullanıcı" referansı
 
 
 def _load_models() -> None:
     global CONFIG, SCORING_FEATURES, KNN_FEATURES
-    global xgb_model, shap_explainer, knn_model, scaler, product_df, _product_index
+    global xgb_model, shap_explainer, knn_model, scaler, product_df, _product_index, _dataset_medians
 
     def _require(path: str, hint: str) -> None:
         if not os.path.exists(path):
@@ -153,6 +222,19 @@ def _load_models() -> None:
     SCORING_FEATURES = CONFIG["scoring_features"]
     KNN_FEATURES     = CONFIG["knn_features"]
 
+    # features.py ile model_config.json arasında drift varsa uyar
+    # (eğitilen model ile inference kodu farklı feature set kullanmasın)
+    if list(SCORING_FEATURES) != list(EXPECTED_SCORING_FEATURES):
+        logger.warning(
+            "DRIFT: model_config.json scoring_features != features.py SCORING_FEATURES. "
+            "Modeli yeni feature seti ile yeniden eğitin."
+        )
+    if list(KNN_FEATURES) != list(EXPECTED_KNN_FEATURES):
+        logger.warning(
+            "DRIFT: model_config.json knn_features != features.py KNN_FEATURES. "
+            "Modeli yeni feature seti ile yeniden eğitin."
+        )
+
     xgb_model = xgb.XGBRegressor()
     xgb_model.load_model(os.path.join(MODELS_DIR, "xgboost_scoring_model.json"))
 
@@ -165,10 +247,62 @@ def _load_models() -> None:
     # O(1) lookup index — pandas boolean mask yerine dict
     _product_index = {pid: i for i, pid in enumerate(product_df["product_id"].astype(str))}
 
+    # /recommend için "ortalama kullanıcı" referansı (mean değil median — outlier'a dayanıklı)
+    median_features = [
+        "ingredient_count", "rating", "price_usd",
+        "banned_count", "restricted_count", "penalty_score",
+    ]
+    _dataset_medians = {}
+    for feat in median_features:
+        if feat in product_df.columns:
+            val = product_df[feat].median()
+            _dataset_medians[feat] = float(val) if pd.notna(val) else 0.0
+        else:
+            _dataset_medians[feat] = 0.0
+    logger.info(f"Dataset medians: {_dataset_medians}")
+
+    # Allergen text matching için ingredients_text varsa lowercase normalize et
+    if "ingredients_text" in product_df.columns:
+        product_df["ingredients_text"] = product_df["ingredients_text"].fillna("").astype(str).str.lower()
+        nonempty = (product_df["ingredients_text"].str.len() > 0).sum()
+        logger.info(f"Allergen matching: ingredients_text kolonu mevcut ({nonempty:,} ürün)")
+    else:
+        logger.warning(
+            "Allergen matching: ingredients_text kolonu YOK. "
+            "build_dataset_v2.py'yi yeniden çalıştırın — allergen text matching devre dışı."
+        )
+
     logger.info(f"XGBoost  : OK  (best_iter={CONFIG.get('xgb_best_iteration', '?')})")
     logger.info(f"SHAP     : OK")
     logger.info(f"KNN      : OK  ({len(product_df):,} ürün, {len(KNN_FEATURES)} özellik)")
     logger.info(f"Index    : {len(_product_index):,} ürün indekslendi")
+
+
+def _check_llm_health() -> bool:
+    """LLM sağlayıcısına basit bir bağlantı testi yapar. Hata durumunda False döner."""
+    try:
+        if LLM_PROVIDER == "openai" and OPENAI_KEY:
+            # OpenAI: list models endpoint ucuz bir health check
+            llm_client.models.list()
+            logger.info(f"LLM health: OpenAI ({llm_model}) erişilebilir.")
+            return True
+        # Ollama: /api/tags endpoint'ini direkt HTTP ile dene
+        import urllib.request
+        import urllib.error
+        url = f"{OLLAMA_HOST.rstrip('/')}/api/tags"
+        req = urllib.request.Request(url, method="GET")
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            if resp.status == 200:
+                logger.info(f"LLM health: Ollama ({llm_model}) @ {OLLAMA_HOST} erişilebilir.")
+                return True
+            logger.warning(f"LLM health: Ollama beklenmeyen durum kodu {resp.status}")
+            return False
+    except Exception as exc:
+        logger.warning(
+            f"LLM health: {LLM_PROVIDER} erişilemiyor ({exc}). "
+            "Sunucu kalkacak, ancak /explain çağrıları LLM hatası dönebilir."
+        )
+        return False
 
 
 @asynccontextmanager
@@ -182,6 +316,10 @@ async def lifespan(app: FastAPI):
     except FileNotFoundError as exc:
         logger.error(f"KRITIK — model yüklenemedi:\n{exc}")
         raise
+
+    # LLM bağlantı testi (hatalı bile olsa sunucu kalkar — /explain dışındaki endpoint'ler etkilenmez)
+    _check_llm_health()
+
     yield
     logger.info("─── Shutdown ───")
 
@@ -192,9 +330,23 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="DerMind AI Server",
     description="Kişiselleştirilmiş kozmetik puanlama ve öneri API'si",
-    version="2.1",
+    version="2.2",
     lifespan=lifespan,
 )
+
+# ── OpenTelemetry FastAPI instrumentation ──
+if OTEL_ENABLED:
+    try:
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+        FastAPIInstrumentor.instrument_app(app)
+        logger.info(f"OpenTelemetry: tracing aktif → {OTEL_ENDPOINT} (service={OTEL_SERVICE_NAME})")
+    except Exception as exc:
+        logger.warning(f"OpenTelemetry FastAPI instrument hatası: {exc}")
+
+# ── Rate Limiter ──
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # ── CORS ──
 app.add_middleware(
@@ -229,7 +381,6 @@ def verify_internal_key(x_internal_key: Optional[str] = Header(default=None)) ->
 # ─────────────────────────────────────────────
 # REQUEST / RESPONSE SCHEMAS
 # ─────────────────────────────────────────────
-VALID_SKIN_TYPES = {"dry", "oily", "combination", "normal"}
 MAX_ALLERGIES    = 20
 MAX_BATCH_SIZE   = 50
 
@@ -237,7 +388,7 @@ MAX_BATCH_SIZE   = 50
 class UserProfile(BaseModel):
     skin_type: str = Field(..., description="dry | oily | combination | normal")
     has_acne:  bool = False
-    allergies: list[str] = Field(default=[], max_length=MAX_ALLERGIES)
+    allergies: list[str] = Field(default_factory=list, max_length=MAX_ALLERGIES)
 
     @field_validator("skin_type")
     @classmethod
@@ -291,20 +442,46 @@ class ExplainRequest(BaseModel):
 # ─────────────────────────────────────────────
 # YARDIMCI FONKSİYONLAR
 # ─────────────────────────────────────────────
-SKIN_ONE_HOT = {
-    "dry":         {"skin_dry": 1, "skin_oily": 0, "skin_combination": 0, "skin_normal": 0},
-    "oily":        {"skin_dry": 0, "skin_oily": 1, "skin_combination": 0, "skin_normal": 0},
-    "combination": {"skin_dry": 0, "skin_oily": 0, "skin_combination": 1, "skin_normal": 0},
-    "normal":      {"skin_dry": 0, "skin_oily": 0, "skin_combination": 0, "skin_normal": 1},
-}
-
-
 def get_product_row(sephora_product_id: str) -> pd.Series:
     """O(1) ürün satırı erişimi — pandas mask yerine önceden oluşturulmuş index."""
     idx = _product_index.get(sephora_product_id)
     if idx is None:
         raise HTTPException(status_code=404, detail=f"Ürün bulunamadı: {sephora_product_id}")
     return product_df.iloc[idx]
+
+
+def find_matching_allergens(ingredients_text: str, user_allergies: list[str]) -> list[str]:
+    """
+    Ürünün ingredients metni içinde kullanıcının allergen listesinden geçenleri döner.
+    Substring match (case-insensitive) — "fragrance" "fragrance oil"u da yakalar.
+    Boş list = ürün güvenli.
+    """
+    if not ingredients_text or not user_allergies:
+        return []
+    text = ingredients_text.lower()
+    matched = []
+    for allergen in user_allergies:
+        a = allergen.strip().lower()
+        if a and a in text:
+            matched.append(a)
+    return matched
+
+
+def filter_by_allergens(df: pd.DataFrame, user_allergies: list[str]) -> pd.DataFrame:
+    """
+    DataFrame'den kullanıcının allergen'ini ingredients metninde içeren ürünleri çıkarır.
+    ingredients_text kolonu yoksa veya allergies boşsa orijinal df döner.
+    """
+    if not user_allergies or "ingredients_text" not in df.columns:
+        return df
+    allergens_lower = [a.strip().lower() for a in user_allergies if a.strip()]
+    if not allergens_lower:
+        return df
+    # Tek regex ile hepsini kontrol et — substring OR
+    import re
+    pattern = "|".join(re.escape(a) for a in allergens_lower)
+    mask = ~df["ingredients_text"].str.contains(pattern, regex=True, na=False)
+    return df[mask]
 
 
 def build_scoring_input(
@@ -333,14 +510,31 @@ def build_scoring_input(
     return pd.DataFrame([row])[SCORING_FEATURES]
 
 
+def _trace_span(name: str):
+    """OpenTelemetry varsa span aç, yoksa no-op context manager döner."""
+    if _otel_tracer is not None:
+        return _otel_tracer.start_as_current_span(name)
+    from contextlib import nullcontext
+    return nullcontext()
+
+
 def _score_single(
     product: pd.Series,
     user: UserProfile,
     is_recommended: Optional[float] = None,
 ) -> dict:
-    x = build_scoring_input(product, user, is_recommended)
-    personal_score = float(np.clip(xgb_model.predict(x)[0], 1, 10))
+    with _trace_span("xgb.predict"):
+        x = build_scoring_input(product, user, is_recommended)
+        personal_score = float(np.clip(xgb_model.predict(x)[0], 1, 10))
     base_score     = float(product.get("base_score", personal_score))
+
+    # Allergen text matching — ürün kullanıcı için tehlikeli mi?
+    allergen_matches: list[str] = []
+    if user.allergies and "ingredients_text" in product.index:
+        ing_text = product.get("ingredients_text", "")
+        if isinstance(ing_text, str) and ing_text:
+            allergen_matches = find_matching_allergens(ing_text, user.allergies)
+
     return {
         "product_id":     str(product["product_id"]),
         "product_name":   product["product_name"],
@@ -348,6 +542,7 @@ def _score_single(
         "base_score":     round(base_score, 1),
         "personal_score": round(personal_score, 1),
         "skin_type":      user.skin_type,
+        "allergen_warnings": allergen_matches,  # Boş list = güvenli
     }
 
 
@@ -373,12 +568,15 @@ def metrics():
     with _cache_lock:
         cache_size = len(_explain_cache)
     with _counts_lock:
-        hits   = _cache_hits
-        misses = _cache_misses
+        hits        = _cache_hits
+        misses      = _cache_misses
+        llm_calls   = _llm_calls
+        llm_errors  = _llm_errors
         req_snapshot = dict(_request_counts)
 
     total_explain = hits + misses
     hit_rate = round(hits / total_explain * 100, 1) if total_explain > 0 else 0.0
+    llm_error_rate = round(llm_errors / llm_calls * 100, 1) if llm_calls > 0 else 0.0
 
     return {
         "uptime_seconds":    round(time.time() - _startup_time, 1),
@@ -389,6 +587,13 @@ def metrics():
             "hits":       hits,
             "misses":     misses,
             "hit_rate_pct": hit_rate,
+        },
+        "llm": {
+            "provider":       LLM_PROVIDER,
+            "model":          llm_model,
+            "calls":          llm_calls,
+            "errors":         llm_errors,
+            "error_rate_pct": llm_error_rate,
         },
         "request_counts": req_snapshot,
         "model": {
@@ -403,7 +608,8 @@ def metrics():
 # ENDPOINT — POST /score
 # ─────────────────────────────────────────────
 @app.post("/score", dependencies=[Depends(verify_internal_key)])
-def score(req: ScoreRequest):
+@limiter.limit(SCORE_RATE_LIMIT)
+async def score(request: Request, req: ScoreRequest):
     """
     Bir ürünün base ve kişiselleştirilmiş puanını döner.
 
@@ -411,46 +617,50 @@ def score(req: ScoreRequest):
     tavsiye oranı (UserProductRating.wouldRecommend ortalaması) gönderilebilir.
     """
     product = get_product_row(req.sephora_product_id)
-    return _score_single(product, req.user, req.is_recommended)
+    return await asyncio.to_thread(_score_single, product, req.user, req.is_recommended)
 
 
 # ─────────────────────────────────────────────
 # ENDPOINT — POST /score/batch
 # ─────────────────────────────────────────────
-@app.post("/score/batch", dependencies=[Depends(verify_internal_key)])
-def score_batch(req: BatchScoreRequest):
-    """Tek çağrıda birden fazla ürünü puanlar (maks 50)."""
+def _score_batch_sync(product_ids: list[str], user: "UserProfile", is_recommended: Optional[float]) -> dict:
     results, errors = [], []
-    for pid in req.sephora_product_ids:
+    for pid in product_ids:
         idx = _product_index.get(pid)
         if idx is None:
             errors.append({"product_id": pid, "error": "Ürün bulunamadı"})
         else:
             try:
-                results.append(_score_single(product_df.iloc[idx], req.user, req.is_recommended))
+                results.append(_score_single(product_df.iloc[idx], user, is_recommended))
             except Exception as exc:
                 errors.append({"product_id": pid, "error": str(exc)})
     return {"results": results, "errors": errors}
 
 
+@app.post("/score/batch", dependencies=[Depends(verify_internal_key)])
+@limiter.limit(SCORE_RATE_LIMIT)
+async def score_batch(request: Request, req: BatchScoreRequest):
+    """Tek çağrıda birden fazla ürünü puanlar (maks 50)."""
+    return await asyncio.to_thread(
+        _score_batch_sync, req.sephora_product_ids, req.user, req.is_recommended
+    )
+
+
 # ─────────────────────────────────────────────
 # ENDPOINT — POST /recommend
 # ─────────────────────────────────────────────
-@app.post("/recommend", dependencies=[Depends(verify_internal_key)])
-def recommend(req: RecommendRequest):
-    """
-    Kullanıcı profiline KNN ile en uygun ürünleri önerir.
-    Kategori filtresi opsiyoneldir.
-    """
+def _recommend_sync(req: "RecommendRequest") -> dict:
     skin        = SKIN_ONE_HOT[req.user.skin_type]
     user_vector = {f: 0.0 for f in KNN_FEATURES}
+    # "Ortalama kullanıcı" referansı — keyfi sabit yerine dataset median'ları
+    # banned_count ve penalty_score için 0 (kullanıcı tehlikesiz ürün ister)
     user_vector.update({
-        "ingredient_count": 20,
+        "ingredient_count": _dataset_medians.get("ingredient_count", 20),
         "banned_count":     0,
         "restricted_count": 0,
         "penalty_score":    0,
-        "rating":           4.5,
-        "price_usd":        35.0,
+        "rating":           _dataset_medians.get("rating",   4.5),
+        "price_usd":        _dataset_medians.get("price_usd", 35.0),
     })
 
     skin_type = req.user.skin_type
@@ -468,7 +678,9 @@ def recommend(req: RecommendRequest):
     if req.user.allergies:
         user_vector["penalty_score"] = 0
 
+    # Kategori filtresi
     filtered = product_df
+    has_category_filter = bool(req.category or req.secondary_category)
     if req.category:
         filtered = filtered[filtered["primary_category"] == req.category]
     if req.secondary_category:
@@ -477,13 +689,50 @@ def recommend(req: RecommendRequest):
     if filtered.empty:
         raise HTTPException(status_code=404, detail="Bu kategoride ürün bulunamadı.")
 
-    knn_data_scaled = scaler.transform(filtered[KNN_FEATURES].fillna(0))
-    user_scaled     = scaler.transform(pd.DataFrame([user_vector])[KNN_FEATURES])
+    # Alerjisi olan kullanıcı için 3 katmanlı filtre:
+    # (1) Ingredients text içinde allergen geçen ürünleri tamamen çıkar (en sıkı)
+    # (2) banned=0 + restricted=0 (CosIng tabanlı)
+    # (3) Sadece banned=0; yetmezse penalty median altı (son çare)
+    has_allergy_filter = False
+    if req.user.allergies:
+        # (1) Text-level match — kesin tehlike
+        text_safe = filter_by_allergens(filtered, req.user.allergies)
+        if len(text_safe) >= req.top_k:
+            filtered = text_safe
+            has_allergy_filter = True
+        else:
+            # (2) CosIng strict
+            strict = filtered[
+                (filtered["banned_count"] == 0) & (filtered["restricted_count"] == 0)
+            ]
+            if len(strict) >= req.top_k:
+                filtered = strict
+                has_allergy_filter = True
+            else:
+                # (3) banned=0 → penalty median altı
+                safe = filtered[filtered["banned_count"] == 0]
+                if len(safe) >= req.top_k:
+                    filtered = safe
+                    has_allergy_filter = True
+                elif "penalty_score" in filtered.columns and not filtered.empty:
+                    med = filtered["penalty_score"].median()
+                    low = filtered[filtered["penalty_score"] <= med]
+                    if len(low) >= req.top_k:
+                        filtered = low
+                        has_allergy_filter = True
 
-    k        = min(req.top_k, len(filtered))
-    knn_temp = NearestNeighbors(n_neighbors=k, metric="cosine", algorithm="brute")
-    knn_temp.fit(knn_data_scaled)
-    distances, indices = knn_temp.kneighbors(user_scaled)
+    user_scaled = scaler.transform(pd.DataFrame([user_vector])[KNN_FEATURES])
+
+    # Kategori veya alerji filtresi yoksa önceden fit edilmiş knn_model'i kullan
+    if not has_category_filter and not has_allergy_filter:
+        k = min(req.top_k, len(product_df))
+        distances, indices = knn_model.kneighbors(user_scaled, n_neighbors=k)
+    else:
+        knn_data_scaled = scaler.transform(filtered[KNN_FEATURES].fillna(0))
+        k = min(req.top_k, len(filtered))
+        knn_temp = NearestNeighbors(n_neighbors=k, metric="cosine", algorithm="brute")
+        knn_temp.fit(knn_data_scaled)
+        distances, indices = knn_temp.kneighbors(user_scaled)
 
     results = []
     for local_idx, dist in zip(indices[0], distances[0]):
@@ -504,6 +753,16 @@ def recommend(req: RecommendRequest):
         "category_filter": req.secondary_category or req.category or "Tümü",
         "recommendations": results,
     }
+
+
+@app.post("/recommend", dependencies=[Depends(verify_internal_key)])
+@limiter.limit(RECOMMEND_RATE_LIMIT)
+async def recommend(request: Request, req: RecommendRequest):
+    """
+    Kullanıcı profiline KNN ile en uygun ürünleri önerir.
+    Kategori filtresi opsiyoneldir.
+    """
+    return await asyncio.to_thread(_recommend_sync, req)
 
 
 # ─────────────────────────────────────────────
@@ -609,35 +868,46 @@ def _build_llm_prompt(
     )
 
 
-def _call_llm(prompt: str, cache_key: str) -> tuple[str, bool]:
-    """LLM çağrısı. (yanıt, cache'den_mi) döner."""
+def _call_llm(prompt: str, cache_key: str) -> tuple[str, bool, bool]:
+    """LLM çağrısı. (yanıt, cache_hit, llm_error) döner. Hata durumunda cache'lenmez."""
     cached = _cache_get(cache_key)
     if cached is not None:
         _inc_cache_hit()
-        return cached, True
+        return cached, True, False
 
     _inc_cache_miss()
+    _inc_llm_call()
     try:
-        response = llm_client.chat.completions.create(
-            model=llm_model,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=200,
-            temperature=0.7,
-        )
-        text = response.choices[0].message.content.strip()
+        with _trace_span("llm.chat.completions"):
+            response = llm_client.chat.completions.create(
+                model=llm_model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=200,
+                temperature=0.7,
+            )
+        if not response or not response.choices:
+            raise ValueError("LLM returned empty response")
+        message = response.choices[0].message
+        content = getattr(message, "content", None)
+        if content is None:
+            raise ValueError("LLM returned null content")
+        text = content.strip()
+        if not text:
+            raise ValueError("LLM returned empty content")
+        _cache_set(cache_key, text)  # Sadece başarılı yanıt cache'lenir
+        return text, False, False
     except Exception as exc:
+        _inc_llm_error()
         logger.error(f"LLM hatası: {exc}")
-        text = f"LLM hatası: {exc}"
-
-    _cache_set(cache_key, text)
-    return text, False
+        return f"LLM hatası: {exc}", False, True
 
 
 # ─────────────────────────────────────────────
 # ENDPOINT — POST /explain
 # ─────────────────────────────────────────────
 @app.post("/explain", dependencies=[Depends(verify_internal_key)])
-def explain(req: ExplainRequest):
+@limiter.limit(EXPLAIN_RATE_LIMIT)
+async def explain(request: Request, req: ExplainRequest):
     """
     SHAP ile puanı etkileyen faktörleri hesaplar,
     LLM (Ollama / OpenAI) ile kullanıcıya doğal dilde açıklar.
@@ -648,17 +918,20 @@ def explain(req: ExplainRequest):
     product = get_product_row(req.sephora_product_id)
     x       = build_scoring_input(product, req.user, req.is_recommended)
 
-    personal_score = float(np.clip(xgb_model.predict(x)[0], 1, 10))
-    base_score     = float(product.get("base_score", personal_score))
+    # CPU-bound XGBoost + SHAP: thread pool'a al
+    def _predict_and_shap():
+        ps = float(np.clip(xgb_model.predict(x)[0], 1, 10))
+        sv = shap_explainer(x)
+        return ps, sv.values[0]
 
-    shap_values = shap_explainer(x)
-    effects     = shap_values.values[0]
+    personal_score, effects = await asyncio.to_thread(_predict_and_shap)
+    base_score = float(product.get("base_score", personal_score))
 
     lang = req.language if req.language in ("tr", "en") else "tr"
 
     factors = []
     for feat, effect in zip(SCORING_FEATURES, effects):
-        if abs(effect) > 0.01:
+        if abs(effect) > SHAP_EFFECT_THRESHOLD:
             direction = (
                 ("INCREASES" if effect > 0 else "DECREASES")
                 if lang == "en"
@@ -686,7 +959,9 @@ def explain(req: ExplainRequest):
         top_factors=factors,
         language=lang,
     )
-    explanation, was_cached = _call_llm(prompt, cache_key)
+    explanation, was_cached, llm_error = await asyncio.to_thread(
+        _call_llm, prompt, cache_key
+    )
 
     return {
         "product_id":     req.sephora_product_id,
@@ -697,4 +972,147 @@ def explain(req: ExplainRequest):
         "shap_factors":   factors[:10],
         "explanation":    explanation,
         "cached":         was_cached,
+        "llm_error":      llm_error,
     }
+
+
+# ─────────────────────────────────────────────
+# ENDPOINT — POST /explain/stream  (Server-Sent Events)
+# ─────────────────────────────────────────────
+def _build_explain_context(req: ExplainRequest) -> dict:
+    """SHAP + scoring + cache key — sync hesaplama, streaming başlamadan önce."""
+    product = get_product_row(req.sephora_product_id)
+    x       = build_scoring_input(product, req.user, req.is_recommended)
+    personal_score = float(np.clip(xgb_model.predict(x)[0], 1, 10))
+    base_score     = float(product.get("base_score", personal_score))
+    shap_values = shap_explainer(x)
+    effects     = shap_values.values[0]
+
+    lang = req.language if req.language in ("tr", "en") else "tr"
+    factors = []
+    for feat, effect in zip(SCORING_FEATURES, effects):
+        if abs(effect) > SHAP_EFFECT_THRESHOLD:
+            direction = (
+                ("INCREASES" if effect > 0 else "DECREASES")
+                if lang == "en"
+                else ("ARTIRAN" if effect > 0 else "DUSUREN")
+            )
+            factors.append({
+                "feature":   feat,
+                "effect":    round(float(effect), 3),
+                "direction": direction,
+            })
+    factors.sort(key=lambda f: abs(f["effect"]), reverse=True)
+
+    allergies_key = "_".join(sorted(req.user.allergies))
+    cache_key     = hashlib.md5(
+        f"{req.sephora_product_id}|{req.user.skin_type}|{req.user.has_acne}"
+        f"|{allergies_key}|{req.is_recommended}|{lang}".encode()
+    ).hexdigest()
+
+    prompt = _build_llm_prompt(
+        product_name=product["product_name"],
+        base_score=base_score,
+        personal_score=personal_score,
+        skin_type=req.user.skin_type,
+        has_acne=req.user.has_acne,
+        top_factors=factors,
+        language=lang,
+    )
+    return {
+        "product_id":     req.sephora_product_id,
+        "product_name":   product["product_name"],
+        "base_score":     round(base_score, 1),
+        "personal_score": round(personal_score, 1),
+        "language":       lang,
+        "shap_factors":   factors[:10],
+        "prompt":         prompt,
+        "cache_key":      cache_key,
+    }
+
+
+@app.post("/explain/stream", dependencies=[Depends(verify_internal_key)])
+@limiter.limit(EXPLAIN_RATE_LIMIT)
+async def explain_stream(request: Request, req: ExplainRequest):
+    """
+    Server-Sent Events (SSE) ile /explain'in streaming versiyonu.
+    SHAP ve metadata anında, LLM açıklaması token-by-token akışla gelir.
+    Latency: TTFB ~300ms (SHAP), tam yanıt ~30sn (Ollama).
+
+    Event tipleri:
+      - meta       : product info + shap_factors (cache hit'te tek event'de tüm açıklamayla)
+      - token      : LLM'den gelen kısmi metin parçası
+      - done       : Stream tamamlandı (final flag'ler: cached, llm_error)
+    """
+    ctx = await asyncio.to_thread(_build_explain_context, req)
+
+    async def event_generator():
+        # 1) Meta + SHAP (anında)
+        meta = {
+            "type": "meta",
+            "product_id":     ctx["product_id"],
+            "product_name":   ctx["product_name"],
+            "base_score":     ctx["base_score"],
+            "personal_score": ctx["personal_score"],
+            "language":       ctx["language"],
+            "shap_factors":   ctx["shap_factors"],
+        }
+        yield f"data: {json.dumps(meta, ensure_ascii=False)}\n\n"
+
+        # 2) Cache hit'te streaming yapmadan tek seferde dön
+        cached = _cache_get(ctx["cache_key"])
+        if cached is not None:
+            _inc_cache_hit()
+            yield f"data: {json.dumps({'type': 'token', 'text': cached}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'done', 'cached': True, 'llm_error': False}, ensure_ascii=False)}\n\n"
+            return
+
+        # 3) Cache miss → LLM streaming
+        _inc_cache_miss()
+        _inc_llm_call()
+        full_text_parts: list[str] = []
+        llm_error = False
+
+        def _open_stream():
+            return llm_client.chat.completions.create(
+                model=llm_model,
+                messages=[{"role": "user", "content": ctx["prompt"]}],
+                max_tokens=200,
+                temperature=0.7,
+                stream=True,
+            )
+
+        try:
+            stream = await asyncio.to_thread(_open_stream)
+            for chunk in stream:
+                try:
+                    delta = chunk.choices[0].delta
+                    piece = getattr(delta, "content", None)
+                    if piece:
+                        full_text_parts.append(piece)
+                        yield f"data: {json.dumps({'type': 'token', 'text': piece}, ensure_ascii=False)}\n\n"
+                except (IndexError, AttributeError):
+                    continue
+        except Exception as exc:
+            _inc_llm_error()
+            llm_error = True
+            logger.error(f"LLM stream hatası: {exc}")
+            err_text = f"LLM hatası: {exc}"
+            yield f"data: {json.dumps({'type': 'token', 'text': err_text}, ensure_ascii=False)}\n\n"
+
+        # 4) Cache'le (sadece başarılı yanıt)
+        if not llm_error:
+            full_text = "".join(full_text_parts).strip()
+            if full_text:
+                _cache_set(ctx["cache_key"], full_text)
+
+        yield f"data: {json.dumps({'type': 'done', 'cached': False, 'llm_error': llm_error}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # nginx buffering kapalı
+        },
+    )

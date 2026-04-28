@@ -82,7 +82,7 @@ def _build_payload(row: pd.Series) -> dict:
 
     # Opsiyonel alanlar — CSV'de varsa ekle
     if "price_usd" in row.index and not pd.isna(row["price_usd"]):
-        payload["priceUsd"] = round(float(row["price_usd"]), 2)
+        payload["price"] = round(float(row["price_usd"]), 2)
     if "category" in row.index and not pd.isna(row["category"]):
         payload["category"] = str(row["category"]).strip()
     if "secondary_category" in row.index and not pd.isna(row["secondary_category"]):

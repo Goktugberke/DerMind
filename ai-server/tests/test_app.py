@@ -133,6 +133,13 @@ def client():
 
     import app as ai_app
 
+    # KNN mock: her zaman ilk 3 ürünü döndür
+    mock_knn = MagicMock()
+    mock_knn.kneighbors.return_value = (
+        np.array([[0.1, 0.2, 0.3]]),
+        np.array([[0, 1, 2]]),
+    )
+
     with (
         patch.object(ai_app, "CONFIG",           mock_cfg),
         patch.object(ai_app, "SCORING_FEATURES", _SCORING_FEATURES),
@@ -140,9 +147,10 @@ def client():
         patch.object(ai_app, "xgb_model",        mock_xgb),
         patch.object(ai_app, "shap_explainer",   mock_shap_explainer),
         patch.object(ai_app, "scaler",            mock_scaler),
-        patch.object(ai_app, "knn_model",         MagicMock()),
+        patch.object(ai_app, "knn_model",         mock_knn),
         patch.object(ai_app, "product_df",        mock_df),
         patch.object(ai_app, "_product_index",    {f"P00000{i+1}": i for i in range(5)}),
+        patch.object(ai_app, "_dataset_medians",  {"ingredient_count": 20.0, "rating": 4.5, "price_usd": 35.0}),
         patch.object(ai_app, "llm_client",        mock_llm_client),
         patch.object(ai_app, "_startup_time",     0.0),
     ):
@@ -407,3 +415,271 @@ class TestExplain:
             assert "effect"    in factor
             assert "direction" in factor
             assert isinstance(factor["effect"], float)
+
+
+# ─────────────────────────────────────────────
+# BUSINESS INVARIANTS  —  model davranışı testleri
+# ─────────────────────────────────────────────
+
+class TestBusinessInvariants:
+    """Mock'lar üzerinden iş kuralı testleri (deterministik input → beklenen output)."""
+
+    def test_score_input_includes_skin_one_hot(self, client):
+        """Yağlı cilt input'unda skin_oily=1, diğerleri 0 olmalı."""
+        import app as ai_app
+        ai_app.xgb_model.predict.reset_mock()
+
+        client.post("/score", json={
+            "sephora_product_id": "P000001",
+            "user": {"skin_type": "oily", "has_acne": False, "allergies": []},
+        })
+
+        # predict çağrıldığında ilk argüman (DataFrame) skin_oily=1, diğer skin_*=0 içermeli
+        called_input = ai_app.xgb_model.predict.call_args[0][0]
+        assert called_input["skin_oily"].iloc[0] == 1
+        assert called_input["skin_dry"].iloc[0] == 0
+        assert called_input["skin_combination"].iloc[0] == 0
+        assert called_input["skin_normal"].iloc[0] == 0
+
+    def test_allergies_increase_penalty_score(self, client):
+        """Alerjisi olan kullanıcının input'unda penalty_score artmış olmalı."""
+        import app as ai_app
+        ai_app.xgb_model.predict.reset_mock()
+
+        # Alerjisiz baseline
+        client.post("/score", json={
+            "sephora_product_id": "P000001",
+            "user": {"skin_type": "dry", "has_acne": False, "allergies": []},
+        })
+        no_allergy_input = ai_app.xgb_model.predict.call_args[0][0]
+        baseline_penalty = float(no_allergy_input["penalty_score"].iloc[0])
+
+        # 3 alerjili
+        client.post("/score", json={
+            "sephora_product_id": "P000001",
+            "user": {"skin_type": "dry", "has_acne": False, "allergies": ["a", "b", "c"]},
+        })
+        allergy_input = ai_app.xgb_model.predict.call_args[0][0]
+        with_penalty = float(allergy_input["penalty_score"].iloc[0])
+
+        # Her alerji +3 penalty ekliyor
+        assert with_penalty >= baseline_penalty + 3 * 3
+
+    def test_allergies_increase_banned_count(self, client):
+        """Alerjisi olan kullanıcının input'unda banned_count artmış olmalı."""
+        import app as ai_app
+        ai_app.xgb_model.predict.reset_mock()
+
+        client.post("/score", json={
+            "sephora_product_id": "P000001",
+            "user": {"skin_type": "dry", "has_acne": False, "allergies": ["paraben", "sls"]},
+        })
+        called_input = ai_app.xgb_model.predict.call_args[0][0]
+        assert float(called_input["banned_count"].iloc[0]) >= 2
+
+    def test_is_recommended_passed_to_model(self, client):
+        """Backend'den gelen is_recommended değeri input'a yansımalı."""
+        import app as ai_app
+        ai_app.xgb_model.predict.reset_mock()
+
+        client.post("/score", json={
+            "sephora_product_id": "P000001",
+            "user": {"skin_type": "normal", "has_acne": False, "allergies": []},
+            "is_recommended": 0.85,
+        })
+        called_input = ai_app.xgb_model.predict.call_args[0][0]
+        assert abs(float(called_input["is_recommended"].iloc[0]) - 0.85) < 1e-6
+
+    def test_is_recommended_default_neutral(self, client):
+        """is_recommended verilmezse 0.5 (nötr) kullanılmalı."""
+        import app as ai_app
+        ai_app.xgb_model.predict.reset_mock()
+
+        client.post("/score", json={
+            "sephora_product_id": "P000001",
+            "user": {"skin_type": "normal", "has_acne": False, "allergies": []},
+        })
+        called_input = ai_app.xgb_model.predict.call_args[0][0]
+        assert abs(float(called_input["is_recommended"].iloc[0]) - 0.5) < 1e-6
+
+    def test_personal_score_clipped_to_valid_range(self, client):
+        """personal_score her zaman [1, 10] aralığında olmalı."""
+        r = client.post("/score", json={
+            "sephora_product_id": "P000001",
+            "user": {"skin_type": "dry", "has_acne": False, "allergies": []},
+        })
+        assert r.status_code == 200
+        body = r.json()
+        assert 1.0 <= body["personal_score"] <= 10.0
+
+    def test_recommend_uses_pretrained_knn_when_no_filter(self, client):
+        """Kategori/alerji filtresi yoksa pre-fitted knn_model kullanılmalı (refit yok)."""
+        import app as ai_app
+        ai_app.knn_model.kneighbors.reset_mock()
+
+        r = client.post("/recommend", json={
+            "user": {"skin_type": "dry", "has_acne": False, "allergies": []},
+            "top_k": 3,
+        })
+        assert r.status_code == 200
+        # Pre-fitted model çağrılmış olmalı
+        assert ai_app.knn_model.kneighbors.called
+
+    def test_recommend_dry_skin_prefers_dry_features(self, client):
+        """Kuru cilt user_vector'unda good_for_dry > 0 olmalı."""
+        import app as ai_app
+        ai_app.scaler.transform.reset_mock()
+
+        client.post("/recommend", json={
+            "user": {"skin_type": "dry", "has_acne": False, "allergies": []},
+            "top_k": 3,
+        })
+        # scaler.transform en az iki kez çağrıldı; user_vector son çağrıda
+        # En son çağrı user vektörü olur (KNN data'dan sonra) — ama no-filter durumunda
+        # sadece user_scaled için bir çağrı var. Her durumda user_vector good_for_dry içermeli.
+        all_calls = ai_app.scaler.transform.call_args_list
+        # User vector tek satırlı DataFrame olarak gelir
+        user_calls = [c for c in all_calls if hasattr(c[0][0], "shape") and c[0][0].shape[0] == 1]
+        assert len(user_calls) > 0
+        user_df = user_calls[0][0][0]
+        assert user_df["good_for_dry"].iloc[0] > 0
+
+    def test_recommend_acne_user_prefers_acne_features(self, client):
+        """has_acne=True user_vector'da good_for_acne > 0 olmalı."""
+        import app as ai_app
+        ai_app.scaler.transform.reset_mock()
+
+        client.post("/recommend", json={
+            "user": {"skin_type": "oily", "has_acne": True, "allergies": []},
+            "top_k": 3,
+        })
+        all_calls = ai_app.scaler.transform.call_args_list
+        user_calls = [c for c in all_calls if hasattr(c[0][0], "shape") and c[0][0].shape[0] == 1]
+        assert len(user_calls) > 0
+        user_df = user_calls[0][0][0]
+        assert user_df["good_for_acne"].iloc[0] > 0
+
+    def test_llm_error_not_cached(self, client):
+        """LLM hatası cache'lenmemeli — ikinci çağrıda yeniden denemeli."""
+        import app as ai_app
+        ai_app.llm_client.chat.completions.create.side_effect = RuntimeError("LLM down")
+        # Cache temizliği
+        ai_app._explain_cache.clear()
+
+        payload = {
+            "sephora_product_id": "P000001",
+            "user": {"skin_type": "dry", "has_acne": False, "allergies": []},
+            "language": "tr",
+        }
+        r1 = client.post("/explain", json=payload)
+        r2 = client.post("/explain", json=payload)
+
+        # Mock side_effect'i geri al
+        ai_app.llm_client.chat.completions.create.side_effect = None
+
+        # Her iki çağrıda llm_error=True ve cached=False olmalı
+        assert r1.status_code == 200
+        assert r2.status_code == 200
+        assert r1.json()["llm_error"] is True
+        assert r2.json()["llm_error"] is True
+        assert r2.json()["cached"] is False
+
+    def test_metrics_tracks_llm_errors(self, client):
+        """Metrics endpoint LLM hata sayacı içermeli."""
+        body = client.get("/metrics").json()
+        assert "llm" in body
+        assert "errors" in body["llm"]
+        assert "calls" in body["llm"]
+        assert "error_rate_pct" in body["llm"]
+
+
+# ─────────────────────────────────────────────
+# COLD-START SENARYOLARI  —  yeni kullanıcı, hiç rating yok
+# ─────────────────────────────────────────────
+
+class TestColdStart:
+    """
+    Cold-start: kullanıcı sisteme yeni katılmış, hiç UserProductRating yok.
+    Backend `is_recommended=null` gönderir → AI server 0.5 (nötr) kullanmalı,
+    ama puanlama yine çalışmalı (model eğitiminde 0.5 ile pretrain edildi).
+    """
+
+    BASE_USER = {"skin_type": "normal", "has_acne": False, "allergies": []}
+
+    def test_score_without_is_recommended(self, client):
+        """is_recommended verilmezse 200 dönmeli ve geçerli puan üretmeli."""
+        r = client.post("/score", json={
+            "sephora_product_id": "P000001",
+            "user": self.BASE_USER,
+        })
+        assert r.status_code == 200
+        body = r.json()
+        assert 1.0 <= body["personal_score"] <= 10.0
+        assert 1.0 <= body["base_score"] <= 10.0
+
+    def test_score_with_explicit_null_is_recommended(self, client):
+        """is_recommended=null açıkça gönderilirse de 200 dönmeli."""
+        r = client.post("/score", json={
+            "sephora_product_id": "P000001",
+            "user": self.BASE_USER,
+            "is_recommended": None,
+        })
+        assert r.status_code == 200
+
+    def test_recommend_no_filters_no_history(self, client):
+        """Cold-start kullanıcı için /recommend filtre olmadan çalışmalı (default top_k)."""
+        r = client.post("/recommend", json={"user": self.BASE_USER})
+        assert r.status_code == 200
+        body = r.json()
+        assert "recommendations" in body
+        assert len(body["recommendations"]) > 0  # En az bir öneri dönmeli
+
+    def test_recommend_uses_dataset_medians_for_unknown_user(self, client):
+        """
+        Cold-start user vector dataset median'larını kullanmalı (hardcoded sabit değil).
+        Test: scaler.transform'a giden user vector'ün rating ve price_usd'si patch edilen
+        median değerleriyle eşleşmeli.
+        """
+        import app as ai_app
+        ai_app.scaler.transform.reset_mock()
+
+        client.post("/recommend", json={"user": self.BASE_USER, "top_k": 3})
+
+        all_calls = ai_app.scaler.transform.call_args_list
+        user_calls = [c for c in all_calls if hasattr(c[0][0], "shape") and c[0][0].shape[0] == 1]
+        assert len(user_calls) > 0
+        user_df = user_calls[0][0][0]
+        # _dataset_medians fixture'da {"ingredient_count": 20.0, "rating": 4.5, "price_usd": 35.0}
+        assert abs(float(user_df["rating"].iloc[0]) - 4.5) < 1e-6
+        assert abs(float(user_df["price_usd"].iloc[0]) - 35.0) < 1e-6
+
+    def test_score_batch_cold_start(self, client):
+        """Yeni kullanıcı birden fazla ürünü cold-start ile puanlayabilmeli."""
+        r = client.post("/score/batch", json={
+            "sephora_product_ids": ["P000001", "P000002", "P000003"],
+            "user": self.BASE_USER,
+        })
+        assert r.status_code == 200
+        body = r.json()
+        assert len(body["results"]) == 3
+        assert all(1.0 <= res["personal_score"] <= 10.0 for res in body["results"])
+
+    def test_explain_cold_start_falls_back_gracefully(self, client):
+        """LLM down + cold-start kullanıcısı için /explain crash etmemeli."""
+        import app as ai_app
+        ai_app.llm_client.chat.completions.create.side_effect = RuntimeError("down")
+        ai_app._explain_cache.clear()
+
+        r = client.post("/explain", json={
+            "sephora_product_id": "P000001",
+            "user": self.BASE_USER,
+            "language": "tr",
+        })
+        ai_app.llm_client.chat.completions.create.side_effect = None
+
+        assert r.status_code == 200
+        body = r.json()
+        # SHAP çalışmalı, sadece LLM açıklaması hata mesajı içersin
+        assert "shap_factors" in body
+        assert body["llm_error"] is True
+        assert 1.0 <= body["personal_score"] <= 10.0
