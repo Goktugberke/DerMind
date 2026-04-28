@@ -2,6 +2,7 @@ package com.dermind.DerMind.ai;
 
 import com.dermind.DerMind.ai.dto.*;
 import com.dermind.DerMind.ai.service.AiServerClient;
+import com.dermind.DerMind.error.AiServerUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,6 +16,7 @@ import org.springframework.web.client.RestTemplate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
 
@@ -27,7 +29,7 @@ class AiServerClientTest {
 
     @BeforeEach
     void setUp() {
-        client = new AiServerClient(restTemplate, "http://localhost:8000");
+        client = new AiServerClient(restTemplate, "http://localhost:8000", "");
     }
 
     // ── /score ─────────────────────────────────────────────────────────
@@ -63,18 +65,17 @@ class AiServerClientTest {
     }
 
     @Test
-    void score_aiServerUnreachable_returnsNull() {
+    void score_aiServerUnreachable_throwsAiServerUnavailableException() {
         when(restTemplate.exchange(anyString(), any(), any(), eq(AiScoreResponseDTO.class)))
                 .thenThrow(new ResourceAccessException("Connection refused"));
 
-        AiScoreResponseDTO result = client.score(
-                AiScoreRequestDTO.builder()
-                        .sephoraProductId("P123")
-                        .user(UserProfileDTO.builder().skinType("normal").allergies(List.of()).build())
-                        .build()
-        );
+        AiScoreRequestDTO request = AiScoreRequestDTO.builder()
+                .sephoraProductId("P123")
+                .user(UserProfileDTO.builder().skinType("normal").allergies(List.of()).build())
+                .build();
 
-        assertThat(result).isNull();
+        assertThatThrownBy(() -> client.score(request))
+                .isInstanceOf(AiServerUnavailableException.class);
     }
 
     // ── /recommend ─────────────────────────────────────────────────────
@@ -101,17 +102,16 @@ class AiServerClientTest {
     }
 
     @Test
-    void recommend_aiServerUnreachable_returnsNull() {
+    void recommend_aiServerUnreachable_throwsAiServerUnavailableException() {
         when(restTemplate.exchange(anyString(), any(), any(), eq(AiRecommendResponseDTO.class)))
                 .thenThrow(new ResourceAccessException("Connection refused"));
 
-        AiRecommendResponseDTO result = client.recommend(
-                AiRecommendRequestDTO.builder()
-                        .user(UserProfileDTO.builder().skinType("oily").allergies(List.of()).build())
-                        .build()
-        );
+        AiRecommendRequestDTO request = AiRecommendRequestDTO.builder()
+                .user(UserProfileDTO.builder().skinType("oily").allergies(List.of()).build())
+                .build();
 
-        assertThat(result).isNull();
+        assertThatThrownBy(() -> client.recommend(request))
+                .isInstanceOf(AiServerUnavailableException.class);
     }
 
     // ── /health ────────────────────────────────────────────────────────
