@@ -1,7 +1,7 @@
 # DerMind Backend
 
-Spring Boot tabanlı REST API — kullanıcı yönetimi, ürün kataloğu, satın alma, streak, bildirimler ve AI server proxy katmanı.  
-**Spring Boot 3.5 · PostgreSQL · OAuth2 (Google) · JPA · TestContainers**
+Spring Boot tabanlı REST API — kullanıcı yönetimi, ürün kataloğu, satın alma, streak, bildirim ve AI server proxy katmanı.
+**Spring Boot 3.5 · PostgreSQL · Firebase Auth · JPA · Bucket4j · Micrometer Tracing (OTel)**
 
 ---
 
@@ -14,36 +14,44 @@ Spring Boot tabanlı REST API — kullanıcı yönetimi, ürün kataloğu, satı
 5. [Ortam Değişkenleri](#ortam-değişkenleri)
 6. [API Endpointleri](#api-endpointleri)
 7. [AI Server Entegrasyonu](#ai-server-entegrasyonu)
-8. [Testler](#testler)
-9. [Proje Yapısı](#proje-yapısı)
+8. [Rate Limiting](#rate-limiting)
+9. [Distributed Tracing](#distributed-tracing-opentelemetry)
+10. [Testler](#testler)
+11. [Proje Yapısı](#proje-yapısı)
 
 ---
 
 ## Mimari
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      DerMind Sistemi                        │
-│                                                             │
-│  Mobil Uygulama                                             │
-│       │                                                     │
-│       ▼                                                     │
-│  Spring Boot Backend (:8080)                                │
-│  ├── UserController         → /api/users                   │
-│  ├── ProductController      → /api/products                │
-│  ├── AiController           → /api/ai  (proxy)             │
-│  ├── PurchaseController     → /api/purchases               │
-│  ├── StreakController       → /api/streaks                 │
-│  ├── NotificationController → /api/notifications           │
-│  └── UserProductRatingController → /api/ratings            │
-│       │                      │                             │
-│       ▼                      ▼                             │
-│  PostgreSQL (:5432)    AI Server (:8000)                    │
-│  (JPA/Hibernate)       (FastAPI — XGBoost/KNN/SHAP)        │
-└─────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                      DerMind Sistemi                          │
+│                                                               │
+│  Mobil Uygulama / Frontend                                    │
+│       │  Authorization: Bearer <Firebase ID Token>            │
+│       ▼                                                       │
+│  Spring Boot Backend (:8080)                                  │
+│  ├── FirebaseTokenFilter   → her istekte token doğrular       │
+│  ├── RateLimitFilter       → IP başı bucket (60 req/dk)       │
+│  ├── UserController        → /api/users                       │
+│  ├── ProductController     → /api/products  (paginated)       │
+│  ├── AiController          → /api/ai  (proxy + auth)          │
+│  ├── PurchaseController    → /api/purchases                   │
+│  ├── StreakController      → /api/streaks                     │
+│  ├── FavoriteController    → /api/favorites                   │
+│  ├── CartController        → /api/cart                        │
+│  ├── NotificationController → /api/notifications              │
+│  └── UserProductRatingController → /api/ratings               │
+│       │                      │                                │
+│       ▼                      ▼ X-Internal-Key                 │
+│  PostgreSQL (:5432)    AI Server (:8000)                      │
+│  (JPA/Hibernate)       (FastAPI — XGBoost/KNN/SHAP)           │
+└───────────────────────────────────────────────────────────────┘
 ```
 
-**Kimlik doğrulama:** Google OAuth2 / OIDC. Tüm `/api/**` endpointleri (hariç `/api/ai/health`) kimlik doğrulaması gerektirir.
+**Kimlik doğrulama:** Firebase ID token (Google login + email/şifre + telefon). Token `Authorization: Bearer <token>` header'ı ile gelir, `FirebaseTokenFilter` doğrular ve `SecurityContext`'e yerleştirir.
+
+**AI server entegrasyonu:** Backend, AI server'a `X-Internal-Key` shared secret ile gider. Frontend doğrudan AI server'ı çağıramaz — proxy üzerinden geçmek zorundadır (güvenlik açığı önlenir).
 
 ---
 
@@ -51,21 +59,13 @@ Spring Boot tabanlı REST API — kullanıcı yönetimi, ürün kataloğu, satı
 
 ### Docker Compose ile (önerilen)
 
-Tüm sistem — PostgreSQL, AI sunucusu, backend ve frontend — tek komutla ayağa kalkar:
-
 ```bash
-# Bu repo'nun backend/ klasöründe çalıştır
 cd backend
-
-# Ortam değişkenlerini hazırla
 cp .env.example .env
-# .env içinde POSTGRES_USER ve POSTGRES_PASSWORD'ü doldur
+# .env içinde POSTGRES_USER, POSTGRES_PASSWORD, AI_SERVER_INTERNAL_KEY doldur
 
-# Sistemi başlat
 docker compose up --build
 ```
-
-Başarılı başlangıçtan sonra:
 
 | Servis | URL |
 |--------|-----|
@@ -75,10 +75,9 @@ Başarılı başlangıçtan sonra:
 | AI Swagger | http://localhost:8000/docs |
 | Frontend | http://localhost:80 |
 
-Sistemi durdurmak için:
 ```bash
 docker compose down          # konteynerları durdur
-docker compose down -v       # konteynerları ve veri hacmini (DB) sil
+docker compose down -v       # konteynerları + DB hacmini sil
 ```
 
 ---
@@ -88,13 +87,13 @@ docker compose down -v       # konteynerları ve veri hacmini (DB) sil
 ### Gereksinimler
 
 - Java 21+
-- Maven 3.9+ (ya da projedeki `./mvnw` sarmalayıcısını kullan)
-- PostgreSQL 15+ (ya da Docker ile: `docker run -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:15`)
+- Maven 3.9+ (ya da `./mvnw`)
+- PostgreSQL 15+
+- Firebase projesi + service account JSON
 
 ### 1. PostgreSQL'i Hazırla
 
 ```bash
-# Docker ile hızlı başlat
 docker run -d \
   --name dermind-postgres \
   -e POSTGRES_USER=postgres \
@@ -104,54 +103,40 @@ docker run -d \
   postgres:15
 ```
 
-### 2. Google OAuth2 Kimlik Bilgilerini Ayarla
+### 2. Firebase Service Account
 
-[Google Cloud Console](https://console.cloud.google.com/apis/credentials)'a gir, OAuth 2.0 kimlik bilgisi oluştur.  
-İzin verilen yönlendirme URI: `http://localhost:8080/login/oauth2/code/google`
-
-`application.properties` dosyasını güncelle:
-
-```properties
-spring.security.oauth2.client.registration.google.client-id=GERCEK_CLIENT_ID
-spring.security.oauth2.client.registration.google.client-secret=GERCEK_CLIENT_SECRET
-```
+[Firebase Console](https://console.firebase.google.com/) → Project Settings → Service Accounts → "Generate new private key" → JSON dosyasını `backend/firebase-service-account.json` olarak kaydet (git'te ignore'lı).
 
 ### 3. Uygulamayı Başlat
 
 ```bash
-# Proje kökünden (backend/ klasörü)
 ./mvnw spring-boot:run
-
-# Ya da önce derle, sonra çalıştır
-./mvnw package -DskipTests
-java -jar target/DerMind-0.0.1-SNAPSHOT.jar
+# veya
+./mvnw package -DskipTests && java -jar target/DerMind-0.0.1-SNAPSHOT.jar
 ```
 
-Uygulama başladığında:
 ```
 Started DerMindApplication in X.XXX seconds
 ```
 
 ### 4. Veritabanı Şeması
 
-Uygulama `spring.jpa.hibernate.ddl-auto=update` ile ayarlıdır — tabloları otomatik oluşturur.  
-İlk başlangıçta `products`, `users`, `purchases`, `streaks`, `notifications`, `user_product_ratings` tabloları oluşur.
+Uygulama `spring.jpa.hibernate.ddl-auto=update` ile çalışır — tabloları otomatik oluşturur (`products`, `users`, `purchases`, `streaks`, `notifications`, `user_product_ratings`, `favorites`, `cart_items`).
 
-### 5. Ürünleri Yükle (isteğe bağlı)
-
-AI puanlama özelliği için ürünlerin `sephoraProductId` alanının dolu olması gerekir.  
-`ai-server/seed_products.py` ile CSV'deki 4.692 ürünü içeri aktarabilirsin:
+### 5. Ürünleri Yükle (isteğe bağlı, ama AI puanlama için zorunlu)
 
 ```bash
 cd ../ai-server
 python seed_products.py --backend-url http://localhost:8080
+# Önce dry-run
+python seed_products.py --dry-run
 ```
 
 ---
 
 ## Kurulum (Docker Compose)
 
-`compose.yaml` dosyası dört servisi yönetir:
+`compose.yaml` dört servisi yönetir:
 
 | Servis | Port | Bağımlılık |
 |--------|------|-----------|
@@ -160,8 +145,7 @@ python seed_products.py --backend-url http://localhost:8080
 | `backend` | 8080 | postgres (healthy) + ai-server (healthy) |
 | `frontend` | 80 | — |
 
-Backend, AI sunucusu hazır olmadan başlamaz (`depends_on: ai-server: condition: service_healthy`).  
-`AI_SERVER_URL=http://ai-server:8000` ortam değişkeni ile AI sunucusuna iç ağdan bağlanır.
+Backend, AI sunucusu hazır olmadan başlamaz (`depends_on: condition: service_healthy`). `AI_SERVER_URL=http://ai-server:8000` ortam değişkeni ile iç ağdan bağlanır.
 
 ### .env Dosyası
 
@@ -169,75 +153,92 @@ Backend, AI sunucusu hazır olmadan başlamaz (`depends_on: ai-server: condition
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=guclu_bir_sifre
 
-# Google OAuth2 (compose içinde backend'in ortam değişkenine enjekte edilir)
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
+# AI server ile shared secret — boş bırakılırsa auth devre dışı (development için OK)
+AI_SERVER_INTERNAL_KEY=ortak-gizli-anahtar
 ```
+
+> **Not:** `firebase-service-account.json` dosyası backend'in çalışma dizinine kopyalanmalı (Dockerfile bind mount kullanır).
 
 ---
 
 ## Ortam Değişkenleri
 
-`application.properties` içindeki değerler ortam değişkenleriyle geçersiz kılınabilir  
-(Spring Boot relaxed binding: `AI_SERVER_URL` → `ai.server.url`).
+Spring Boot relaxed binding: `AI_SERVER_URL` env → `ai.server.url` property.
 
 | Değişken | Varsayılan | Açıklama |
 |----------|-----------|---------|
-| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/dermind` | PostgreSQL bağlantı URL'i |
-| `SPRING_DATASOURCE_USERNAME` | `postgres` | DB kullanıcı adı |
-| `SPRING_DATASOURCE_PASSWORD` | `postgres` | DB şifresi |
+| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/dermind` | PostgreSQL URL |
+| `SPRING_DATASOURCE_USERNAME` | `postgres` | |
+| `SPRING_DATASOURCE_PASSWORD` | `postgres` | |
 | `AI_SERVER_URL` | `http://localhost:8000` | AI sunucusu adresi |
-| `SPRING_PROFILES_ACTIVE` | — | `dev` veya `prod` |
+| `AI_SERVER_INTERNAL_KEY` | — | AI server `INTERNAL_API_KEY` ile aynı olmalı |
+| `RATELIMIT_PRODUCT_DETAIL_REQUESTS_PER_MINUTE` | `60` | `GET /api/products/{id}` IP başı limit |
+| `MANAGEMENT_OTLP_TRACING_ENDPOINT` | — | Boş = tracing devre dışı |
+| `MANAGEMENT_TRACING_SAMPLING_PROBABILITY` | `1.0` | 0.0–1.0 |
 
 ---
 
 ## API Endpointleri
 
-Tüm endpointler `/api` prefix'i ile başlar. Swagger UI: `http://localhost:8080/swagger-ui.html`
+Swagger UI: `http://localhost:8080/swagger-ui.html`
 
 ### Kimlik Doğrulama
 
 | Endpoint | Auth | Açıklama |
 |----------|------|---------|
 | `GET /` | Hayır | Ana sayfa |
-| `GET /login` | Hayır | Google OAuth2 yönlendirmesi |
-| `GET /api/ai/health` | Hayır | AI sunucusu sağlık kontrolü |
-| Diğer tüm `/api/**` | **Gerekli** | Google OAuth2 ile giriş yapılmış olmalı |
+| `POST /api/users/firebase` | Hayır | Firebase token doğrulama + kullanıcı kaydı |
+| `POST /api/users` | Hayır | Manuel kayıt |
+| `GET /api/users/email/**` | Hayır | Email lookup |
+| `GET /api/products/**` | Hayır | Ürün listesi (anonim erişim) |
+| `GET /api/ratings/**` | Hayır | Public rating'ler |
+| `GET /api/ai/health` | Hayır | AI server sağlık kontrolü |
+| `GET /actuator/health` | Hayır | Backend sağlık |
+| Diğer tüm `/api/**` | **Bearer token** | Firebase ID token gerekli |
 
 ---
 
 ### Ürünler — `/api/products`
 
+Tüm liste endpointleri **paginated** (`Page<>`): `?page=0&size=20&sort=name,asc`.
+
 | Method | Endpoint | Açıklama |
 |--------|----------|---------|
-| GET | `/api/products` | Tüm ürünleri listele |
-| GET | `/api/products/{id}` | ID ile ürün getir |
+| GET | `/api/products` | Tüm ürünler (paginated) |
+| GET | `/api/products/{id}` | ID ile ürün + AI personal_score |
 | POST | `/api/products` | Yeni ürün oluştur |
-| PUT | `/api/products/{id}` | Ürün güncelle |
-| DELETE | `/api/products/{id}` | Ürün sil |
-| GET | `/api/products/search?q={terim}` | İsim veya marka ile ara |
+| PUT | `/api/products/{id}` | Güncelle |
+| DELETE | `/api/products/{id}` | Sil |
+| GET | `/api/products/search?query={terim}` | Ad/marka ara (paginated) |
 | GET | `/api/products/brand/{marka}` | Markaya göre filtrele |
-| GET | `/api/products/quality?min={puan}` | Kalite puanına göre filtrele |
-| GET | `/api/products/top/quality?limit=10` | En kaliteli ürünler |
-| GET | `/api/products/top/purchased?limit=10` | En çok satın alınan |
-| GET | `/api/products/recommendations/{userId}` | Kullanıcıya özel öneri (basit) |
+| GET | `/api/products/quality?min={puan}` | Kalite puanı |
+| GET | `/api/products/filter?...` | Çoklu filtre (price, quality, search) |
+| GET | `/api/products/top/quality?limit=10` | En kaliteli |
+| GET | `/api/products/top/purchased?limit=10` | En çok satılan |
+| GET | `/api/products/recommendations/{userId}` | Basit kural-tabanlı öneri |
 
-**POST /api/products örneği:**
+**`GET /api/products/{id}` özel davranış:**
+Authenticated kullanıcı → AI server'a `is_recommended` (UserProductRating ortalaması) ile gider, response'taki `personalScore` AI'dan gelir.
+Anonymous → `personalScore = qualityScore` fallback.
+
+**POST /api/products:**
 
 ```json
 {
   "name": "Barrier Moisture Cream",
   "brand": "COSRX",
-  "ingredients": "Contains 24 ingredients. Beneficial for: dry, normal. Banned: 0, Restricted: 1.",
+  "ingredients": "Contains 24 ingredients...",
   "qualityScore": 8.5,
   "sephoraProductId": "P123456",
   "baseScore": 8.2,
+  "price": 38.0,
   "category": "Skincare",
   "secondaryCategory": "Moisturizers",
-  "sephoraRating": 4.6,
-  "priceUsd": 38.0
+  "sephoraRating": 4.6
 }
 ```
+
+> Backend artık `priceUsd` değil **`price`** kullanır (eski seed script'leri güncellendi).
 
 ---
 
@@ -245,37 +246,36 @@ Tüm endpointler `/api` prefix'i ile başlar. Swagger UI: `http://localhost:8080
 
 | Method | Endpoint | Açıklama |
 |--------|----------|---------|
-| GET | `/api/users` | Tüm kullanıcılar |
-| GET | `/api/users/{id}` | Kullanıcı detayı |
-| POST | `/api/users` | Yeni kullanıcı (OAuth2 akışında otomatik oluşturulur) |
-| PUT | `/api/users/{id}` | Profil güncelle (cilt tipi, alerjenler) |
-| DELETE | `/api/users/{id}` | Kullanıcı sil |
+| POST | `/api/users/firebase` | Firebase token → kullanıcı kayıt/giriş |
+| GET | `/api/users` | Tümü |
+| GET | `/api/users/{id}` | Detay |
+| GET | `/api/users/me` | Authenticated kullanıcı |
+| GET | `/api/users/email/{email}` | Email ile lookup |
+| PUT | `/api/users/{id}` | Profil (skinType, allergens, hasAcne, picture) |
+| DELETE | `/api/users/{id}` | Sil |
 
 ---
 
 ### AI Proxy — `/api/ai`
 
-Backend, AI sunucusuna proxy görevi görür. Mobil bu endpointleri çağırır; backend kullanıcı kimliğini ve ürün verilerini otomatik ekler.
+Backend, AI sunucusuna proxy görevi görür. Mobil bu endpointleri Firebase token ile çağırır; backend kullanıcıyı email üzerinden bulur, profili hazırlar ve `X-Internal-Key` ile AI'ya iletir.
 
 | Method | Endpoint | Açıklama |
 |--------|----------|---------|
-| GET | `/api/ai/health` | AI sunucusu durumu (auth gerektirmez) |
-| GET | `/api/ai/score/{productId}` | Ürün için XGBoost puanı |
-| GET | `/api/ai/recommend?category=X&topK=5` | KNN ürün önerisi |
+| GET | `/api/ai/health` | AI server durumu (auth gerektirmez) |
+| GET | `/api/ai/score/{productId}` | XGBoost puanı + allergen warnings |
+| GET | `/api/ai/recommend?category=X&secondaryCategory=Y&topK=5` | KNN öneriler |
 | GET | `/api/ai/explain/{productId}?language=tr` | SHAP + LLM açıklaması |
 
-**Örnek: AI health kontrolü**
 ```bash
 curl http://localhost:8080/api/ai/health
 ```
+
 ```json
-{
-  "ai_server_status": "UP",
-  "ai_server_url": "http://localhost:8000"
-}
+{ "ai_server_status": "UP", "ai_server_url": "http://localhost:8000" }
 ```
 
-AI sunucusu erişilemez durumdaysa `/api/ai/score`, `/api/ai/recommend` ve `/api/ai/explain` endpointleri `HTTP 503` döner — mobil bu durumu gracefully ele almalıdır.
+AI sunucusu erişilemezse `/api/ai/score`, `/recommend`, `/explain` → `HTTP 503`.
 
 ---
 
@@ -283,61 +283,103 @@ AI sunucusu erişilemez durumdaysa `/api/ai/score`, `/api/ai/recommend` ve `/api
 
 | Prefix | Açıklama |
 |--------|---------|
-| `/api/purchases` | Satın alma geçmişi CRUD |
+| `/api/purchases` | Satın alma geçmişi |
 | `/api/streaks` | Kullanım serisi takibi |
-| `/api/ratings` | Kullanıcı ürün değerlendirmeleri |
+| `/api/ratings` | Kullanıcı ürün değerlendirmeleri (`wouldRecommend` AI'ya beslenir) |
+| `/api/favorites` | Favori ürünler |
+| `/api/cart` | Sepet |
 | `/api/notifications` | Bildirim yönetimi |
 
 ---
 
 ## AI Server Entegrasyonu
 
-Entegrasyon `AiServerClient` servis sınıfı üzerinden yürür:
+İki ayrı client var:
 
 ```
-AiController (HTTP proxy)
-    └── AiServerClient (RestTemplate, 35sn timeout)
-            └── FastAPI AI Server :8000
+ProductService.getProductById()  ──┐
+                                   ├─→ AiServiceClient (X-Internal-Key)  ──→ POST /score
+                                   │   ProductService → tek-amaçlı, recommend rate hesaplı
+                                   │
+AiController.getScore/recommend/  ─┴─→ AiServerClient (X-Internal-Key)   ──→ POST /score
+explain                                AiController → proxy, mobil için      POST /recommend
+                                                                              POST /explain
+                                       45sn read timeout (LLM)
 ```
 
-**Önemli:** `Product.sephoraProductId` alanı AI server ile köprü kuran kritik alandır.  
-Bu alan boş olan ürünler için `/api/ai/score` ve `/api/ai/explain` çağrıları `HTTP 400` döner.
+**Önemli detaylar:**
 
-**AI sunucusu çalışmıyorken davranış:**
-- `AiServerClient` `null` döner (exception fırlatmaz).
-- `AiController` `null` görünce `HTTP 503` döner.
-- Veritabanı ve diğer API'ler etkilenmez.
+- `Product.sephoraProductId` boş olan ürünler AI puanı alamaz (HTTP 400).
+- `AiServiceClient`, ürünün `UserProductRating.wouldRecommend` ortalamasını **`is_recommended`** olarak iletir → modelin SHAP #1 feature'ı (etki ≈ 1.32).
+- `User.hasAcne` ve `User.allergens` artık doğru iletilir (önceden `has_acne` hardcoded `false`'tu).
+- Her iki client da `X-Internal-Key` header gönderir — AI server `INTERNAL_API_KEY` aktifken çalışır.
+- AI server null döndüğünde `personalScore` → `qualityScore` fallback.
 
-**RestTemplate zaman aşımı ayarları** (`RestTemplateConfig.java`):
-- Bağlantı: 5 saniye
-- Okuma: 35 saniye (`/explain` LLM çağrısı 30 saniyeye kadar sürebilir)
+**RestTemplate timeout** (`AppConfig.java`):
+- `restTemplate` (default): connect 3sn, read 10sn
+- `aiRestTemplate` (AI proxy için): connect 3sn, read **45sn** — `/explain` LLM çağrısı 30sn'ye kadar sürebilir
+
+---
+
+## Rate Limiting
+
+`RateLimitFilter` (Bucket4j, IP başı per-minute bucket). Sadece **AI maliyeti olan endpoint'leri** sınırlar:
+
+| Endpoint | Default | Override |
+|----------|---------|----------|
+| `GET /api/products/{id}` (AI çağrısı tetikler) | 60 req/dk | `RATELIMIT_PRODUCT_DETAIL_REQUESTS_PER_MINUTE` |
+
+Listing/search etkilenmez. Limit aşılırsa `HTTP 429`:
+
+```json
+{ "errorCode": "RATE_LIMIT_EXCEEDED", "message": "Too many requests, please retry later." }
+```
+
+> AI server tarafında ikinci katman: slowapi ile `/score` 60/dk, `/recommend` 30/dk, `/explain` 10/dk.
+
+---
+
+## Distributed Tracing (OpenTelemetry)
+
+`micrometer-tracing-bridge-otel` + `opentelemetry-exporter-otlp` ile aktif edilir.
+
+```env
+MANAGEMENT_OTLP_TRACING_ENDPOINT=http://localhost:4317
+MANAGEMENT_TRACING_SAMPLING_PROBABILITY=1.0
+```
+
+Spring Boot tracing **otomatik**:
+- HTTP request'leri (servlet filter)
+- JDBC sorguları
+- `RestTemplate` çağrıları → AI server'a giderken trace ID propagate edilir
+
+AI server tarafında `OTEL_ENABLED=true` ise aynı OTLP collector'a span gönderir → **cross-service trace**: tek bir `traceId` ile mobile → backend → AI → LLM yolculuğu görünür.
+
+```bash
+# Jaeger ile lokal test
+docker run -d -p 16686:16686 -p 4317:4317 jaegertracing/all-in-one:latest
+open http://localhost:16686
+```
 
 ---
 
 ## Testler
 
 ```bash
-# Tüm testleri çalıştır (H2 in-memory DB, Docker gerektirmez)
 ./mvnw test
-
-# Belirli test sınıfı
 ./mvnw test -Dtest=ProductControllerTest
-
-# Test coverage raporu
-./mvnw test jacoco:report
-# Rapor: target/site/jacoco/index.html
+./mvnw test jacoco:report   # target/site/jacoco/index.html
 ```
 
 **Test profili** (`application-test.properties`):
-- H2 in-memory veritabanı (PostgreSQL gerekmez)
+- H2 in-memory veritabanı
 - Docker Compose devre dışı
-- Sahte Google OAuth2 kimlik bilgileri
 
 **Mevcut testler:**
 
 | Sınıf | Tip | Test Sayısı |
 |-------|-----|-------------|
-| `ProductControllerTest` | `@WebMvcTest` | 9 |
+| `ProductControllerTest` | `@WebMvcTest` (paginated API + Firebase) | 9 |
 | `AiControllerTest` | `@WebMvcTest` | 7 |
 | `AiServerClientTest` | Birim (Mockito) | 7 |
 | **Toplam** | | **23** |
@@ -348,42 +390,42 @@ Bu alan boş olan ürünler için `/api/ai/score` ve `/api/ai/explain` çağrıl
 
 ```
 backend/
-├── Dockerfile                  ← Çok aşamalı Maven + JRE imajı
-├── compose.yaml                ← Tam sistem Docker Compose (postgres + ai + backend + frontend)
-├── pom.xml                     ← Bağımlılıklar (Spring Boot 3.5, Lombok, TestContainers, H2)
+├── Dockerfile                  ← Multi-stage Maven + JRE
+├── compose.yaml                ← postgres + ai-server + backend + frontend
+├── pom.xml                     ← Spring Boot 3.5, Lombok, TestContainers, H2,
+│                                  Bucket4j, Micrometer Tracing OTel
 └── src/
     ├── main/
     │   ├── java/com/dermind/DerMind/
     │   │   ├── DerMindApplication.java
     │   │   ├── HomeController.java
     │   │   ├── ai/
-    │   │   │   ├── controller/AiController.java       ← AI proxy endpoint'leri
-    │   │   │   ├── service/AiServerClient.java        ← FastAPI HTTP istemcisi
-    │   │   │   └── dto/                               ← AI istek/yanıt DTO'ları
+    │   │   │   ├── controller/AiController.java       ← /api/ai proxy (Firebase auth)
+    │   │   │   ├── service/AiServerClient.java        ← X-Internal-Key gönderir, 45sn read timeout
+    │   │   │   └── dto/                               ← Score / Recommend / Explain DTO'ları
     │   │   ├── config/
-    │   │   │   ├── RestTemplateConfig.java            ← 35sn timeout ayarı
-    │   │   │   └── SecurityConfig.java                ← OAuth2 + yetkilendirme kuralları
+    │   │   │   ├── AppConfig.java                     ← restTemplate + aiRestTemplate
+    │   │   │   ├── FirebaseConfig.java
+    │   │   │   ├── RateLimitFilter.java               ← Bucket4j IP-based limiter
+    │   │   │   └── SecurityConfig.java                ← Firebase + permitAll rules + filter chain
+    │   │   ├── security/
+    │   │   │   └── FirebaseTokenFilter.java           ← Bearer token → SecurityContext
     │   │   ├── error/
-    │   │   │   ├── GlobalExceptionHandler.java        ← Merkezi hata yönetimi
+    │   │   │   ├── GlobalExceptionHandler.java
     │   │   │   ├── ResourceNotFoundException.java
-    │   │   │   ├── BusinessException.java
-    │   │   │   └── ...
+    │   │   │   └── BusinessException.java
     │   │   ├── product/
-    │   │   │   ├── controller/ProductController.java
-    │   │   │   ├── service/ProductService.java
+    │   │   │   ├── controller/ProductController.java   ← Paginated API
+    │   │   │   ├── service/ProductService.java         ← AI çağrı + recommend rate hesabı
+    │   │   │   ├── service/AiServiceClient.java        ← /score için ikinci AI client
     │   │   │   ├── model/Product.java
     │   │   │   ├── repository/ProductRepository.java
-    │   │   │   └── dto/                               ← Create / Update / Response / Detail
-    │   │   ├── user/
-    │   │   ├── purchase/
-    │   │   ├── streak/
-    │   │   ├── notification/
-    │   │   ├── user_product_rating/
-    │   │   ├── favorite/
-    │   │   ├── security/CustomOAuth2UserService.java  ← Google login → DB kullanıcı kaydı
+    │   │   │   └── dto/                                ← Create / Update / Response / Detail / ai/
+    │   │   ├── user/, purchase/, streak/, notification/, user_product_rating/,
+    │   │   │   favorite/, cart/                       ← Domain modülleri
     │   │   └── scheduler/NotificationScheduler.java
     │   └── resources/
-    │       └── application.properties
+    │       └── application.properties                 ← AI URL + internal-key + rate limit + tracing
     └── test/
         ├── java/com/dermind/DerMind/
         │   ├── product/ProductControllerTest.java
@@ -391,5 +433,5 @@ backend/
         │       ├── AiControllerTest.java
         │       └── AiServerClientTest.java
         └── resources/
-            └── application-test.properties            ← H2 + devre dışı Docker Compose
+            └── application-test.properties            ← H2 + tracing kapalı
 ```

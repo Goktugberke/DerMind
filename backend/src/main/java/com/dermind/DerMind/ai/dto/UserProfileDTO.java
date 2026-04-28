@@ -1,6 +1,8 @@
 package com.dermind.DerMind.ai.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,12 +20,15 @@ import java.util.List;
 @AllArgsConstructor
 public class UserProfileDTO {
 
+    @NotBlank(message = "Cilt tipi boş olamaz")
+    @Pattern(regexp = "^(dry|oily|combination|normal|sensitive)$",
+             message = "Cilt tipi dry, oily, combination, normal veya sensitive olmalıdır")
     @JsonProperty("skin_type")
-    private String skinType;          // "dry" | "oily" | "combination" | "normal"
+    private String skinType;
 
     @JsonProperty("has_acne")
-    private boolean hasAcne;          // User.hasAcne alanından gelir
+    private boolean hasAcne;
 
     @JsonProperty("allergies")
-    private List<String> allergies;   // User.allergens virgülle ayrılıp listeye çevrilir
+    private List<String> allergies;
 }

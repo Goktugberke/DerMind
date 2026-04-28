@@ -5,21 +5,29 @@ import com.dermind.DerMind.streak.model.Streak;
 import com.dermind.DerMind.user_product_rating.model.UserProductRating;
 import com.dermind.DerMind.favorite.model.Favorite;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "users")
-@Data
+@Table(name = "users", indexes = {
+        @Index(name = "idx_users_email", columnList = "email", unique = true),
+        @Index(name = "idx_users_skin_type", columnList = "skin_type")
+})
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@EqualsAndHashCode(of = "id")
+@ToString(exclude = {"purchases", "ratings", "streaks", "favorites"})
 public class User {
+
     @Id
     @Column(name = "id")
-    @NotNull
+    @NotBlank
     private String id;
 
     @Column(name = "provider")
@@ -28,35 +36,35 @@ public class User {
     @Column(name = "provider_id", unique = true)
     private String providerId;
 
-    @Column(name = "email", unique = true)
-    @NotNull
-    @NotNull
+    @Column(name = "email", nullable = false, unique = true)
+    @NotBlank
+    @Email
     private String email;
 
     @Column(name = "name")
     private String name;
 
-    @Column(name = "picture")
+    @Column(name = "picture", length = 1024)
     private String picture;
 
-    @Column(name = "allergens")
+    @Column(name = "allergens", length = 2000)
     private String allergens;
 
-    @Column(name = "skin_type")
+    @Column(name = "skin_type", length = 32)
     private String skinType;
 
-    @Column(name = "has_acne")
+    @Column(name = "has_acne", nullable = false)
     private boolean hasAcne = false;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Purchase> purchases = new ArrayList<>();
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<UserProductRating> ratings = new ArrayList<>();
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Streak> streaks = new ArrayList<>();
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Favorite> favorites = new ArrayList<>();
 }

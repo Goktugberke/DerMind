@@ -12,16 +12,20 @@ import com.dermind.DerMind.streak.repository.StreakRepository;
 import com.dermind.DerMind.user.model.User;
 import com.dermind.DerMind.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class StreakService {
 
     private final StreakRepository streakRepository;
@@ -32,7 +36,6 @@ public class StreakService {
     public StreakResponseDTO createStreak(String userId, StreakCreateDTO dto) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
-
         Product product = productRepository.findById(dto.getProductId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", dto.getProductId()));
 
@@ -52,8 +55,7 @@ public class StreakService {
                 .isActive(true)
                 .build();
 
-        Streak savedStreak = streakRepository.save(streak);
-        return mapToResponseDTO(savedStreak);
+        return mapToResponseDTO(streakRepository.save(streak));
     }
 
     @Transactional(readOnly = true)
@@ -65,89 +67,65 @@ public class StreakService {
 
     @Transactional
     public List<StreakResponseDTO> getStreaksByUserId(String userId) {
-        // Fetch streaks
-        List<Streak> streaks = streakRepository.findByUserId(userId);
-        return processAndMapStreaks(streaks);
+        return processAndMapStreaks(streakRepository.findByUserId(userId));
     }
 
     @Transactional
     public List<StreakResponseDTO> getActiveStreaksByUserId(String userId) {
-        List<Streak> streaks = streakRepository.findActiveStreaksByUser(userId);
-        return processAndMapStreaks(streaks);
+        return processAndMapStreaks(streakRepository.findActiveStreaksByUser(userId));
     }
 
     @Transactional
     public List<StreakResponseDTO> getTopStreaksByUserId(String userId) {
-        List<Streak> streaks = streakRepository.findTopStreaksByUserId(userId);
-        return processAndMapStreaks(streaks);
+        return processAndMapStreaks(streakRepository.findTopStreaksByUserId(userId));
     }
 
     @Transactional
     public List<StreakResponseDTO> getAllStreaks() {
-        List<Streak> streaks = streakRepository.findAll();
-        return processAndMapStreaks(streaks);
+        return processAndMapStreaks(streakRepository.findAll());
     }
 
     private List<StreakResponseDTO> processAndMapStreaks(List<Streak> streaks) {
-        // Lazy Reset: Check and reset streaks if missed
         boolean needsSave = false;
         for (Streak streak : streaks) {
-            if (checkAndResetStreak(streak)) {
-                needsSave = true;
-            }
+            if (checkAndResetStreak(streak)) needsSave = true;
         }
-        if (needsSave) {
-            streakRepository.saveAll(streaks);
-        }
-
-        return streaks.stream()
-                .map(this::mapToResponseDTO)
-                .collect(Collectors.toList());
+        if (needsSave) streakRepository.saveAll(streaks);
+        return streaks.stream().map(this::mapToResponseDTO).collect(Collectors.toList());
     }
 
     @Transactional
     public StreakResponseDTO updateStreak(Long id, StreakUpdateDTO dto) {
         Streak streak = streakRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Streak", "id", id));
-
-        if (dto.getUsageFrequency() != null) {
-            streak.setUsageFrequency(dto.getUsageFrequency());
-        }
-
-        // Check reset on update too
+        if (dto.getUsageFrequency() != null) streak.setUsageFrequency(dto.getUsageFrequency());
         checkAndResetStreak(streak);
-
-        Streak updatedStreak = streakRepository.save(streak);
-        return mapToResponseDTO(updatedStreak);
+        return mapToResponseDTO(streakRepository.save(streak));
     }
 
+    /**
+     * Optimistic lock retry: çift tap durumunda OptimisticLockingFailureException fırlar,
+     * 3 kez 50ms backoff ile yeniden dener (counter doğru artar).
+     */
+    @Retryable(retryFor = OptimisticLockingFailureException.class,
+               maxAttempts = 3, backoff = @Backoff(delay = 50, multiplier = 2))
     @Transactional
     public StreakResponseDTO recordUsage(String userId, Long streakId) {
         Streak streak = streakRepository.findById(streakId)
                 .orElseThrow(() -> new ResourceNotFoundException("Streak", "id", streakId));
-
         if (!streak.getUser().getId().equals(userId)) {
             throw new UnauthorizedAccessException("Bu seri size ait değil.");
         }
 
         LocalDate today = LocalDate.now();
-
-        // 1. Check/Reset broken streaks first
         checkAndResetStreak(streak);
-
-        // 2. Increment Usage Counter
         streak.setDailyUsageCounter(streak.getDailyUsageCounter() + 1);
 
-        // 3. Check if target reached for Streak Increment
-        // DAILY -> 1, TWICE_DAILY -> 2
         int targetUses = (streak.getUsageFrequency() == UsageFrequency.TWICE_DAILY) ? 2 : 1;
-
         if (streak.getDailyUsageCounter() >= targetUses) {
-            boolean isFirstCompletionToday = (streak.getLastCompletedDate() == null
-                    || !streak.getLastCompletedDate().isEqual(today));
-
-            if (isFirstCompletionToday) {
-                // Target reached and first time completing today -> Increment Streak
+            boolean firstTodayCompletion = streak.getLastCompletedDate() == null
+                    || !streak.getLastCompletedDate().isEqual(today);
+            if (firstTodayCompletion) {
                 streak.setCurrentStreak(streak.getCurrentStreak() + 1);
                 if (streak.getCurrentStreak() > streak.getLongestStreak()) {
                     streak.setLongestStreak(streak.getCurrentStreak());
@@ -155,12 +133,9 @@ public class StreakService {
                 streak.setLastCompletedDate(today);
             }
         }
-
         streak.setLastUsedDate(today);
         streak.setTotalUses(streak.getTotalUses() + 1);
-
-        Streak savedStreak = streakRepository.save(streak);
-        return mapToResponseDTO(savedStreak);
+        return mapToResponseDTO(streakRepository.save(streak));
     }
 
     @Transactional
@@ -171,37 +146,21 @@ public class StreakService {
         streakRepository.deleteById(id);
     }
 
-    // ============== HELPER METHODS ==============
-
-    /**
-     * Checks if the streak is broken based on frequency and resets if necessary.
-     * Returns true if a reset occurred.
-     */
     private boolean checkAndResetStreak(Streak streak) {
         if (streak.getLastCompletedDate() == null) {
-            // Never completed, if streak > 0, reset it
             if (streak.getCurrentStreak() > 0) {
                 streak.setCurrentStreak(0);
                 return true;
             }
             return false;
         }
-
         LocalDate today = LocalDate.now();
         LocalDate lastCompleted = streak.getLastCompletedDate();
-
-        if (lastCompleted.isEqual(today)) {
-            return false; // Already done today
-        }
-
-        // Logic for DAILY / TWICE_DAILY
-        // Must have completed YESTERDAY (or Today if already done)
-        // If lastCompletedDate < yesterday, then streak is broken.
+        if (lastCompleted.isEqual(today)) return false;
         if (lastCompleted.isBefore(today.minusDays(1))) {
             streak.setCurrentStreak(0);
             return true;
         }
-
         return false;
     }
 

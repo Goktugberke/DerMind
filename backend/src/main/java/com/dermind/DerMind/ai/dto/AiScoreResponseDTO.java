@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 /**
  * POST /score yanıtı — app.py /score endpoint dönüş değeri.
  */
@@ -28,4 +30,8 @@ public class AiScoreResponseDTO {
 
     @JsonProperty("skin_type")
     private String skinType;
+
+    /** Kullanıcının alerjenlerine uyan içerik uyarıları. Boş liste = güvenli. */
+    @JsonProperty("allergen_warnings")
+    private List<String> allergenWarnings;
 }

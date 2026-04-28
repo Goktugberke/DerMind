@@ -3,13 +3,13 @@ package com.dermind.DerMind.cart.controller;
 import com.dermind.DerMind.cart.dto.CartItemAddDTO;
 import com.dermind.DerMind.cart.dto.CartItemResponseDTO;
 import com.dermind.DerMind.cart.service.CartService;
-import com.dermind.DerMind.user.dto.UserResponseDTO;
-import com.dermind.DerMind.user.service.UserService;
+import com.dermind.DerMind.security.CurrentUser;
+import com.dermind.DerMind.user.model.User;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,32 +17,30 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/cart")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+@Validated
 public class CartController {
 
     private final CartService cartService;
-    private final UserService userService;
 
     @GetMapping
-    public ResponseEntity<List<CartItemResponseDTO>> getCart(Authentication authentication) {
-        String userId = getUserId(authentication);
-        return ResponseEntity.ok(cartService.getCart(userId));
+    public ResponseEntity<List<CartItemResponseDTO>> getCart(@CurrentUser User user) {
+        return ResponseEntity.ok(cartService.getCart(user.getId()));
     }
 
     @PostMapping("/add")
-    public ResponseEntity<CartItemResponseDTO> addItem(Authentication authentication, @RequestBody CartItemAddDTO dto) {
-        String userId = getUserId(authentication);
+    public ResponseEntity<CartItemResponseDTO> addItem(
+            @CurrentUser User user,
+            @Valid @RequestBody CartItemAddDTO dto) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(cartService.addItem(userId, dto.getProductId(), dto.getQuantity()));
+                .body(cartService.addItem(user.getId(), dto.getProductId(), dto.getQuantity()));
     }
 
     @PutMapping("/item/{productId}")
     public ResponseEntity<CartItemResponseDTO> updateQuantity(
-            Authentication authentication,
+            @CurrentUser User user,
             @PathVariable Long productId,
             @RequestParam int quantity) {
-        String userId = getUserId(authentication);
-        CartItemResponseDTO updated = cartService.updateQuantity(userId, productId, quantity);
+        CartItemResponseDTO updated = cartService.updateQuantity(user.getId(), productId, quantity);
         if (updated == null) {
             return ResponseEntity.noContent().build();
         }
@@ -50,41 +48,21 @@ public class CartController {
     }
 
     @DeleteMapping("/item/{productId}")
-    public ResponseEntity<Void> removeItem(Authentication authentication, @PathVariable Long productId) {
-        String userId = getUserId(authentication);
-        cartService.removeItem(userId, productId);
+    public ResponseEntity<Void> removeItem(@CurrentUser User user, @PathVariable Long productId) {
+        cartService.removeItem(user.getId(), productId);
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping
-    public ResponseEntity<Void> clearCart(Authentication authentication) {
-        String userId = getUserId(authentication);
-        cartService.clearCart(userId);
+    public ResponseEntity<Void> clearCart(@CurrentUser User user) {
+        cartService.clearCart(user.getId());
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/merge")
-    public ResponseEntity<List<CartItemResponseDTO>> mergeCart(Authentication authentication, @RequestBody List<CartItemAddDTO> localItems) {
-        String userId = getUserId(authentication);
-        return ResponseEntity.ok(cartService.mergeCart(userId, localItems));
-    }
-
-    private String getUserId(Authentication authentication) {
-        if (authentication == null) {
-            throw new RuntimeException("Unauthorized");
-        }
-
-        String email;
-        if (authentication.getPrincipal() instanceof org.springframework.security.core.userdetails.UserDetails) {
-            email = ((org.springframework.security.core.userdetails.UserDetails) authentication.getPrincipal()).getUsername();
-        } else if (authentication.getPrincipal() instanceof OidcUser) {
-            email = ((OidcUser) authentication.getPrincipal()).getEmail();
-        } else {
-            throw new RuntimeException("Principal type not supported");
-        }
-
-        // Get user by email to get their UID (id field)
-        UserResponseDTO user = userService.getUserByEmail(email);
-        return user.getId();
+    public ResponseEntity<List<CartItemResponseDTO>> mergeCart(
+            @CurrentUser User user,
+            @Valid @RequestBody List<CartItemAddDTO> localItems) {
+        return ResponseEntity.ok(cartService.mergeCart(user.getId(), localItems));
     }
 }
