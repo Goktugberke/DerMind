@@ -57,6 +57,15 @@ build/
 ai-server/models/
 ai-server/datasets/
 ai-server/*.csv
+# Inference için zorunlu artefaktlar — Docker build, seed_products.py ve runtime bağımlı
+!ai-server/dermind_knn_product_vectors.csv
+!ai-server/models/
+# Eğitim CSV'leri (60 GB) hâlâ ignore — sadece inference vektörü tutulur
+ai-server/dermind_ai_training_dataset.csv
+ai-server/dermind_synthetic_coldstart.csv
+ai-server/incibeauty_products_onehot.csv
+# RF baseline modeli git'te tutulmaz (52 MB), runtime'da kullanılmıyor
+ai-server/models/random_forest_scoring_model.pkl
 ai-server/__pycache__/
 ai-server/.coverage
 ai-server/.env
@@ -70,3 +79,11 @@ firebase-service-account.json
 # Misc
 all_api_endpoints.txt
 mock_data.sql
+
+# Claude Code memory (local AI assistant context — never commit)
+.claude/
+
+# Root-level kişisel dökümanlar
+*.docx
+*.pdf
+CHOICES.md

@@ -1,0 +1,35 @@
+package com.dermind.DerMind.config;
+
+import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Contact;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.info.License;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class OpenApiConfig {
+
+    private static final String BEARER_SCHEME = "bearerAuth";
+
+    @Bean
+    public OpenAPI dermindOpenAPI() {
+        return new OpenAPI()
+                .info(new Info()
+                        .title("DerMind Backend API")
+                        .version("1.0.0")
+                        .description("AI destekli kişiselleştirilmiş kozmetik öneri ve puanlama platformu")
+                        .contact(new Contact().name("DerMind Team").email("contact@dermind.app"))
+                        .license(new License().name("Proprietary")))
+                .addSecurityItem(new SecurityRequirement().addList(BEARER_SCHEME))
+                .components(new Components()
+                        .addSecuritySchemes(BEARER_SCHEME, new SecurityScheme()
+                                .type(SecurityScheme.Type.HTTP)
+                                .scheme("bearer")
+                                .bearerFormat("Firebase JWT")
+                                .description("Firebase ID token. Frontend Firebase Auth ile login sonrası bu token'ı Authorization header'da gönderir.")));
+    }
+}
