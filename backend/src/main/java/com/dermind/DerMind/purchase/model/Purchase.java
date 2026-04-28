@@ -1,8 +1,8 @@
 package com.dermind.DerMind.purchase.model;
 
 import com.dermind.DerMind.common.enums.OrderStatus;
-import com.dermind.DerMind.common.enums.PaymentMethod; // YENİ EKLENDİ
-import com.dermind.DerMind.common.enums.PaymentStatus; // YENİ EKLENDİ
+import com.dermind.DerMind.common.enums.PaymentMethod;
+import com.dermind.DerMind.common.enums.PaymentStatus;
 import com.dermind.DerMind.product.model.Product;
 import com.dermind.DerMind.user.model.User;
 import jakarta.persistence.*;
@@ -14,13 +14,21 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "purchases")
+@Table(name = "purchases", indexes = {
+        @Index(name = "idx_purchases_user_id", columnList = "user_id"),
+        @Index(name = "idx_purchases_product_id", columnList = "product_id"),
+        @Index(name = "idx_purchases_order_status", columnList = "order_status"),
+        @Index(name = "idx_purchases_purchased_at", columnList = "purchased_at")
+})
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(of = "id")
+@ToString(exclude = {"user", "product"})
 public class Purchase {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -43,21 +51,21 @@ public class Purchase {
     private BigDecimal totalPrice;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "order_status", nullable = false)
+    @Column(name = "order_status", nullable = false, length = 32)
     private OrderStatus orderStatus;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "payment_method")
+    @Column(name = "payment_method", length = 32)
     private PaymentMethod paymentMethod;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "payment_status")
+    @Column(name = "payment_status", length = 32)
     private PaymentStatus paymentStatus;
 
     @Column(name = "shipping_address", length = 500)
     private String shippingAddress;
 
-    @Column(name = "tracking_number")
+    @Column(name = "tracking_number", length = 128)
     private String trackingNumber;
 
     @Column(name = "notes", length = 1000)
