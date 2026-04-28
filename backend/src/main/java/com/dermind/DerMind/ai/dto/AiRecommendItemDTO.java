@@ -1,6 +1,8 @@
 package com.dermind.DerMind.ai.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -26,11 +28,13 @@ public class AiRecommendItemDTO {
     @JsonProperty("base_score")
     private Double baseScore;
 
+    @DecimalMin(value = "0.0", message = "Benzerlik skoru 0 ile 1 arasında olmalıdır")
+    @DecimalMax(value = "1.0", message = "Benzerlik skoru 0 ile 1 arasında olmalıdır")
     @JsonProperty("similarity")
-    private Double similarity;       // 0-1 arası, KNN kosinüs benzerlik skoru
+    private Double similarity;
 
     @JsonProperty("rating")
-    private Double rating;           // Sephora kullanıcı puanı (1-5)
+    private Double rating;
 
     @JsonProperty("price_usd")
     private Double priceUsd;

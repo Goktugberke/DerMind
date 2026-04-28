@@ -36,4 +36,8 @@ public class AiExplainResponseDTO {
 
     @JsonProperty("cached")
     private Boolean cached;
+
+    /** LLM çağrısı başarısız oldu mu? true → açıklama fallback metni içerebilir. */
+    @JsonProperty("llm_error")
+    private Boolean llmError;
 }

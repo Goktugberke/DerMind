@@ -2,120 +2,96 @@ package com.dermind.DerMind.ai.controller;
 
 import com.dermind.DerMind.ai.dto.*;
 import com.dermind.DerMind.ai.service.AiServerClient;
+import com.dermind.DerMind.error.BusinessException;
+import com.dermind.DerMind.error.ResourceNotFoundException;
 import com.dermind.DerMind.product.model.Product;
 import com.dermind.DerMind.product.repository.ProductRepository;
-import com.dermind.DerMind.security.CustomOAuth2UserService;
+import com.dermind.DerMind.security.CurrentUser;
 import com.dermind.DerMind.user.model.User;
-import com.dermind.DerMind.user.repository.UserRepository;
+import com.dermind.DerMind.user_product_rating.repository.UserProductRatingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import jakarta.validation.Valid;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
- * AI Server entegrasyonu için proxy endpoint'ler.
- *
- * Tüm endpoint'ler mevcut kullanıcıyı OAuth2 oturumundan alır.
- * AI server çalışmıyorsa HTTP 503 döner (fallback yoktur — mobilin
- * yerel mantığı devreye girer).
- *
- * Endpoint'ler:
- *   GET  /api/ai/score/{productId}       — XGBoost puanlama
- *   POST /api/ai/recommend               — KNN öneriler
- *   GET  /api/ai/explain/{productId}     — SHAP + LLM açıklama
- *   GET  /api/ai/health                  — AI server sağlık kontrolü
+ * AI Server proxy. Mobile/frontend AI server'a doğrudan erişemez;
+ * her istek backend'in @CurrentUser ile authenticate edilmiş kullanıcısı üzerinden geçer.
  */
 @RestController
 @RequestMapping("/api/ai")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+@Validated
 public class AiController {
 
     private final AiServerClient aiServerClient;
     private final ProductRepository productRepository;
-    private final UserRepository userRepository;
-    private final CustomOAuth2UserService oauth2UserService;
+    private final UserProductRatingRepository ratingRepository;
 
     @Value("${ai.server.url}")
     private String aiServerUrl;
 
-    // ─────────────────────────────────────────────
-    // GET /api/ai/score/{productId}
-    // ─────────────────────────────────────────────
+    // ── GET /api/ai/score/{productId} ──────────────────────────────────────
 
-    /**
-     * Bir ürün için AI tabanlı base_score ve personal_score döner.
-     *
-     * @param productId Backend veritabanındaki ürün ID'si (Long)
-     * @return AiScoreResponseDTO veya 404/503
-     */
     @GetMapping("/score/{productId}")
-    public ResponseEntity<?> getScore(@PathVariable Long productId) {
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<AiScoreResponseDTO> getScore(
+            @CurrentUser User user,
+            @PathVariable Long productId) {
 
-        // Ürünü bul
-        Product product = productRepository.findById(productId).orElse(null);
-        if (product == null) {
-            return ResponseEntity.notFound().build();
-        }
-        if (product.getSephoraProductId() == null || product.getSephoraProductId().isBlank()) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Bu ürünün Sephora ID'si yok, AI puanı hesaplanamaz."));
-        }
+        Product product = resolveProduct(productId);
+        Double recommendRate = ratingRepository.getRecommendRateByProductId(productId);
 
-        // Mevcut kullanıcıyı bul
-        User user = getCurrentUser();
-        if (user == null) {
-            return ResponseEntity.status(401)
-                    .body(Map.of("error", "Kimlik doğrulama gerekli."));
-        }
-
-        // AI isteği oluştur
         AiScoreRequestDTO request = AiScoreRequestDTO.builder()
                 .sephoraProductId(product.getSephoraProductId())
                 .user(buildUserProfile(user))
+                .isRecommended(recommendRate)
                 .build();
 
-        // AI server'a gönder
-        AiScoreResponseDTO result = aiServerClient.score(request);
-        if (result == null) {
-            return ResponseEntity.status(503)
-                    .body(Map.of("error", "AI server şu an erişilemiyor. Lütfen daha sonra tekrar deneyin."));
-        }
-
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(aiServerClient.score(request));
     }
 
-    // ─────────────────────────────────────────────
-    // POST /api/ai/recommend
-    // ─────────────────────────────────────────────
+    // ── POST /api/ai/score/batch ───────────────────────────────────────────
 
-    /**
-     * Kullanıcı profiline göre KNN ürün önerileri döner.
-     *
-     * @param category          Örn: "Skincare" (opsiyonel)
-     * @param secondaryCategory Örn: "Sunscreen" (opsiyonel)
-     * @param topK              Kaç öneri isteniyor (varsayılan 5, maks 20)
-     */
+    @PostMapping("/score/batch")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<AiBatchScoreResponseDTO> scoreBatch(
+            @CurrentUser User user,
+            @Valid @RequestBody AiBatchScoreRequestDTO request) {
+
+        // Override user profile with the authenticated user
+        AiBatchScoreRequestDTO secured = AiBatchScoreRequestDTO.builder()
+                .sephoraProductIds(request.getSephoraProductIds())
+                .user(buildUserProfile(user))
+                .isRecommended(request.getIsRecommended())
+                .build();
+
+        return ResponseEntity.ok(aiServerClient.scoreBatch(secured));
+    }
+
+    // ── GET /api/ai/recommend ─────────────────────────────────────────────
+
     @GetMapping("/recommend")
-    public ResponseEntity<?> getRecommendations(
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<AiRecommendResponseDTO> getRecommendations(
+            @CurrentUser User user,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String secondaryCategory,
             @RequestParam(defaultValue = "5") int topK) {
 
-        User user = getCurrentUser();
-        if (user == null) {
-            return ResponseEntity.status(401)
-                    .body(Map.of("error", "Kimlik doğrulama gerekli."));
-        }
-
         int clampedTopK = Math.min(Math.max(topK, 1), 20);
-
         AiRecommendRequestDTO request = AiRecommendRequestDTO.builder()
                 .user(buildUserProfile(user))
                 .category(category)
@@ -123,71 +99,63 @@ public class AiController {
                 .topK(clampedTopK)
                 .build();
 
-        AiRecommendResponseDTO result = aiServerClient.recommend(request);
-        if (result == null) {
-            return ResponseEntity.status(503)
-                    .body(Map.of("error", "AI server şu an erişilemiyor."));
-        }
-
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(aiServerClient.recommend(request));
     }
 
-    // ─────────────────────────────────────────────
-    // GET /api/ai/explain/{productId}
-    // ─────────────────────────────────────────────
+    // ── GET /api/ai/explain/{productId} ──────────────────────────────────
 
-    /**
-     * Bir ürünün puanını SHAP + LLM ile açıklar.
-     * NOT: Bu endpoint LLM çağrısı yaptığından 5-30 saniye sürebilir.
-     *
-     * @param productId Backend veritabanındaki ürün ID'si
-     * @param language  "tr" (varsayılan) veya "en"
-     */
     @GetMapping("/explain/{productId}")
-    public ResponseEntity<?> explainScore(
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<AiExplainResponseDTO> explainScore(
+            @CurrentUser User user,
             @PathVariable Long productId,
             @RequestParam(defaultValue = "tr") String language) {
 
-        Product product = productRepository.findById(productId).orElse(null);
-        if (product == null) {
-            return ResponseEntity.notFound().build();
-        }
-        if (product.getSephoraProductId() == null || product.getSephoraProductId().isBlank()) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Bu ürünün Sephora ID'si yok, XAI açıklaması üretilemez."));
-        }
-
-        User user = getCurrentUser();
-        if (user == null) {
-            return ResponseEntity.status(401)
-                    .body(Map.of("error", "Kimlik doğrulama gerekli."));
-        }
+        Product product = resolveProduct(productId);
+        Double recommendRate = ratingRepository.getRecommendRateByProductId(productId);
 
         String lang = "en".equalsIgnoreCase(language) ? "en" : "tr";
-
         AiExplainRequestDTO request = AiExplainRequestDTO.builder()
                 .sephoraProductId(product.getSephoraProductId())
                 .user(buildUserProfile(user))
                 .language(lang)
+                .isRecommended(recommendRate)
                 .build();
 
         AiExplainResponseDTO result = aiServerClient.explain(request);
         if (result == null) {
-            return ResponseEntity.status(503)
-                    .body(Map.of("error", "AI server şu an erişilemiyor."));
+            return ResponseEntity.status(503).build();
         }
-
         return ResponseEntity.ok(result);
     }
 
-    // ─────────────────────────────────────────────
-    // GET /api/ai/health
-    // ─────────────────────────────────────────────
+    // ── GET /api/ai/explain/{productId}/stream (SSE) ─────────────────────
 
-    /**
-     * AI server'ın çalışıp çalışmadığını döner.
-     * Mobil bu endpoint'i başlangıçta kontrol edebilir.
-     */
+    @GetMapping(value = "/explain/{productId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PreAuthorize("isAuthenticated()")
+    public SseEmitter explainStream(
+            @CurrentUser User user,
+            @PathVariable Long productId,
+            @RequestParam(defaultValue = "tr") String language) {
+
+        Product product = resolveProduct(productId);
+        Double recommendRate = ratingRepository.getRecommendRateByProductId(productId);
+
+        String lang = "en".equalsIgnoreCase(language) ? "en" : "tr";
+        AiExplainRequestDTO request = AiExplainRequestDTO.builder()
+                .sephoraProductId(product.getSephoraProductId())
+                .user(buildUserProfile(user))
+                .language(lang)
+                .isRecommended(recommendRate)
+                .build();
+
+        SseEmitter emitter = new SseEmitter(60_000L);
+        CompletableFuture.runAsync(() -> aiServerClient.streamExplain(request, emitter));
+        return emitter;
+    }
+
+    // ── GET /api/ai/health ────────────────────────────────────────────────
+
     @GetMapping("/health")
     public ResponseEntity<Map<String, Object>> aiHealth() {
         boolean healthy = aiServerClient.isHealthy();
@@ -197,33 +165,31 @@ public class AiController {
         ));
     }
 
-    // ─────────────────────────────────────────────
-    // Yardımcı metodlar
-    // ─────────────────────────────────────────────
+    // ── GET /api/ai/metrics ───────────────────────────────────────────────
 
-    /**
-     * OAuth2 oturumundaki kullanıcıyı veritabanından getirir.
-     * Oturum yoksa veya kullanıcı bulunamazsa null döner.
-     */
-    private User getCurrentUser() {
-        try {
-            String userId = oauth2UserService.currentUserId();
-            return userRepository.findById(userId).orElse(null);
-        } catch (Exception e) {
-            return null;
+    @GetMapping("/metrics")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Object> aiMetrics() {
+        Object metrics = aiServerClient.getMetrics();
+        if (metrics == null) {
+            return ResponseEntity.status(503).body(Map.of("error", "AI server unavailable"));
         }
+        return ResponseEntity.ok(metrics);
     }
 
-    /**
-     * User entity'sini AI server'ın beklediği UserProfileDTO'ya dönüştürür.
-     *
-     * Dönüşüm kuralları:
-     *   skinType  → küçük harfe indirilir (örn. "Dry" → "dry")
-     *   allergens → virgülle ayrılıp listeye çevrilir (örn. "Fragrance,Alcohol" → ["fragrance","alcohol"])
-     *   hasAcne   → User.isHasAcne() değerinden gelir
-     */
+    // ── Helpers ───────────────────────────────────────────────────────────
+
+    private Product resolveProduct(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productId));
+        if (product.getSephoraProductId() == null || product.getSephoraProductId().isBlank()) {
+            throw new BusinessException("Bu ürünün Sephora ID'si yok, AI puanı hesaplanamaz.");
+        }
+        return product;
+    }
+
     private UserProfileDTO buildUserProfile(User user) {
-        String skinType = user.getSkinType() != null
+        String skinType = (user.getSkinType() != null && !user.getSkinType().isBlank())
                 ? user.getSkinType().toLowerCase().trim()
                 : "normal";
 
@@ -235,7 +201,6 @@ public class AiController {
                     .filter(s -> !s.isEmpty())
                     .collect(Collectors.toList());
         }
-
         return UserProfileDTO.builder()
                 .skinType(skinType)
                 .hasAcne(user.isHasAcne())
