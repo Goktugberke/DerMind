@@ -17,7 +17,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Akıllı Bildirim Zamanlayıcı.
@@ -34,8 +34,6 @@ public class NotificationScheduler {
     private final UserRepository userRepository;
     private final StreakRepository streakRepository;
     private final PurchaseRepository purchaseRepository;
-
-    private final Random random = new Random();
 
     private static final String[] MORNING_MESSAGES = {
             "Cildin sana teşekkür ediyor! Bugün de rutinini sürdürmeyi unutma. 💚",
@@ -72,12 +70,16 @@ public class NotificationScheduler {
         LocalDateTime purchaseSince = LocalDateTime.now().minusDays(7);
         List<User> activeUsers = userRepository.findActiveUsers(streakSince, purchaseSince);
 
-        // Tek query ile her kullanıcının streak'lerini topla — N+1 yerine batch
-        Map<String, List<Streak>> streaksByUser = activeUsers.stream()
-                .collect(java.util.stream.Collectors.toMap(
-                        User::getId,
-                        u -> streakRepository.findByUserId(u.getId()),
-                        (a, b) -> a));
+        if (activeUsers.isEmpty()) {
+            log.info("No active users for daily reminders");
+            return;
+        }
+
+        // Tek sorguda tüm kullanıcıların streak'lerini çek — N+1 önleme
+        List<String> userIds = activeUsers.stream().map(User::getId).toList();
+        Map<String, List<Streak>> streaksByUser = streakRepository.findByUserIdIn(userIds)
+                .stream()
+                .collect(java.util.stream.Collectors.groupingBy(s -> s.getUser().getId()));
 
         int sent = 0;
         for (User user : activeUsers) {
@@ -132,11 +134,22 @@ public class NotificationScheduler {
         LocalDateTime purchaseSince = LocalDateTime.now().minusDays(7);
         List<User> activeUsers = userRepository.findActiveUsers(streakSince, purchaseSince);
 
+        if (activeUsers.isEmpty()) {
+            log.info("No active users for weekly summary");
+            return;
+        }
+
+        // Tek sorguda tüm streak'leri çek
+        List<String> userIds = activeUsers.stream().map(User::getId).toList();
+        Map<String, List<Streak>> streaksByUser = streakRepository.findByUserIdIn(userIds)
+                .stream()
+                .collect(java.util.stream.Collectors.groupingBy(s -> s.getUser().getId()));
+
         int sent = 0;
         for (User user : activeUsers) {
             try {
-                List<Streak> streaks = streakRepository.findByUserId(user.getId());
-                String summary = generateWeeklySummary(user, streaks);
+                List<Streak> streaks = streaksByUser.getOrDefault(user.getId(), List.of());
+                String summary = generateWeeklySummary(user, streaks, purchaseSince);
                 notificationService.createNotification(
                         user.getId(),
                         "📈 Haftalık Cilt Bakım Raporu",
@@ -190,7 +203,7 @@ public class NotificationScheduler {
             return String.format("%s ürününle %d günlük harika bir seri tutturmuşsun! 🎉",
                     best.getProduct().getName(), best.getCurrentStreak());
         }
-        return MORNING_MESSAGES[random.nextInt(MORNING_MESSAGES.length)];
+        return MORNING_MESSAGES[ThreadLocalRandom.current().nextInt(MORNING_MESSAGES.length)];
     }
 
     private String generateEveningMessage(List<Streak> userStreaks) {
@@ -199,18 +212,17 @@ public class NotificationScheduler {
         if (!usedToday) {
             return "Gün bitmeden cilt bakımını tamamlamayı unutma! 🌜 Sadece birkaç dakika ayırman yeterli.";
         }
-        return EVENING_MESSAGES[random.nextInt(EVENING_MESSAGES.length)];
+        return EVENING_MESSAGES[ThreadLocalRandom.current().nextInt(EVENING_MESSAGES.length)];
     }
 
-    private String generateWeeklySummary(User user, List<Streak> streaks) {
+    private String generateWeeklySummary(User user, List<Streak> streaks, LocalDateTime since) {
         int totalActive = (int) streaks.stream()
                 .filter(s -> s.getCurrentStreak() != null && s.getCurrentStreak() > 0).count();
         int longest = streaks.stream()
                 .mapToInt(s -> s.getLongestStreak() != null ? s.getLongestStreak() : 0)
                 .max().orElse(0);
-        LocalDateTime weekAgo = LocalDateTime.now().minusDays(7);
-        long purchases = purchaseRepository.findByUserId(user.getId()).stream()
-                .filter(p -> p.getCreatedAt() != null && p.getCreatedAt().isAfter(weekAgo)).count();
+        // DB-side count — tüm satın alımları belleğe yüklemeden
+        long purchases = purchaseRepository.countByUserIdAndCreatedAtAfter(user.getId(), since);
 
         if (totalActive == 0 && purchases == 0) {
             return "Bu hafta biraz sessizdin. 😊 Yeni haftada cilt bakımına geri dönmeye ne dersin?";

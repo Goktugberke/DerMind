@@ -52,4 +52,9 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
     @Query("SELECT p FROM Purchase p WHERE p.user.id = :userId AND p.createdAt > :since")
     List<Purchase> findRecentPurchasesByUser(@Param("userId") String userId,
                                              @Param("since") LocalDateTime since);
+
+    /** Haftalık özet için DB-side count — tüm satın alımları belleğe yüklemeyi önler. */
+    @Query("SELECT COUNT(p) FROM Purchase p WHERE p.user.id = :userId AND p.createdAt > :since")
+    long countByUserIdAndCreatedAtAfter(@Param("userId") String userId,
+                                        @Param("since") LocalDateTime since);
 }

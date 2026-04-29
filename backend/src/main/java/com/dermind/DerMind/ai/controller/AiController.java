@@ -19,12 +19,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import jakarta.validation.Valid;
-import java.util.Arrays;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 
 /**
  * AI Server proxy. Mobile/frontend AI server'a doğrudan erişemez;
@@ -193,14 +191,9 @@ public class AiController {
                 ? user.getSkinType().toLowerCase().trim()
                 : "normal";
 
-        List<String> allergies = Collections.emptyList();
-        if (user.getAllergens() != null && !user.getAllergens().isBlank()) {
-            allergies = Arrays.stream(user.getAllergens().split(","))
-                    .map(String::trim)
-                    .map(String::toLowerCase)
-                    .filter(s -> !s.isEmpty())
-                    .collect(Collectors.toList());
-        }
+        List<String> allergies = (user.getAllergens() != null && !user.getAllergens().isEmpty())
+                ? new ArrayList<>(user.getAllergens())
+                : List.of();
         return UserProfileDTO.builder()
                 .skinType(skinType)
                 .hasAcne(user.isHasAcne())

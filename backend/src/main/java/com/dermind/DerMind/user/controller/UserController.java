@@ -42,8 +42,9 @@ public class UserController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<UserResponseDTO>> getAllUsers() {
-        return ResponseEntity.ok(userService.getAllUsers());
+    public ResponseEntity<org.springframework.data.domain.Page<UserResponseDTO>> getAllUsers(
+            org.springframework.data.domain.Pageable pageable) {
+        return ResponseEntity.ok(userService.getAllUsers(pageable));
     }
 
     @GetMapping("/{id}")

@@ -1,5 +1,7 @@
 package com.dermind.DerMind.config;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import jakarta.servlet.FilterChain;
@@ -15,8 +17,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * IP başına token-bucket rate limiter.
@@ -28,7 +28,11 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class RateLimitFilter extends OncePerRequestFilter {
 
-    private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
+    // Maksimum 50_000 IP; 2 dakika kullanılmayan bucket otomatik silinir
+    private final Cache<String, Bucket> buckets = Caffeine.newBuilder()
+            .maximumSize(50_000)
+            .expireAfterAccess(Duration.ofMinutes(2))
+            .build();
 
     @Value("${ratelimit.product-detail.requests-per-minute:60}")
     private int productDetailRpm;
@@ -37,7 +41,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private int aiRpm;
 
     private Bucket resolveBucket(String key, int rpm) {
-        return buckets.computeIfAbsent(key, k -> Bucket.builder()
+        return buckets.get(key, k -> Bucket.builder()
                 .addLimit(Bandwidth.builder()
                         .capacity(rpm)
                         .refillGreedy(rpm, Duration.ofMinutes(1))

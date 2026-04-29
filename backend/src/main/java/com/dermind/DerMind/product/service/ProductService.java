@@ -34,7 +34,7 @@ public class ProductService {
     private final ProductMapper productMapper;
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "products-page", key = "#pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort")
+    @Cacheable(value = "products-page", key = "#pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort.toString()")
     public Page<ProductResponseDTO> getAllProducts(Pageable pageable) {
         return productRepository.findAll(pageable).map(productMapper::toResponseDTO);
     }
@@ -145,14 +145,15 @@ public class ProductService {
     }
 
     /**
-     * Basit kural-tabanlı öneri. Tez-MVP için legacy endpoint.
-     * Production tarafında /api/ai/recommend (KNN) kullanılmalı.
+     * Basit kural-tabanlı öneri — kural tabanlı MVP, /api/ai/recommend (KNN) tercih edilmeli.
+     * findAll() yerine top-quality sayfası üzerinde çalışır (maks 200 ürün, OOM önleme).
      */
     @Transactional(readOnly = true)
     public List<ProductRecommendationDTO> getRecommendationsForUser(String userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
-        return productRepository.findAll().stream()
+        return productRepository.findTopQualityProducts(Pageable.ofSize(200))
+                .getContent().stream()
                 .map(p -> analyzeProductForUser(p, user))
                 .sorted((a, b) -> Double.compare(b.getMatchScore(), a.getMatchScore()))
                 .collect(Collectors.toList());
@@ -170,11 +171,10 @@ public class ProductService {
         if (user.getAllergens() != null && !user.getAllergens().isEmpty()
                 && product.getIngredients() != null) {
             String ingredientsLower = product.getIngredients().toLowerCase();
-            for (String allergen : user.getAllergens().split(",")) {
-                String trimmed = allergen.trim().toLowerCase();
-                if (!trimmed.isEmpty() && ingredientsLower.contains(trimmed)) {
+            for (String allergen : user.getAllergens()) {
+                if (ingredientsLower.contains(allergen)) {
                     matchScore -= ALLERGEN_PENALTY;
-                    reason.append(String.format("Warning: Contains allergen '%s'. ", trimmed));
+                    reason.append(String.format("Warning: Contains allergen '%s'. ", allergen));
                     recommendation = "Not Recommended";
                 }
             }

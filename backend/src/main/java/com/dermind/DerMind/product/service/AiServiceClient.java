@@ -14,10 +14,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.Arrays;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -38,14 +36,9 @@ public class AiServiceClient {
         }
 
         try {
-            List<String> userAllergies = Collections.emptyList();
-            if (user.getAllergens() != null && !user.getAllergens().isBlank()) {
-                userAllergies = Arrays.stream(user.getAllergens().split(","))
-                        .map(String::trim)
-                        .map(String::toLowerCase)
-                        .filter(s -> !s.isEmpty())
-                        .collect(Collectors.toList());
-            }
+            List<String> userAllergies = (user.getAllergens() != null && !user.getAllergens().isEmpty())
+                    ? new ArrayList<>(user.getAllergens())
+                    : List.of();
 
             UserProfileDTO aiProfile = UserProfileDTO.builder()
                     .skinType(user.getSkinType() != null ? user.getSkinType().toLowerCase().trim() : "normal")
