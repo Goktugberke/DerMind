@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -56,4 +57,11 @@ public interface StreakRepository extends JpaRepository<Streak, Long> {
     @Query("SELECT s FROM Streak s WHERE s.currentStreak > 0 " +
            "AND s.lastUsedDate IS NOT NULL AND s.lastUsedDate < :cutoff")
     List<Streak> findExpiredStreaks(@Param("cutoff") LocalDate cutoff);
+
+    /**
+     * Çoklu kullanıcı için tek sorguda streak yükle — N+1 önleme (scheduler için).
+     */
+    @EntityGraph(attributePaths = {"user", "product"})
+    @Query("SELECT s FROM Streak s WHERE s.user.id IN :userIds")
+    List<Streak> findByUserIdIn(@Param("userIds") Collection<String> userIds);
 }

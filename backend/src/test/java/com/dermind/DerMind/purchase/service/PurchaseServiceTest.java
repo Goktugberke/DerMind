@@ -13,6 +13,7 @@ import com.dermind.DerMind.purchase.model.Purchase;
 import com.dermind.DerMind.purchase.repository.PurchaseRepository;
 import com.dermind.DerMind.user.model.User;
 import com.dermind.DerMind.user.repository.UserRepository;
+import com.dermind.DerMind.purchase.mapper.PurchaseMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,6 +37,7 @@ class PurchaseServiceTest {
     @Mock PurchaseRepository purchaseRepository;
     @Mock UserRepository userRepository;
     @Mock ProductRepository productRepository;
+    @Mock PurchaseMapper purchaseMapper;
 
     @InjectMocks PurchaseService purchaseService;
 
@@ -124,7 +126,7 @@ class PurchaseServiceTest {
             return p;
         });
 
-        PurchaseResponseDTO result = purchaseService.createPurchase("u1", dto);
+        purchaseService.createPurchase("u1", dto);
 
         ArgumentCaptor<Purchase> captor = ArgumentCaptor.forClass(Purchase.class);
         verify(purchaseRepository).save(captor.capture());
@@ -186,6 +188,8 @@ class PurchaseServiceTest {
         Product product = makeProduct(1L);
         Purchase purchase = makePurchase(5L, user, product);
         when(purchaseRepository.findById(5L)).thenReturn(Optional.of(purchase));
+        PurchaseResponseDTO expectedDto = PurchaseResponseDTO.builder().id(5L).userId("u1").build();
+        when(purchaseMapper.toResponseDTO(purchase)).thenReturn(expectedDto);
 
         PurchaseResponseDTO result = purchaseService.getPurchaseById("u1", 5L);
 

@@ -10,7 +10,9 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "users", indexes = {
@@ -47,8 +49,10 @@ public class User {
     @Column(name = "picture", length = 1024)
     private String picture;
 
-    @Column(name = "allergens", length = 2000)
-    private String allergens;
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_allergens", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "allergen", length = 128)
+    private Set<String> allergens = new LinkedHashSet<>();
 
     @Column(name = "skin_type", length = 32)
     private String skinType;

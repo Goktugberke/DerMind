@@ -257,7 +257,7 @@ curl -X POST http://localhost:8000/score \
 
 - `is_recommended` (opsiyonel, 0.0–1.0): Backend'in `UserProductRating.wouldRecommend` ortalaması. Verilmezse 0.5 (nötr) — cold-start.
 - `allergen_warnings`: Ürün ingredients metninde geçen kullanıcı allergen'leri.
-- `skin_type`: `dry | oily | combination | normal`
+- `skin_type`: `dry | oily | combination | normal | sensitive`
 
 ---
 

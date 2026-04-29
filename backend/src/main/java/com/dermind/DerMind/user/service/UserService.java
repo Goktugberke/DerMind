@@ -8,6 +8,9 @@ import com.dermind.DerMind.user.model.User;
 import com.dermind.DerMind.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,10 +26,8 @@ public class UserService {
     private final UserMapper userMapper;
 
     @Transactional(readOnly = true)
-    public List<UserResponseDTO> getAllUsers() {
-        return userRepository.findAll().stream()
-                .map(userMapper::toResponseDTO)
-                .collect(Collectors.toList());
+    public Page<UserResponseDTO> getAllUsers(Pageable pageable) {
+        return userRepository.findAll(pageable).map(userMapper::toResponseDTO);
     }
 
     @Transactional(readOnly = true)
@@ -90,48 +91,45 @@ public class UserService {
     }
 
     /**
-     * Firebase login — frontend Firebase auth sonrası kullanıcıyı kayıt/güncelle.
-     * Tek doğru kaynak: Firebase UID. Mevcut email kontrolü ile race condition önlenir.
+     * Firebase login — @Transactional YOK, böylece saveAndFlush'ın kendi transaction'ı
+     * tamamlanır ve DataIntegrityViolationException yakalanabilir (race condition koruması).
      */
-    @Transactional
     public UserResponseDTO handleFirebaseLogin(String firebaseUid, String email, String name, String picture) {
         if (firebaseUid == null || firebaseUid.isBlank() || email == null || email.isBlank()) {
             throw new BusinessException("firebaseUid ve email zorunlu");
         }
 
-        // Önce UID ile bul (idempotent), yoksa email ile (mevcut user'lar için backward compat)
-        User user = userRepository.findById(firebaseUid)
+        User existing = userRepository.findById(firebaseUid)
                 .orElseGet(() -> userRepository.findByEmail(email).orElse(null));
 
-        if (user == null) {
-            user = new User();
-            user.setId(firebaseUid);
-            user.setProvider("firebase");
-            user.setProviderId(firebaseUid);
-            user.setEmail(email);
-            user.setName(name);
-            user.setPicture(picture);
-            log.info("New Firebase user created: {} ({})", firebaseUid, email);
-        } else {
-            user.setName(name);
-            user.setPicture(picture);
-            // Email güncelleme tehlikeli (unique constraint), sadece eşleşmiyorsa logla
-            if (!email.equalsIgnoreCase(user.getEmail())) {
+        if (existing != null) {
+            existing.setName(name);
+            existing.setPicture(picture);
+            if (!email.equalsIgnoreCase(existing.getEmail())) {
                 log.warn("Email mismatch for user {}: stored={}, firebase={}",
-                        firebaseUid, user.getEmail(), email);
+                        firebaseUid, existing.getEmail(), email);
             }
+            return userMapper.toResponseDTO(userRepository.save(existing));
         }
-        return userMapper.toResponseDTO(userRepository.save(user));
-    }
 
-    /** Alerjen stringini normalize et: trim, lowercase, boşlukları temizle. */
-    public static String normalizeAllergens(String raw) {
-        if (raw == null || raw.isBlank()) return null;
-        String result = java.util.Arrays.stream(raw.split(","))
-                .map(String::trim)
-                .map(String::toLowerCase)
-                .filter(s -> !s.isEmpty())
-                .collect(java.util.stream.Collectors.joining(","));
-        return result.isEmpty() ? null : result;
+        User newUser = new User();
+        newUser.setId(firebaseUid);
+        newUser.setProvider("firebase");
+        newUser.setProviderId(firebaseUid);
+        newUser.setEmail(email);
+        newUser.setName(name);
+        newUser.setPicture(picture);
+
+        try {
+            log.info("New Firebase user created: {} ({})", firebaseUid, email);
+            return userMapper.toResponseDTO(userRepository.saveAndFlush(newUser));
+        } catch (DataIntegrityViolationException e) {
+            // Eş zamanlı ilk-login: başka bir istek aynı kullanıcıyı yarattı; kazananı fetch et
+            log.warn("Concurrent Firebase login for {} — fetching winner", firebaseUid);
+            return userMapper.toResponseDTO(
+                    userRepository.findById(firebaseUid)
+                            .or(() -> userRepository.findByEmail(email))
+                            .orElseThrow(() -> new BusinessException("Login çakışması, lütfen tekrar deneyin")));
+        }
     }
 }

@@ -24,8 +24,8 @@ public interface UserRepository extends JpaRepository<User, String> {
     // Cilt tipine göre kullanıcıları listeleme
     List<User> findBySkinType(String skinType);
 
-    // Belirli alerjeni olan kullanıcıları bulma
-    @Query("SELECT u FROM User u WHERE u.allergens LIKE %:allergen%")
+    // Belirli alerjeni olan kullanıcıları bulma (ElementCollection join)
+    @Query("SELECT DISTINCT u FROM User u JOIN u.allergens a WHERE a = :allergen")
     List<User> findByAllergenContaining(@Param("allergen") String allergen);
 
     // İsme göre arama (case insensitive)

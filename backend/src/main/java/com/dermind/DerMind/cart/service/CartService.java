@@ -87,10 +87,28 @@ public class CartService {
 
     @Transactional
     public List<CartItemResponseDTO> mergeCart(String userId, List<CartItemAddDTO> localItems) {
+        // Kullanıcıyı bir kez fetch et, döngü içinde tekrar sorgu yapma
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
         for (CartItemAddDTO item : localItems) {
-            addItem(userId, item.getProductId(), item.getQuantity());
+            if (item.getQuantity() <= 0 || item.getQuantity() > 100) continue;
+            Product product = productRepository.findById(item.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product", "id", item.getProductId()));
+            CartItem cartItem = cartItemRepository
+                    .findByUserIdAndProductId(userId, item.getProductId())
+                    .orElseGet(() -> {
+                        CartItem ci = new CartItem();
+                        ci.setUser(user);
+                        ci.setProduct(product);
+                        ci.setQuantity(0);
+                        return ci;
+                    });
+            cartItem.setQuantity(Math.min(cartItem.getQuantity() + item.getQuantity(), 100));
+            cartItemRepository.save(cartItem);
         }
-        return getCart(userId);
+        return cartItemRepository.findByUserId(userId).stream()
+                .map(this::toResponseDTO)
+                .collect(Collectors.toList());
     }
 
     private CartItemResponseDTO toResponseDTO(CartItem cartItem) {

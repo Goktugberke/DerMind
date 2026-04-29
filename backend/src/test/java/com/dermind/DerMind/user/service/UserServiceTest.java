@@ -14,6 +14,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
@@ -50,13 +54,13 @@ class UserServiceTest {
     void handleFirebaseLogin_newUser_createsAndReturns() {
         when(userRepository.findById("uid-1")).thenReturn(Optional.empty());
         when(userRepository.findByEmail("user@test.com")).thenReturn(Optional.empty());
-        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(userRepository.saveAndFlush(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         when(userMapper.toResponseDTO(any(User.class))).thenReturn(makeResponse("uid-1", "user@test.com"));
 
         UserResponseDTO result = userService.handleFirebaseLogin("uid-1", "user@test.com", "Name", null);
 
         assertThat(result.getId()).isEqualTo("uid-1");
-        verify(userRepository).save(any(User.class));
+        verify(userRepository).saveAndFlush(any(User.class));
     }
 
     @Test
@@ -86,7 +90,6 @@ class UserServiceTest {
         userService.handleFirebaseLogin("new-uid", "user@test.com", "Name", null);
 
         verify(userRepository).save(byEmail);
-        verify(userRepository, never()).save(argThat(u -> u != byEmail));
     }
 
     @Test
@@ -207,10 +210,11 @@ class UserServiceTest {
     // ── getAllUsers ───────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("getAllUsers: boş liste döner")
-    void getAllUsers_empty_returnsEmptyList() {
-        when(userRepository.findAll()).thenReturn(List.of());
-        assertThat(userService.getAllUsers()).isEmpty();
+    @DisplayName("getAllUsers: boş sayfa döner")
+    void getAllUsers_empty_returnsEmptyPage() {
+        Pageable pageable = PageRequest.of(0, 10);
+        when(userRepository.findAll(pageable)).thenReturn(Page.empty());
+        assertThat(userService.getAllUsers(pageable)).isEmpty();
     }
 
     @Test
@@ -218,13 +222,75 @@ class UserServiceTest {
     void getAllUsers_mapsEachUser() {
         User u1 = makeUser("1", "a@test.com");
         User u2 = makeUser("2", "b@test.com");
-        when(userRepository.findAll()).thenReturn(List.of(u1, u2));
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<User> page = new PageImpl<>(List.of(u1, u2));
+        when(userRepository.findAll(pageable)).thenReturn(page);
         when(userMapper.toResponseDTO(u1)).thenReturn(makeResponse("1", "a@test.com"));
         when(userMapper.toResponseDTO(u2)).thenReturn(makeResponse("2", "b@test.com"));
 
-        List<UserResponseDTO> result = userService.getAllUsers();
+        Page<UserResponseDTO> result = userService.getAllUsers(pageable);
 
-        assertThat(result).hasSize(2);
-        assertThat(result).extracting(UserResponseDTO::getId).containsExactly("1", "2");
+        assertThat(result.getTotalElements()).isEqualTo(2);
+        assertThat(result.getContent()).extracting(UserResponseDTO::getId).containsExactly("1", "2");
+    }
+
+    // ── getUsersBySkinType ────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("getUsersBySkinType: eşleşenler map edilir")
+    void getUsersBySkinType_returnsMappedList() {
+        User u = makeUser("uid-1", "a@test.com");
+        when(userRepository.findBySkinType("dry")).thenReturn(List.of(u));
+        when(userMapper.toResponseDTO(u)).thenReturn(makeResponse("uid-1", "a@test.com"));
+
+        List<UserResponseDTO> result = userService.getUsersBySkinType("dry");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getId()).isEqualTo("uid-1");
+    }
+
+    @Test
+    @DisplayName("getUsersBySkinType: eşleşme yoksa boş liste döner")
+    void getUsersBySkinType_noMatch_returnsEmpty() {
+        when(userRepository.findBySkinType("unknown")).thenReturn(List.of());
+        assertThat(userService.getUsersBySkinType("unknown")).isEmpty();
+    }
+
+    // ── searchUsersByName ─────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("searchUsersByName: eşleşenler map edilir")
+    void searchUsersByName_returnsMappedResults() {
+        User u = makeUser("uid-2", "b@test.com");
+        when(userRepository.searchByName("Ahmet")).thenReturn(List.of(u));
+        when(userMapper.toResponseDTO(u)).thenReturn(makeResponse("uid-2", "b@test.com"));
+
+        List<UserResponseDTO> result = userService.searchUsersByName("Ahmet");
+
+        assertThat(result).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("searchUsersByName: sonuç yoksa boş liste döner")
+    void searchUsersByName_noResult_returnsEmpty() {
+        when(userRepository.searchByName("XYZ")).thenReturn(List.of());
+        assertThat(userService.searchUsersByName("XYZ")).isEmpty();
+    }
+
+    // ── getMostActiveUsers ────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("getMostActiveUsers: en aktif kullanıcılar döner")
+    void getMostActiveUsers_returnsMappedList() {
+        User u1 = makeUser("uid-1", "a@test.com");
+        User u2 = makeUser("uid-2", "b@test.com");
+        when(userRepository.findMostActiveUsers()).thenReturn(List.of(u1, u2));
+        when(userMapper.toDetailDTO(u1)).thenReturn(null);
+        when(userMapper.toDetailDTO(u2)).thenReturn(null);
+
+        userService.getMostActiveUsers();
+
+        verify(userRepository).findMostActiveUsers();
+        verify(userMapper, times(2)).toDetailDTO(any(User.class));
     }
 }

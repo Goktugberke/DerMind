@@ -31,12 +31,12 @@ class AiServiceClientTest {
         ReflectionTestUtils.setField(aiServiceClient, "internalKey", "");
     }
 
-    private User makeUser(String skinType, boolean hasAcne, String allergens) {
+    private User makeUser(String skinType, boolean hasAcne, java.util.Set<String> allergens) {
         User u = new User();
         u.setId("uid-1");
         u.setSkinType(skinType);
         u.setHasAcne(hasAcne);
-        u.setAllergens(allergens);
+        if (allergens != null) u.setAllergens(allergens);
         return u;
     }
 
@@ -104,7 +104,7 @@ class AiServiceClientTest {
         when(restTemplate.postForEntity(anyString(), any(), eq(AiScoreResponseDTO.class)))
                 .thenReturn(ResponseEntity.ok(response));
 
-        User user = makeUser("sensitive", false, "paraben, fragrance, sulfate");
+        User user = makeUser("sensitive", false, new java.util.LinkedHashSet<>(java.util.Set.of("paraben", "fragrance", "sulfate")));
         Double result = aiServiceClient.getPersonalScore("P003", user, 0.4);
 
         assertThat(result).isEqualTo(6.2);
