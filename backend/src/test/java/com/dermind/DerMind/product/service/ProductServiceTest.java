@@ -229,7 +229,7 @@ class ProductServiceTest {
     void getRecommendationsForUser_allergicUser_lowersScore() {
         User user = new User();
         user.setId("uid-1");
-        user.setAllergens("paraben,fragrance");
+        user.setAllergens(new java.util.LinkedHashSet<>(java.util.Set.of("paraben", "fragrance")));
 
         Product safe = makeProduct(1L, "Clean Product", "P001");
         safe.setIngredients("water, glycerin");
@@ -237,7 +237,8 @@ class ProductServiceTest {
         unsafe.setIngredients("water, paraben");
 
         when(userRepository.findById("uid-1")).thenReturn(Optional.of(user));
-        when(productRepository.findAll()).thenReturn(List.of(safe, unsafe));
+        when(productRepository.findTopQualityProducts(any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(safe, unsafe)));
 
         var result = productService.getRecommendationsForUser("uid-1");
 
