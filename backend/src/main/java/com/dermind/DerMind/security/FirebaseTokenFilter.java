@@ -1,6 +1,7 @@
 package com.dermind.DerMind.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
@@ -47,6 +48,12 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
+
+        // Firebase başlatılmadıysa (service account eksik) tüm istekleri geçir
+        if (FirebaseApp.getApps().isEmpty()) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         String header = request.getHeader(AUTH_HEADER);
 
