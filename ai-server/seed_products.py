@@ -11,9 +11,8 @@ Spring Boot backend'ine POST /api/products üzerinden aktarır.
   python seed_products.py --backend-url http://host:8080 --batch-size 50
   python seed_products.py --token Bearer eyJhb...     # JWT ile
 
-Not: ProductCreateDTO şu an sadece name, brand, ingredients, qualityScore
-     alanlarını kabul ediyor. sephoraProductId, price, category gibi alanlar
-     için backend ProductCreateDTO güncellenmelidir (bkz. TODO.md).
+POST /api/products `hasRole("ADMIN")` ister; admin Firebase token gerek.
+Lokal/CI tohumlama için backend'i bypass eden seed_products_direct.py kullan.
 """
 
 import argparse
@@ -46,26 +45,38 @@ def _fetch_existing(backend_url: str, headers: dict) -> set[str]:
         return set()
 
 
-def _build_payload(row: pd.Series) -> dict:
-    """CSV satırı → ProductCreateDTO JSON."""
-    name  = str(row["product_name"]).strip()
-    brand = str(row["brand_name"]).strip()
+def _build_ingredients(row: pd.Series) -> str:
+    """
+    `ingredients_text` (build_dataset_v2'nin "|"-join ettiği INCI listesi) varsa
+    onu virgülle döndürür — backend'in rule-based allergen taraması ve UI gösterimi
+    için gerçek bileşen metni gerekiyor. Yoksa good_for/banned özetine düşer.
+    """
+    raw = row.get("ingredients_text")
+    if isinstance(raw, str) and raw.strip():
+        parts = [p.strip() for p in raw.split("|") if p.strip()]
+        if parts:
+            return ", ".join(parts)
 
-    # ingredients: CSV'de ham metin yok, özellik sayısından özet üret
     good_flags = [
         col.replace("good_for_", "")
         for col in row.index
         if col.startswith("good_for_") and row[col] > 0
     ]
-    ingredient_summary = (
+    return (
         f"Contains {int(row.get('ingredient_count', 0))} ingredients. "
         f"Beneficial for: {', '.join(good_flags) if good_flags else 'general use'}. "
         f"Banned: {int(row.get('banned_count', 0))}, "
         f"Restricted: {int(row.get('restricted_count', 0))}."
     )
 
+
+def _build_payload(row: pd.Series) -> dict:
+    """CSV satırı → ProductCreateDTO JSON."""
+    name  = str(row["product_name"]).strip()
+    brand = str(row["brand_name"]).strip()
+
     quality = float(row.get("base_score", 5.0))
-    quality = max(0.0, min(10.0, quality))   # 0-10 aralığına kısıt
+    quality = max(0.0, min(10.0, quality))
 
     base_score = float(row.get("base_score", quality))
     base_score = max(0.0, min(10.0, base_score))
@@ -73,18 +84,21 @@ def _build_payload(row: pd.Series) -> dict:
     payload: dict = {
         "name":             name,
         "brand":            brand,
-        "ingredients":      ingredient_summary,
+        "ingredients":      _build_ingredients(row),
         "qualityScore":     round(quality, 2),
         # AI server entegrasyonu için zorunlu alan
         "sephoraProductId": str(row["product_id"]).strip(),
         "baseScore":        round(base_score, 2),
     }
 
-    # Opsiyonel alanlar — CSV'de varsa ekle
     if "price_usd" in row.index and not pd.isna(row["price_usd"]):
         payload["price"] = round(float(row["price_usd"]), 2)
-    if "category" in row.index and not pd.isna(row["category"]):
-        payload["category"] = str(row["category"]).strip()
+
+    # CSV başlığı `primary_category` (eski sürümlerde `category` olabilir)
+    cat = row.get("primary_category", row.get("category"))
+    if isinstance(cat, str) and cat.strip():
+        payload["category"] = cat.strip()
+
     if "secondary_category" in row.index and not pd.isna(row["secondary_category"]):
         payload["secondaryCategory"] = str(row["secondary_category"]).strip()
     if "rating" in row.index and not pd.isna(row["rating"]):

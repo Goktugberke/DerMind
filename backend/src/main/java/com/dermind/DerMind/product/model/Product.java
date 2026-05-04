@@ -36,7 +36,7 @@ public class Product {
     @Column(length = 256)
     private String brand;
 
-    @Column(length = 4000)
+    @Column(columnDefinition = "TEXT")
     private String ingredients;
 
     private Double qualityScore;
