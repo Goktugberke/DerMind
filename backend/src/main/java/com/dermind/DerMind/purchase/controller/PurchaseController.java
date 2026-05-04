@@ -24,7 +24,6 @@ import java.util.Map;
 public class PurchaseController {
 
     private final PurchaseService purchaseService;
-    private final UserService userService;
 
     @PostMapping
     public ResponseEntity<PurchaseResponseDTO> createPurchase(
@@ -54,19 +53,6 @@ public class PurchaseController {
             @CurrentUser User user,
             @PathVariable Long id) {
         return ResponseEntity.ok(purchaseService.getPurchaseDetailById(user.getId(), id));
-    }
-
-    /**
-     * Get purchases by user ID
-     * GET /api/purchases/user/{userId}
-     */
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<List<PurchaseResponseDTO>> getPurchasesByUserId(
-            @CurrentUser User user,
-            @PathVariable String userId) {
-        // We use the authenticated user's ID for security
-        List<PurchaseResponseDTO> purchases = purchaseService.getPurchasesByUserId(user.getId());
-        return ResponseEntity.ok(purchases);
     }
 
     @GetMapping("/my-purchases")

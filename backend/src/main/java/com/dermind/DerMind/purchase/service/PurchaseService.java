@@ -54,20 +54,13 @@ public class PurchaseService {
                 .notes(dto.getNotes())
                 .purchasedAt(LocalDateTime.now())
                 .build();
+        PurchaseResponseDTO response = purchaseMapper.toResponseDTO(purchaseRepository.save(purchase));
 
-        Purchase savedPurchase = purchaseRepository.save(purchase);
-        PurchaseResponseDTO responseDTO = purchaseMapper.toResponseDTO(savedPurchase);
-        
-        // Send confirmation email asychronously or catch the exception so it doesn't rollback
-        if (user.getEmail() != null) {
-            try {
-                mailServiceClient.sendOrderConfirmationMail(user.getEmail(), responseDTO);
-            } catch (Exception e) {
-                // Log exception if needed, but don't fail the transaction
-            }
+        if (user.getEmail() != null && !user.getEmail().isBlank()) {
+            mailServiceClient.sendOrderConfirmationMail(user.getEmail(), response);
         }
 
-        return responseDTO;
+        return response;
     }
 
     @Transactional(readOnly = true)
