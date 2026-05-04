@@ -87,3 +87,11 @@ mock_data.sql
 *.docx
 *.pdf
 CHOICES.md
+
+# Claude Code memory (local AI assistant context — never commit)
+.claude/
+
+# Root-level kişisel dökümanlar
+*.docx
+*.pdf
+CHOICES.md

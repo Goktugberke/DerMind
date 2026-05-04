@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { clearCart, selectCartItems, selectTotalPrice } from '../store/slices/cartSlice';
+import { purchaseApi, type PurchaseCreateDTO } from '../types/api';
 
 const Checkout = () => {
   const dispatch = useAppDispatch();
@@ -28,12 +29,37 @@ const Checkout = () => {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Burada gerçek projede API çağrısı yapılacak
-    alert('Siparişiniz alındı! Teşekkür ederiz.');
-    dispatch(clearCart());
-    navigate('/');
+    setLoading(true);
+
+    try {
+      // Backend expects individual purchase items. We will create a purchase for each item in the cart.
+      const addressString = `${formData.address}, ${formData.city}, ${formData.postalCode}`;
+      
+      for (const item of cart) {
+        const purchaseData: PurchaseCreateDTO = {
+          productId: Number(item.id),
+          quantity: item.quantity,
+          unitPrice: item.price || 0,
+          paymentMethod: 'CREDIT_CARD', // Defaulting since we only accept card info on UI
+          shippingAddress: addressString,
+          notes: ''
+        };
+        await purchaseApi.createPurchase(purchaseData);
+      }
+
+      alert('Siparişiniz alındı! E-posta ile bilgilendirme yapılmıştır.');
+      dispatch(clearCart());
+      navigate('/orders'); // Siparişlerim sayfasına yönlendir
+    } catch (error) {
+      console.error("Sipariş oluşturulurken hata:", error);
+      alert('Sipariş oluşturulurken bir hata oluştu. Lütfen tekrar deneyiniz.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (cart.length === 0) {
@@ -185,8 +211,8 @@ const Checkout = () => {
               </div>
             </section>
 
-            <button type="submit" className="btn btn-primary btn-block">
-              Siparişi Tamamla ({totalPrice.toFixed(2)} ₺)
+            <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
+              {loading ? 'İşleniyor...' : `Siparişi Tamamla (${totalPrice.toFixed(2)} ₺)`}
             </button>
           </form>
 

@@ -66,6 +66,7 @@ const Navbar = () => {
               <Link to="/profile" className="user-name" onClick={closeMenu}>
                 {user?.name}
               </Link>
+              <Link to="/orders" onClick={closeMenu}>Siparişlerim</Link>
               <button className="btn btn-secondary btn-sm" onClick={handleLogout}>
                 Çıkış
               </button>

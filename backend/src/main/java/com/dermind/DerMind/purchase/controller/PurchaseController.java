@@ -23,10 +23,17 @@ import java.util.Map;
 public class PurchaseController {
 
     private final PurchaseService purchaseService;
+    private final UserService userService;
 
     @PostMapping
+<<<<<<< HEAD
+    public ResponseEntity<?> createPurchase(
+            @AuthenticationPrincipal Object principal,
+=======
+
     public ResponseEntity<PurchaseResponseDTO> createPurchase(
             @CurrentUser User user,
+>>>>>>> dev
             @Valid @RequestBody PurchaseCreateDTO dto) {
         PurchaseResponseDTO created = purchaseService.createPurchase(user.getId(), dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
@@ -54,9 +61,26 @@ public class PurchaseController {
         return ResponseEntity.ok(purchaseService.getPurchaseDetailById(user.getId(), id));
     }
 
+    <<<<<<<HEAD
+    /**
+     * Get purchases by user ID
+     * GET /api/purchases/user/{userId}
+     */
+    @GetMapping("/user/{userId}")
+
+    public ResponseEntity<List<PurchaseResponseDTO>> getPurchasesByUserId(
+            @AuthenticationPrincipal Object principal,
+            @PathVariable String userId) {
+        String authenticatedUserId = getUserIdFromPrincipal(principal);
+        // We use the authenticated user's ID for security
+        List<PurchaseResponseDTO> purchases = purchaseService.getPurchasesByUserId(authenticatedUserId);
+        return ResponseEntity.ok(purchases);
+=======
+
     @GetMapping("/my-purchases")
     public ResponseEntity<List<PurchaseResponseDTO>> getMyPurchases(@CurrentUser User user) {
         return ResponseEntity.ok(purchaseService.getPurchasesByUserId(user.getId()));
+>>>>>>> dev
     }
 
     @GetMapping("/my-purchases/recent")
@@ -81,8 +105,7 @@ public class PurchaseController {
     public ResponseEntity<Map<String, Object>> getMyPurchaseStats(@CurrentUser User user) {
         return ResponseEntity.ok(Map.of(
                 "totalPurchases", purchaseService.getTotalPurchaseCountByUserId(user.getId()),
-                "totalSpending", purchaseService.getTotalSpendingByUserId(user.getId())
-        ));
+                "totalSpending", purchaseService.getTotalSpendingByUserId(user.getId())));
     }
 
     @PutMapping("/{id}")
@@ -98,5 +121,23 @@ public class PurchaseController {
     public ResponseEntity<Void> deletePurchase(@PathVariable Long id) {
         purchaseService.deletePurchase(id);
         return ResponseEntity.noContent().build();
+    }<<<<<<<HEAD
+
+    private String getUserIdFromPrincipal(Object principal) {
+        if (principal == null) {
+            throw new UserNotAuthenticatedException("Bu işlemi gerçekleştirmek için giriş yapmalısınız.");
+        }
+        if (principal instanceof org.springframework.security.core.userdetails.UserDetails) {
+            String email = ((org.springframework.security.core.userdetails.UserDetails) principal).getUsername();
+            return userService.getUserByEmail(email).getId();
+        }
+        if (principal instanceof OidcUser) {
+            String providerId = ((OidcUser) principal).getSubject();
+            // Google login logic uses providerId or prefixed ID depending on your implementation
+            // Let's match FavoriteController's logic for consistency
+            return "google_" + providerId;
+        }
+        throw new UserNotAuthenticatedException(
+                "Desteklenmeyen kimlik doğrulama türü: " + principal.getClass().getName());
     }
-}
+}=======}>>>>>>>dev

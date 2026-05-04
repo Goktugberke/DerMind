@@ -13,6 +13,7 @@ import Routine from './pages/Routine';
 import Profile from './pages/Profile';
 import Favorites from './pages/Favorites';
 import ForgotPassword from './pages/ForgotPassword';
+import MyOrders from './pages/MyOrders';
 import './App.css';
 
 function App() {
@@ -38,6 +39,7 @@ function App() {
           <Route path="profile" element={<Profile />} />
           <Route path="favorites" element={<Favorites />} />
           <Route path="forgot-password" element={<ForgotPassword />} />
+          <Route path="orders" element={<MyOrders />} />
         </Route>
       </Routes>
     </BrowserRouter>

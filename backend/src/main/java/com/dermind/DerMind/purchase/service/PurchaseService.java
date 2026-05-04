@@ -11,6 +11,7 @@ import com.dermind.DerMind.purchase.model.Purchase;
 import com.dermind.DerMind.purchase.repository.PurchaseRepository;
 import com.dermind.DerMind.user.model.User;
 import com.dermind.DerMind.user.repository.UserRepository;
+import com.dermind.DerMind.mail.service.MailServiceClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
@@ -53,7 +54,19 @@ public class PurchaseService {
                 .purchasedAt(LocalDateTime.now())
                 .build();
 
+<<<<<<< HEAD
+        Purchase savedPurchase = purchaseRepository.save(purchase);
+        PurchaseResponseDTO responseDTO = mapToResponseDTO(savedPurchase);
+        
+        // Send confirmation email asychronously or catch the exception so it doesn't rollback
+        if (user.getEmail() != null) {
+            mailServiceClient.sendOrderConfirmationMail(user.getEmail(), responseDTO);
+        }
+
+        return responseDTO;
+=======
         return purchaseMapper.toResponseDTO(purchaseRepository.save(purchase));
+>>>>>>> dev
     }
 
     @Transactional(readOnly = true)
@@ -136,9 +149,12 @@ public class PurchaseService {
                 purchase.setDeliveredAt(LocalDateTime.now());
             }
         }
-        if (dto.getPaymentStatus() != null) purchase.setPaymentStatus(dto.getPaymentStatus());
-        if (dto.getTrackingNumber() != null) purchase.setTrackingNumber(dto.getTrackingNumber());
-        if (dto.getNotes() != null) purchase.setNotes(dto.getNotes());
+        if (dto.getPaymentStatus() != null)
+            purchase.setPaymentStatus(dto.getPaymentStatus());
+        if (dto.getTrackingNumber() != null)
+            purchase.setTrackingNumber(dto.getTrackingNumber());
+        if (dto.getNotes() != null)
+            purchase.setNotes(dto.getNotes());
 
         return purchaseMapper.toResponseDTO(purchaseRepository.save(purchase));
     }

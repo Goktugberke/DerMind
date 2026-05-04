@@ -76,14 +76,14 @@ public class ProductService {
     }
 
     @Transactional
-    @CacheEvict(value = {"products-page", "top-quality", "most-purchased"}, allEntries = true)
+    @CacheEvict(value = { "products-page", "top-quality", "most-purchased" }, allEntries = true)
     public ProductResponseDTO createProduct(ProductCreateDTO dto) {
         Product product = productMapper.toEntity(dto);
         return productMapper.toResponseDTO(productRepository.save(product));
     }
 
     @Transactional
-    @CacheEvict(value = {"products-page", "top-quality", "most-purchased"}, allEntries = true)
+    @CacheEvict(value = { "products-page", "top-quality", "most-purchased" }, allEntries = true)
     public ProductResponseDTO updateProduct(Long id, ProductUpdateDTO dto) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
@@ -92,7 +92,7 @@ public class ProductService {
     }
 
     @Transactional
-    @CacheEvict(value = {"products-page", "top-quality", "most-purchased"}, allEntries = true)
+    @CacheEvict(value = { "products-page", "top-quality", "most-purchased" }, allEntries = true)
     public void deleteProduct(Long id) {
         if (!productRepository.existsById(id)) {
             throw new ResourceNotFoundException("Product", "id", id);
@@ -117,11 +117,13 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public Page<ProductResponseDTO> getProductsByMinQuality(Double minScore, Pageable pageable) {
-        return productRepository.findByQualityScoreGreaterThanEqual(minScore, pageable).map(productMapper::toResponseDTO);
+        return productRepository.findByQualityScoreGreaterThanEqual(minScore, pageable)
+                .map(productMapper::toResponseDTO);
     }
 
     @Transactional(readOnly = true)
-    public Page<ProductResponseDTO> filterProducts(String searchTerm, Double minPrice, Double maxPrice, Double minQuality, Pageable pageable) {
+    public Page<ProductResponseDTO> filterProducts(String searchTerm, Double minPrice, Double maxPrice,
+            Double minQuality, Pageable pageable) {
         return productRepository.filterProducts(searchTerm, minPrice, maxPrice, minQuality, pageable)
                 .map(productMapper::toResponseDTO);
     }
@@ -145,8 +147,10 @@ public class ProductService {
     }
 
     /**
-     * Basit kural-tabanlı öneri — kural tabanlı MVP, /api/ai/recommend (KNN) tercih edilmeli.
-     * findAll() yerine top-quality sayfası üzerinde çalışır (maks 200 ürün, OOM önleme).
+     * Basit kural-tabanlı öneri — kural tabanlı MVP, /api/ai/recommend (KNN) tercih
+     * edilmeli.
+     * findAll() yerine top-quality sayfası üzerinde çalışır (maks 200 ürün, OOM
+     * önleme).
      */
     @Transactional(readOnly = true)
     public List<ProductRecommendationDTO> getRecommendationsForUser(String userId) {
@@ -187,8 +191,8 @@ public class ProductService {
         return new ProductRecommendationDTO(
                 product.getId(), product.getName(), product.getBrand(),
                 product.getQualityScore(), matchScore, recommendation,
-                reason.toString().trim().isEmpty() ? "Highly Recommended for your skin profile." : reason.toString().trim()
-        );
+                reason.toString().trim().isEmpty() ? "Highly Recommended for your skin profile."
+                        : reason.toString().trim());
     }
 
     /**
@@ -196,7 +200,8 @@ public class ProductService {
      * DB-side AVG/SUM. N+1 önleme.
      */
     private Double computeRecommendRate(Product product) {
-        if (product.getId() == null) return null;
+        if (product.getId() == null)
+            return null;
         return ratingRepository.getRecommendRateByProductId(product.getId());
     }
 }

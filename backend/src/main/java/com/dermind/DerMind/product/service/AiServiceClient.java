@@ -77,4 +77,18 @@ public class AiServiceClient {
 
         return null;
     }
+
+    public AiRecommendResponse getRecommendations(AiRecommendRequest request) {
+        if (request == null)
+            return null;
+
+        String url = "http://localhost:8000/recommend";
+        try {
+            log.info("Sending recommend request to AI server at: {}", url);
+            return restTemplate.postForObject(url, request, AiRecommendResponse.class);
+        } catch (Exception e) {
+            log.error("Exception occurred while calling AI server /recommend: {}", e.getMessage());
+        }
+        return null;
+    }
 }

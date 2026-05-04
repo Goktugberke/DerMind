@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { auth } from '../firebase';
+
 
 // --- ERROR TYPES ---
 export class ApiError extends Error {
@@ -141,8 +143,33 @@ export interface CartItemAddDTO {
 }
 
 
-export interface PurchaseResponseDTO { id: number; purchaseDate: string; totalAmount: number; }
-export interface PurchaseCreateDTO { productIds: string[]; totalAmount: number; }
+export interface PurchaseResponseDTO { 
+  id: number; 
+  userId: string;
+  userName?: string;
+  productId: number;
+  productName: string;
+  productBrand: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  orderStatus: string;
+  paymentMethod: string;
+  paymentStatus: string;
+  shippingAddress: string;
+  trackingNumber?: string;
+  notes?: string;
+  purchasedAt: string;
+  deliveredAt?: string;
+}
+export interface PurchaseCreateDTO { 
+  productId: number;
+  quantity: number;
+  unitPrice: number;
+  paymentMethod: string;
+  shippingAddress: string;
+  notes?: string;
+}
 export interface PurchaseUpdateDTO { status: string; }
 export interface PurchaseDetailDTO extends PurchaseResponseDTO { items: unknown[]; }
 export interface PurchaseStatsDTO { totalPurchases: number; totalSpent: number; }
@@ -154,7 +181,6 @@ export interface NotificationUnreadCountDTO { count: number; }
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 const apiClient = axios.create({ baseURL: API_BASE_URL, headers: { 'Content-Type': 'application/json' } });
 
-import { auth } from '../firebase';
 
 // --- INTERCEPTORS ---
 // Request Interceptor: Auth header'ı ekle
@@ -253,6 +279,7 @@ export const productApi = {
   },
   getTopQualityProducts: async (limit = 10) => (await apiClient.get<ProductDetailDTO[]>(`/api/products/top/quality?limit=${limit}`)).data,
   getRecommendationsForUser: async (userId: string) => (await apiClient.get<ProductRecommendationDTO[]>(`/api/products/recommendations/${userId}`)).data,
+  getSimilarProducts: async (id: number) => (await apiClient.get<ProductResponseDTO[]>(`/api/products/${id}/similar`)).data,
 };
 
 export const streakApi = {
@@ -285,4 +312,9 @@ export const cartApi = {
   removeItem: async (productId: string | number) => await apiClient.delete(`/api/cart/item/${productId}`),
   clearCart: async () => await apiClient.delete('/api/cart'),
   mergeCart: async (localItems: CartItemAddDTO[]) => (await apiClient.post<CartItemResponseDTO[]>('/api/cart/merge', localItems)).data,
+};
+
+export const purchaseApi = {
+  createPurchase: async (data: PurchaseCreateDTO) => (await apiClient.post<PurchaseResponseDTO>('/api/purchases', data)).data,
+  getPurchasesByUserId: async (userId: string) => (await apiClient.get<PurchaseResponseDTO[]>(`/api/purchases/user/${userId}`)).data,
 };
