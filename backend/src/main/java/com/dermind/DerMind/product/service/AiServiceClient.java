@@ -3,6 +3,8 @@ package com.dermind.DerMind.product.service;
 import com.dermind.DerMind.ai.dto.AiScoreRequestDTO;
 import com.dermind.DerMind.ai.dto.AiScoreResponseDTO;
 import com.dermind.DerMind.ai.dto.UserProfileDTO;
+import com.dermind.DerMind.product.dto.ai.AiRecommendRequest;
+import com.dermind.DerMind.product.dto.ai.AiRecommendResponse;
 import com.dermind.DerMind.user.model.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
