@@ -30,6 +30,7 @@ public class PurchaseService {
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
     private final PurchaseMapper purchaseMapper;
+    private final MailServiceClient mailServiceClient;
 
     @Transactional
     public PurchaseResponseDTO createPurchase(String userId, PurchaseCreateDTO dto) {
@@ -54,19 +55,13 @@ public class PurchaseService {
                 .purchasedAt(LocalDateTime.now())
                 .build();
 
-<<<<<<< HEAD
-        Purchase savedPurchase = purchaseRepository.save(purchase);
-        PurchaseResponseDTO responseDTO = mapToResponseDTO(savedPurchase);
-        
-        // Send confirmation email asychronously or catch the exception so it doesn't rollback
-        if (user.getEmail() != null) {
-            mailServiceClient.sendOrderConfirmationMail(user.getEmail(), responseDTO);
+        PurchaseResponseDTO response = purchaseMapper.toResponseDTO(purchaseRepository.save(purchase));
+
+        if (user.getEmail() != null && !user.getEmail().isBlank()) {
+            mailServiceClient.sendOrderConfirmationMail(user.getEmail(), response);
         }
 
-        return responseDTO;
-=======
-        return purchaseMapper.toResponseDTO(purchaseRepository.save(purchase));
->>>>>>> dev
+        return response;
     }
 
     @Transactional(readOnly = true)
