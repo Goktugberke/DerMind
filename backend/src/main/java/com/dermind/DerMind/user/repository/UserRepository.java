@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,8 +24,8 @@ public interface UserRepository extends JpaRepository<User, String> {
     // Cilt tipine göre kullanıcıları listeleme
     List<User> findBySkinType(String skinType);
 
-    // Belirli alerjeni olan kullanıcıları bulma
-    @Query("SELECT u FROM User u WHERE u.allergens LIKE %:allergen%")
+    // Belirli alerjeni olan kullanıcıları bulma (ElementCollection join)
+    @Query("SELECT DISTINCT u FROM User u JOIN u.allergens a WHERE a = :allergen")
     List<User> findByAllergenContaining(@Param("allergen") String allergen);
 
     // İsme göre arama (case insensitive)
@@ -37,4 +39,11 @@ public interface UserRepository extends JpaRepository<User, String> {
     // En aktif kullanıcıları bulma (en çok satın alma yapanlar)
     @Query("SELECT u FROM User u LEFT JOIN u.purchases p GROUP BY u.id ORDER BY COUNT(p) DESC")
     List<User> findMostActiveUsers();
+
+    // Son 7 günde streak veya satın alma aktivitesi olan kullanıcılar (N+1 önleme)
+    @Query("SELECT DISTINCT u FROM User u WHERE " +
+           "EXISTS (SELECT s FROM Streak s WHERE s.user = u AND s.lastUsedDate >= :streakSince) OR " +
+           "EXISTS (SELECT p FROM Purchase p WHERE p.user = u AND p.createdAt >= :purchaseSince)")
+    List<User> findActiveUsers(@Param("streakSince") LocalDate streakSince,
+                               @Param("purchaseSince") LocalDateTime purchaseSince);
 }

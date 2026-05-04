@@ -1,9 +1,16 @@
 package com.dermind.DerMind.user.service;
 
+import com.dermind.DerMind.error.BusinessException;
+import com.dermind.DerMind.error.ResourceNotFoundException;
 import com.dermind.DerMind.user.dto.*;
+import com.dermind.DerMind.user.mapper.UserMapper;
 import com.dermind.DerMind.user.model.User;
 import com.dermind.DerMind.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,172 +19,117 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class UserService implements org.springframework.security.core.userdetails.UserDetailsService {
+@Slf4j
+public class UserService {
 
     private final UserRepository userRepository;
+    private final UserMapper userMapper;
 
-    @Override
-    public org.springframework.security.core.userdetails.UserDetails loadUserByUsername(String email)
-            throws org.springframework.security.core.userdetails.UsernameNotFoundException {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException(
-                        "User not found: " + email));
-
-        return org.springframework.security.core.userdetails.User
-                .withUsername(user.getEmail())
-                .password("") // Token tabanlı sistemde şifre boş bırakılır
-                .authorities("USER")
-                .build();
+    @Transactional(readOnly = true)
+    public Page<UserResponseDTO> getAllUsers(Pageable pageable) {
+        return userRepository.findAll(pageable).map(userMapper::toResponseDTO);
     }
 
-    // Tüm kullanıcıları getir
-    public List<UserResponseDTO> getAllUsers() {
-        return userRepository.findAll()
-                .stream()
-                .map(this::convertToResponseDTO)
-                .collect(Collectors.toList());
-    }
-
-    // ID ile kullanıcı getir
+    @Transactional(readOnly = true)
     public UserDetailDTO getUserById(String id) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
-        return convertToDetailDTO(user);
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
+        return userMapper.toDetailDTO(user);
     }
 
-    public User getUserByProviderId(String providerId) {
-        return userRepository.findByProviderId(providerId)
-                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı: " + providerId));
-    }
-
-    // Email ile kullanıcı getir
+    @Transactional(readOnly = true)
     public UserResponseDTO getUserByEmail(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
-        return convertToResponseDTO(user);
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
+        return userMapper.toResponseDTO(user);
     }
 
-    // Yeni kullanıcı oluştur
     @Transactional
     public UserResponseDTO createUser(UserCreateDto dto) {
-        // Email kontrolü
         if (userRepository.existsByEmail(dto.getEmail())) {
-            throw new RuntimeException("User already exists with email: " + dto.getEmail());
+            throw new BusinessException("Bu e-posta ile zaten bir kullanıcı mevcut: " + dto.getEmail());
         }
-
-        User user = new User();
-        user.setId(dto.getId());
-        user.setEmail(dto.getEmail());
-        user.setName(dto.getName());
-        user.setAllergens(dto.getAllergens());
-        user.setSkinType(dto.getSkinType());
-        user.setPicture(dto.getPicture());
-
-        User savedUser = userRepository.save(user);
-        return convertToResponseDTO(savedUser);
+        User user = userMapper.toEntity(dto);
+        return userMapper.toResponseDTO(userRepository.save(user));
     }
 
-    // Kullanıcı bilgilerini güncelle
     @Transactional
     public UserResponseDTO updateUser(String id, UserUpdateDto dto) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
-
-        if (dto.getName() != null)
-            user.setName(dto.getName());
-        if (dto.getAllergens() != null)
-            user.setAllergens(dto.getAllergens());
-        if (dto.getSkinType() != null)
-            user.setSkinType(dto.getSkinType());
-        if (dto.getPicture() != null)
-            user.setPicture(dto.getPicture());
-
-        User updatedUser = userRepository.save(user);
-        return convertToResponseDTO(updatedUser);
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
+        userMapper.updateEntity(user, dto);
+        return userMapper.toResponseDTO(userRepository.save(user));
     }
 
-    // Kullanıcıyı sil
     @Transactional
     public void deleteUser(String id) {
         if (!userRepository.existsById(id)) {
-            throw new RuntimeException("User not found with id: " + id);
+            throw new ResourceNotFoundException("User", "id", id);
         }
         userRepository.deleteById(id);
     }
 
-    // Cilt tipine göre kullanıcıları getir
+    @Transactional(readOnly = true)
     public List<UserResponseDTO> getUsersBySkinType(String skinType) {
-        return userRepository.findBySkinType(skinType)
-                .stream()
-                .map(this::convertToResponseDTO)
+        return userRepository.findBySkinType(skinType).stream()
+                .map(userMapper::toResponseDTO)
                 .collect(Collectors.toList());
     }
 
-    // İsme göre kullanıcı ara
+    @Transactional(readOnly = true)
     public List<UserResponseDTO> searchUsersByName(String name) {
-        return userRepository.searchByName(name)
-                .stream()
-                .map(this::convertToResponseDTO)
+        return userRepository.searchByName(name).stream()
+                .map(userMapper::toResponseDTO)
                 .collect(Collectors.toList());
     }
 
-    // En aktif kullanıcıları getir
+    @Transactional(readOnly = true)
     public List<UserDetailDTO> getMostActiveUsers() {
-        return userRepository.findMostActiveUsers()
-                .stream()
-                .map(this::convertToDetailDTO)
+        return userRepository.findMostActiveUsers().stream()
+                .map(userMapper::toDetailDTO)
                 .collect(Collectors.toList());
     }
 
-    // DTO Dönüşüm metodları
-    private UserResponseDTO convertToResponseDTO(User user) {
-        return new UserResponseDTO(
-                user.getId(),
-                user.getEmail(),
-                user.getName(),
-                user.getAllergens(),
-                user.getSkinType(),
-                user.getPicture());
-    }
-
-    // Google Login İşlemi
-    @Transactional
-    public UserResponseDTO handleGoogleLogin(String email, String name, String picture, String providerId) {
-        User user = userRepository.findByEmail(email).orElse(null);
-
-        if (user == null) {
-            // Yeni kullanıcı oluştur
-            user = new User();
-            user.setId("google_" + providerId); // Benzersiz ID
-            user.setEmail(email);
-            user.setName(name);
-            user.setPicture(picture);
-            user.setProvider("google");
-            user.setProviderId(providerId);
-            // Şifre yok çünkü Google ile girdi
-        } else {
-            // Mevcut kullanıcıyı güncelle
-            user.setName(name);
-            user.setPicture(picture);
-            user.setProvider("google");
-            user.setProviderId(providerId);
+    /**
+     * Firebase login — @Transactional YOK, böylece saveAndFlush'ın kendi transaction'ı
+     * tamamlanır ve DataIntegrityViolationException yakalanabilir (race condition koruması).
+     */
+    public UserResponseDTO handleFirebaseLogin(String firebaseUid, String email, String name, String picture) {
+        if (firebaseUid == null || firebaseUid.isBlank() || email == null || email.isBlank()) {
+            throw new BusinessException("firebaseUid ve email zorunlu");
         }
 
-        User savedUser = userRepository.save(user);
-        return convertToResponseDTO(savedUser);
-    }
+        User existing = userRepository.findById(firebaseUid)
+                .orElseGet(() -> userRepository.findByEmail(email).orElse(null));
 
-    private UserDetailDTO convertToDetailDTO(User user) {
-        return new UserDetailDTO(
-                user.getId(),
-                user.getEmail(),
-                user.getName(),
-                user.getAllergens(),
-                user.getSkinType(),
-                user.getPicture(),
-                user.getPurchases() != null ? user.getPurchases().size() : 0,
-                user.getRatings() != null ? user.getRatings().size() : 0,
-                user.getStreaks() != null ? (int) user.getStreaks().stream()
-                        .filter(s -> s.getCurrentStreak() > 0).count() : 0);
+        if (existing != null) {
+            existing.setName(name);
+            existing.setPicture(picture);
+            if (!email.equalsIgnoreCase(existing.getEmail())) {
+                log.warn("Email mismatch for user {}: stored={}, firebase={}",
+                        firebaseUid, existing.getEmail(), email);
+            }
+            return userMapper.toResponseDTO(userRepository.save(existing));
+        }
+
+        User newUser = new User();
+        newUser.setId(firebaseUid);
+        newUser.setProvider("firebase");
+        newUser.setProviderId(firebaseUid);
+        newUser.setEmail(email);
+        newUser.setName(name);
+        newUser.setPicture(picture);
+
+        try {
+            log.info("New Firebase user created: {} ({})", firebaseUid, email);
+            return userMapper.toResponseDTO(userRepository.saveAndFlush(newUser));
+        } catch (DataIntegrityViolationException e) {
+            // Eş zamanlı ilk-login: başka bir istek aynı kullanıcıyı yarattı; kazananı fetch et
+            log.warn("Concurrent Firebase login for {} — fetching winner", firebaseUid);
+            return userMapper.toResponseDTO(
+                    userRepository.findById(firebaseUid)
+                            .or(() -> userRepository.findByEmail(email))
+                            .orElseThrow(() -> new BusinessException("Login çakışması, lütfen tekrar deneyin")));
+        }
     }
 }

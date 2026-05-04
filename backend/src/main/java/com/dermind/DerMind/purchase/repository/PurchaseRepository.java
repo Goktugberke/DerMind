@@ -2,10 +2,12 @@ package com.dermind.DerMind.purchase.repository;
 
 import com.dermind.DerMind.common.enums.OrderStatus;
 import com.dermind.DerMind.purchase.model.Purchase;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -13,17 +15,22 @@ import java.util.List;
 @Repository
 public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
 
+    @EntityGraph(attributePaths = {"user", "product"})
     @Query("SELECT p FROM Purchase p WHERE p.user.id = :userId")
     List<Purchase> findByUserId(@Param("userId") String userId);
 
+    @EntityGraph(attributePaths = {"user", "product"})
     List<Purchase> findByProductId(Long productId);
 
+    @EntityGraph(attributePaths = {"user", "product"})
     List<Purchase> findByOrderStatus(OrderStatus orderStatus);
 
+    @EntityGraph(attributePaths = {"user", "product"})
     @Query("SELECT p FROM Purchase p WHERE p.user.id = :userId AND p.orderStatus = :orderStatus")
     List<Purchase> findByUserIdAndOrderStatus(@Param("userId") String userId,
                                               @Param("orderStatus") OrderStatus orderStatus);
 
+    @EntityGraph(attributePaths = {"user", "product"})
     @Query("SELECT p FROM Purchase p WHERE p.user.id = :userId ORDER BY p.purchasedAt DESC")
     List<Purchase> findRecentPurchasesByUserId(@Param("userId") String userId);
 
@@ -46,9 +53,8 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
     List<Purchase> findRecentPurchasesByUser(@Param("userId") String userId,
                                              @Param("since") LocalDateTime since);
 
-    @Query("SELECT COUNT(p) FROM Purchase p WHERE p.user.id = :userId")
-    Long countByUserId(@Param("userId") String userId);
-
-    @Query("SELECT SUM(p.totalPrice) FROM Purchase p WHERE p.user.id = :userId")
-    BigDecimal sumTotalPriceByUserId(@Param("userId") String userId);
+    /** Haftalık özet için DB-side count — tüm satın alımları belleğe yüklemeyi önler. */
+    @Query("SELECT COUNT(p) FROM Purchase p WHERE p.user.id = :userId AND p.createdAt > :since")
+    long countByUserIdAndCreatedAtAfter(@Param("userId") String userId,
+                                        @Param("since") LocalDateTime since);
 }

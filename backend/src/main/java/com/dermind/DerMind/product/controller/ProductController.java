@@ -2,12 +2,16 @@ package com.dermind.DerMind.product.controller;
 
 import com.dermind.DerMind.product.dto.*;
 import com.dermind.DerMind.product.service.ProductService;
+import com.dermind.DerMind.security.CurrentUser;
+import com.dermind.DerMind.user.model.User;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,127 +19,58 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/products")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+@Validated
 public class ProductController {
 
     private final ProductService productService;
 
-    /**
-     * Get all products
-     * GET /api/products
-     */
     @GetMapping
     public ResponseEntity<Page<ProductResponseDTO>> getAllProducts(Pageable pageable) {
-        Page<ProductResponseDTO> products = productService.getAllProducts(pageable);
-        return ResponseEntity.ok(products);
+        return ResponseEntity.ok(productService.getAllProducts(pageable));
     }
 
-    /**
-     * Get product by ID
-     * GET /api/products/{id}
-     */
     @GetMapping("/{id}")
     public ResponseEntity<ProductDetailDTO> getProductById(@PathVariable Long id) {
-        try {
-            ProductDetailDTO product = productService.getProductById(id);
-            return ResponseEntity.ok(product);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        return ResponseEntity.ok(productService.getProductById(id));
     }
 
-    /**
-     * Get similar products
-     * GET /api/products/{id}/similar
-     */
-    @GetMapping("/{id}/similar")
-    public ResponseEntity<List<ProductResponseDTO>> getSimilarProducts(@PathVariable Long id) {
-        try {
-            List<ProductResponseDTO> similarProducts = productService.getSimilarProducts(id);
-            return ResponseEntity.ok(similarProducts);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
-    /**
-     * Create new product
-     * POST /api/products
-     */
     @PostMapping
-    public ResponseEntity<?> createProduct(@Valid @RequestBody ProductCreateDTO dto) {
-        try {
-            ProductResponseDTO createdProduct = productService.createProduct(dto);
-            return ResponseEntity.status(HttpStatus.CREATED).body(createdProduct);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ProductResponseDTO> createProduct(@Valid @RequestBody ProductCreateDTO dto) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(productService.createProduct(dto));
     }
 
-    /**
-     * Update product
-     * PUT /api/products/{id}
-     */
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateProduct(
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ProductResponseDTO> updateProduct(
             @PathVariable Long id,
             @Valid @RequestBody ProductUpdateDTO dto) {
-        try {
-            ProductResponseDTO updatedProduct = productService.updateProduct(id, dto);
-            return ResponseEntity.ok(updatedProduct);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        return ResponseEntity.ok(productService.updateProduct(id, dto));
     }
 
-    /**
-     * Delete product
-     * DELETE /api/products/{id}
-     */
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
-        try {
-            productService.deleteProduct(id);
-            return ResponseEntity.noContent().build();
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        productService.deleteProduct(id);
+        return ResponseEntity.noContent().build();
     }
 
-    /**
-     * Get products by brand
-     * GET /api/products/brand/{brand}
-     */
     @GetMapping("/brand/{brand}")
-    public ResponseEntity<Page<ProductResponseDTO>> getProductsByBrand(@PathVariable String brand, Pageable pageable) {
-        Page<ProductResponseDTO> products = productService.getProductsByBrand(brand, pageable);
-        return ResponseEntity.ok(products);
+    public ResponseEntity<Page<ProductResponseDTO>> getProductsByBrand(
+            @PathVariable String brand, Pageable pageable) {
+        return ResponseEntity.ok(productService.getProductsByBrand(brand, pageable));
     }
 
     /**
-     * Search products by name
-     * GET /api/products/search/name?name={name}
-     */
-    @GetMapping("/search/name")
-    public ResponseEntity<Page<ProductResponseDTO>> searchProductsByName(@RequestParam String name, Pageable pageable) {
-        Page<ProductResponseDTO> products = productService.searchProductsByName(name, pageable);
-        return ResponseEntity.ok(products);
-    }
-
-    /**
-     * Search products (name or brand)
-     * GET /api/products/search?q={searchTerm}
+     * Search products by name OR brand. Tek doğru search endpoint.
+     * GET /api/products/search?query=...
      */
     @GetMapping("/search")
-    public ResponseEntity<Page<ProductResponseDTO>> searchProducts(@RequestParam String query, Pageable pageable) {
-        Page<ProductResponseDTO> products = productService.searchProducts(query, pageable);
-        return ResponseEntity.ok(products);
+    public ResponseEntity<Page<ProductResponseDTO>> searchProducts(
+            @RequestParam String query, Pageable pageable) {
+        return ResponseEntity.ok(productService.searchProducts(query, pageable));
     }
 
-    /**
-     * Filter products with multiple criteria
-     * GET /api/products/filter?query={q}&minPrice={min}&maxPrice={max}&minQuality={quality}
-     */
     @GetMapping("/filter")
     public ResponseEntity<Page<ProductResponseDTO>> filterProducts(
             @RequestParam(required = false) String query,
@@ -143,54 +78,33 @@ public class ProductController {
             @RequestParam(required = false) Double maxPrice,
             @RequestParam(required = false) Double minQuality,
             Pageable pageable) {
-        Page<ProductResponseDTO> products = productService.filterProducts(query, minPrice, maxPrice, minQuality, pageable);
-        return ResponseEntity.ok(products);
+        return ResponseEntity.ok(productService.filterProducts(query, minPrice, maxPrice, minQuality, pageable));
     }
 
-    /**
-     * Get products by minimum quality score
-     * GET /api/products/quality?min={minScore}
-     */
     @GetMapping("/quality")
     public ResponseEntity<Page<ProductResponseDTO>> getProductsByMinQuality(
             @RequestParam(defaultValue = "0.0") Double min, Pageable pageable) {
         return ResponseEntity.ok(productService.getProductsByMinQuality(min, pageable));
     }
 
-    /**
-     * Get top quality products
-     * GET /api/products/top/quality?limit={limit}
-     */
     @GetMapping("/top/quality")
     public ResponseEntity<List<ProductDetailDTO>> getTopQualityProducts(
             @RequestParam(defaultValue = "10") int limit) {
-        List<ProductDetailDTO> products = productService.getTopQualityProducts(limit);
-        return ResponseEntity.ok(products);
+        return ResponseEntity.ok(productService.getTopQualityProducts(limit));
     }
 
-    /**
-     * Get most purchased products
-     * GET /api/products/top/purchased?limit={limit}
-     */
     @GetMapping("/top/purchased")
     public ResponseEntity<List<ProductDetailDTO>> getMostPurchasedProducts(
             @RequestParam(defaultValue = "10") int limit) {
-        List<ProductDetailDTO> products = productService.getMostPurchasedProducts(limit);
-        return ResponseEntity.ok(products);
+        return ResponseEntity.ok(productService.getMostPurchasedProducts(limit));
     }
 
     /**
-     * Get personalized product recommendations for a user
-     * GET /api/products/recommendations/{userId}
+     * Authenticated user'ın kendi öneri listesi. IDOR koruması:
+     * userId path'ten gelmez, @CurrentUser ile auth'tan alınır.
      */
-    @GetMapping("/recommendations/{userId}")
-    public ResponseEntity<?> getRecommendationsForUser(@PathVariable String userId) {
-        try {
-            List<ProductRecommendationDTO> recommendations =
-                    productService.getRecommendationsForUser(userId);
-            return ResponseEntity.ok(recommendations);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+    @GetMapping("/recommendations/me")
+    public ResponseEntity<List<ProductRecommendationDTO>> getMyRecommendations(@CurrentUser User user) {
+        return ResponseEntity.ok(productService.getRecommendationsForUser(user.getId()));
     }
 }

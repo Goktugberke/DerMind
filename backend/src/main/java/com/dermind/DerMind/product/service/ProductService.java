@@ -1,19 +1,24 @@
 package com.dermind.DerMind.product.service;
 
+import com.dermind.DerMind.error.ResourceNotFoundException;
 import com.dermind.DerMind.product.dto.*;
+import com.dermind.DerMind.product.mapper.ProductMapper;
 import com.dermind.DerMind.product.model.Product;
 import com.dermind.DerMind.product.repository.ProductRepository;
 import com.dermind.DerMind.user.model.User;
 import com.dermind.DerMind.user.repository.UserRepository;
+import com.dermind.DerMind.user_product_rating.repository.UserProductRatingRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import lombok.extern.slf4j.Slf4j;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -24,271 +29,179 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final UserProductRatingRepository ratingRepository;
     private final AiServiceClient aiServiceClient;
+    private final ProductMapper productMapper;
 
+    @Transactional(readOnly = true)
+    @Cacheable(value = "products-page", key = "#pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort.toString()")
     public Page<ProductResponseDTO> getAllProducts(Pageable pageable) {
-        return productRepository.findAll(pageable)
-                .map(this::convertToResponseDTO);
+        return productRepository.findAll(pageable).map(productMapper::toResponseDTO);
     }
 
+    @Transactional(readOnly = true)
     public ProductDetailDTO getProductById(Long id) {
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product not found with id: " + id));
-        
-        ProductDetailDTO dto = convertToDetailDTO(product);
-        
-        // Get current user and fetch personalized score from AI server
-        String userEmail = SecurityContextHolder.getContext().getAuthentication().getName();
-        log.info("Fetching product detail for id: {}, User context email: {}", id, userEmail);
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
 
-        if (userEmail != null && !userEmail.equals("anonymousUser")) {
-            userRepository.findByEmail(userEmail).ifPresent(user -> {
-                log.info("Authenticated user found: {}. Requesting AI score for Sephora Product ID: {}", userEmail, product.getSephoraProductId());
-                Double personalScore = aiServiceClient.getPersonalScore(product.getSephoraProductId(), user);
+        ProductDetailDTO dto = productMapper.toDetailDTO(product);
+        // Aggregates — tek SQL ile (lazy collection iteration yok, N+1 yok)
+        productRepository.findProductStats(id).ifPresentOrElse(stats -> {
+            dto.setAverageUserRating(stats.getAvgRating() != null ? stats.getAvgRating() : 0.0);
+            dto.setTotalRatings(stats.getTotalRatings() != null ? stats.getTotalRatings().intValue() : 0);
+            dto.setTotalPurchases(stats.getTotalPurchases() != null ? stats.getTotalPurchases().intValue() : 0);
+        }, () -> {
+            dto.setAverageUserRating(0.0);
+            dto.setTotalRatings(0);
+            dto.setTotalPurchases(0);
+        });
+
+        // AI personal score (auth user için)
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName())) {
+            String email = auth.getName();
+            userRepository.findByEmail(email).ifPresent(user -> {
+                Double recommendRate = computeRecommendRate(product);
+                Double personalScore = aiServiceClient.getPersonalScore(
+                        product.getSephoraProductId(), user, recommendRate);
                 if (personalScore != null) {
-                    log.info("Successfully received personal score: {} for user: {}", personalScore, userEmail);
                     dto.setPersonalScore(personalScore);
-                } else {
-                    log.warn("AI server returned null score for product: {} and user: {}. Falling back to quality score.", id, userEmail);
                 }
             });
-        } else {
-            log.info("Request is anonymous. Using quality score as personal score fallback.");
         }
-        
         if (dto.getPersonalScore() == null) {
             dto.setPersonalScore(product.getQualityScore());
         }
-        
         return dto;
     }
 
     @Transactional
+    @CacheEvict(value = { "products-page", "top-quality", "most-purchased" }, allEntries = true)
     public ProductResponseDTO createProduct(ProductCreateDTO dto) {
-        Product product = new Product();
-        product.setName(dto.getName());
-        product.setBrand(dto.getBrand());
-        product.setIngredients(dto.getIngredients());
-        product.setQualityScore(dto.getQualityScore());
-        product.setBaseScore(dto.getBaseScore());
-        product.setPrice(dto.getPrice());
-        product.setSephoraProductId(dto.getSephoraProductId());
-        product.setCategory(dto.getCategory());
-        product.setSecondaryCategory(dto.getSecondaryCategory());
-        product.setSephoraRating(dto.getSephoraRating());
-
-        Product savedProduct = productRepository.save(product);
-        return convertToResponseDTO(savedProduct);
+        Product product = productMapper.toEntity(dto);
+        return productMapper.toResponseDTO(productRepository.save(product));
     }
 
     @Transactional
+    @CacheEvict(value = { "products-page", "top-quality", "most-purchased" }, allEntries = true)
     public ProductResponseDTO updateProduct(Long id, ProductUpdateDTO dto) {
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product not found with id: " + id));
-
-        if (dto.getName() != null) product.setName(dto.getName());
-        if (dto.getBrand() != null) product.setBrand(dto.getBrand());
-        if (dto.getIngredients() != null) product.setIngredients(dto.getIngredients());
-        if (dto.getQualityScore() != null) product.setQualityScore(dto.getQualityScore());
-        if (dto.getBaseScore() != null) product.setBaseScore(dto.getBaseScore());
-        if (dto.getPrice() != null) product.setPrice(dto.getPrice());
-        if (dto.getSephoraProductId() != null) product.setSephoraProductId(dto.getSephoraProductId());
-        if (dto.getCategory() != null) product.setCategory(dto.getCategory());
-        if (dto.getSecondaryCategory() != null) product.setSecondaryCategory(dto.getSecondaryCategory());
-        if (dto.getSephoraRating() != null) product.setSephoraRating(dto.getSephoraRating());
-
-        Product updatedProduct = productRepository.save(product);
-        return convertToResponseDTO(updatedProduct);
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
+        productMapper.updateEntity(product, dto);
+        return productMapper.toResponseDTO(productRepository.save(product));
     }
 
     @Transactional
+    @CacheEvict(value = { "products-page", "top-quality", "most-purchased" }, allEntries = true)
     public void deleteProduct(Long id) {
         if (!productRepository.existsById(id)) {
-            throw new RuntimeException("Product not found with id: " + id);
+            throw new ResourceNotFoundException("Product", "id", id);
         }
         productRepository.deleteById(id);
     }
 
+    @Transactional(readOnly = true)
     public Page<ProductResponseDTO> getProductsByBrand(String brand, Pageable pageable) {
-        return productRepository.findByBrand(brand, pageable)
-                .map(this::convertToResponseDTO);
+        return productRepository.findByBrand(brand, pageable).map(productMapper::toResponseDTO);
     }
 
+    @Transactional(readOnly = true)
     public Page<ProductResponseDTO> searchProductsByName(String name, Pageable pageable) {
-        return productRepository.searchByName(name, pageable)
-                .map(this::convertToResponseDTO);
+        return productRepository.searchByName(name, pageable).map(productMapper::toResponseDTO);
     }
 
+    @Transactional(readOnly = true)
     public Page<ProductResponseDTO> searchProducts(String searchTerm, Pageable pageable) {
-        return productRepository.searchProducts(searchTerm, pageable)
-                .map(this::convertToResponseDTO);
+        return productRepository.searchProducts(searchTerm, pageable).map(productMapper::toResponseDTO);
     }
 
+    @Transactional(readOnly = true)
     public Page<ProductResponseDTO> getProductsByMinQuality(Double minScore, Pageable pageable) {
         return productRepository.findByQualityScoreGreaterThanEqual(minScore, pageable)
-                .map(this::convertToResponseDTO);
+                .map(productMapper::toResponseDTO);
     }
 
-    public Page<ProductResponseDTO> filterProducts(String searchTerm, Double minPrice, Double maxPrice, Double minQuality, Pageable pageable) {
+    @Transactional(readOnly = true)
+    public Page<ProductResponseDTO> filterProducts(String searchTerm, Double minPrice, Double maxPrice,
+            Double minQuality, Pageable pageable) {
         return productRepository.filterProducts(searchTerm, minPrice, maxPrice, minQuality, pageable)
-                .map(this::convertToResponseDTO);
+                .map(productMapper::toResponseDTO);
     }
 
+    @Transactional(readOnly = true)
+    @Cacheable(value = "top-quality", key = "#limit")
     public List<ProductDetailDTO> getTopQualityProducts(int limit) {
-        return productRepository.findTopQualityProducts(Pageable.ofSize(limit))
-                .getContent().stream().map(this::convertToDetailDTO).collect(Collectors.toList());
-    }
-
-    public List<ProductDetailDTO> getMostPurchasedProducts(int limit) {
-        return productRepository.findMostPurchasedProducts(Pageable.ofSize(limit))
-                .getContent().stream().map(this::convertToDetailDTO).collect(Collectors.toList());
-    }
-
-    public List<ProductRecommendationDTO> getRecommendationsForUser(String userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
-
-        List<Product> allProducts = productRepository.findAll();
-        List<ProductRecommendationDTO> recommendations = new ArrayList<>();
-
-        for (Product product : allProducts) {
-            ProductRecommendationDTO recommendation = analyzeProductForUser(product, user);
-            recommendations.add(recommendation);
-        }
-
-        return recommendations.stream()
-                .sorted((r1, r2) -> Double.compare(r2.getMatchScore(), r1.getMatchScore()))
+        return productRepository.findTopQualityProducts(Pageable.ofSize(Math.min(limit, 100)))
+                .getContent().stream()
+                .map(productMapper::toDetailDTO)
                 .collect(Collectors.toList());
     }
 
-    public List<ProductResponseDTO> getSimilarProducts(Long productId) {
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new RuntimeException("Product not found with id: " + productId));
-
-        String userEmail = SecurityContextHolder.getContext().getAuthentication().getName();
-        User currentUser = null;
-        if (userEmail != null && !userEmail.equals("anonymousUser")) {
-            currentUser = userRepository.findByEmail(userEmail).orElse(null);
-        }
-
-        List<String> userAllergies = java.util.Collections.emptyList();
-        String skinType = "normal";
-        boolean hasAcne = false;
-
-        if (currentUser != null) {
-            if (currentUser.getAllergens() != null && !currentUser.getAllergens().isBlank()) {
-                userAllergies = java.util.Arrays.asList(currentUser.getAllergens().split(","));
-            }
-            if (currentUser.getSkinType() != null) {
-                skinType = currentUser.getSkinType().toLowerCase();
-            }
-        }
-
-        com.dermind.DerMind.product.dto.ai.AiUserProfile aiProfile = com.dermind.DerMind.product.dto.ai.AiUserProfile.builder()
-                .skin_type(skinType)
-                .has_acne(hasAcne)
-                .allergies(userAllergies)
-                .build();
-
-        com.dermind.DerMind.product.dto.ai.AiRecommendRequest request = com.dermind.DerMind.product.dto.ai.AiRecommendRequest.builder()
-                .user(aiProfile)
-                .category(product.getCategory())
-                .secondary_category(product.getSecondaryCategory())
-                .top_k(6) // Request 6 in case the product itself is returned
-                .build();
-
-        com.dermind.DerMind.product.dto.ai.AiRecommendResponse response = aiServiceClient.getRecommendations(request);
-
-        List<ProductResponseDTO> similarProducts = new ArrayList<>();
-        if (response != null && response.getRecommendations() != null) {
-            for (com.dermind.DerMind.product.dto.ai.AiRecommendation aiRec : response.getRecommendations()) {
-                if (aiRec.getProduct_id().equals(product.getSephoraProductId())) continue;
-
-                productRepository.findBySephoraProductId(aiRec.getProduct_id()).ifPresent(p -> {
-                    ProductResponseDTO dto = convertToResponseDTO(p);
-                    // Use similarity score as personalScore for this specific view if needed,
-                    // but for now we just return the DTO
-                    dto.setPersonalScore(aiRec.getSimilarity());
-                    similarProducts.add(dto);
-                });
-
-                if (similarProducts.size() >= 5) break;
-            }
-        }
-        return similarProducts;
+    @Transactional(readOnly = true)
+    @Cacheable(value = "most-purchased", key = "#limit")
+    public List<ProductDetailDTO> getMostPurchasedProducts(int limit) {
+        return productRepository.findMostPurchasedProducts(Pageable.ofSize(Math.min(limit, 100)))
+                .getContent().stream()
+                .map(productMapper::toDetailDTO)
+                .collect(Collectors.toList());
     }
+
+    /**
+     * Basit kural-tabanlı öneri — kural tabanlı MVP, /api/ai/recommend (KNN) tercih
+     * edilmeli.
+     * findAll() yerine top-quality sayfası üzerinde çalışır (maks 200 ürün, OOM
+     * önleme).
+     */
+    @Transactional(readOnly = true)
+    public List<ProductRecommendationDTO> getRecommendationsForUser(String userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+        return productRepository.findTopQualityProducts(Pageable.ofSize(200))
+                .getContent().stream()
+                .map(p -> analyzeProductForUser(p, user))
+                .sorted((a, b) -> Double.compare(b.getMatchScore(), a.getMatchScore()))
+                .collect(Collectors.toList());
+    }
+
+    private static final double ALLERGEN_PENALTY = 50.0;
+    private static final double QUALITY_WEIGHT = 3.0;
+    private static final double QUALITY_BIAS = 15.0;
 
     private ProductRecommendationDTO analyzeProductForUser(Product product, User user) {
         double matchScore = 100.0;
         StringBuilder reason = new StringBuilder();
         String recommendation = "Highly Recommended";
 
-        if (user.getAllergens() != null && !user.getAllergens().isEmpty()) {
-            String[] allergens = user.getAllergens().split(",");
-            for (String allergen : allergens) {
-                if (product.getIngredients() != null && product.getIngredients().toLowerCase().contains(allergen.trim().toLowerCase())) {
-                    matchScore -= 50.0;
-                    reason.append(String.format("Warning: Contains allergen '%s'. ", allergen.trim()));
+        if (user.getAllergens() != null && !user.getAllergens().isEmpty()
+                && product.getIngredients() != null) {
+            String ingredientsLower = product.getIngredients().toLowerCase();
+            for (String allergen : user.getAllergens()) {
+                if (ingredientsLower.contains(allergen)) {
+                    matchScore -= ALLERGEN_PENALTY;
+                    reason.append(String.format("Warning: Contains allergen '%s'. ", allergen));
                     recommendation = "Not Recommended";
                 }
             }
         }
-
         if (product.getQualityScore() != null) {
-            matchScore += (product.getQualityScore() * 3) - 15.0;
+            matchScore += (product.getQualityScore() * QUALITY_WEIGHT) - QUALITY_BIAS;
         }
-
-        if (matchScore > 100) matchScore = 100.0;
-        if (matchScore < 0) matchScore = 0.0;
+        matchScore = Math.max(0.0, Math.min(100.0, matchScore));
 
         return new ProductRecommendationDTO(
-                product.getId(),
-                product.getName(),
-                product.getBrand(),
-                product.getQualityScore(),
-                matchScore,
-                recommendation,
-                reason.toString().trim().isEmpty() ? "Highly Recommended for your skin profile." : reason.toString().trim()
-        );
+                product.getId(), product.getName(), product.getBrand(),
+                product.getQualityScore(), matchScore, recommendation,
+                reason.toString().trim().isEmpty() ? "Highly Recommended for your skin profile."
+                        : reason.toString().trim());
     }
 
-    private ProductResponseDTO convertToResponseDTO(Product product) {
-        return new ProductResponseDTO(
-                product.getId(),
-                product.getName(),
-                product.getBrand(),
-                product.getIngredients(),
-                product.getQualityScore(),
-                product.getBaseScore(),
-                product.getPrice(),
-                product.getSephoraProductId(),
-                product.getCategory(),
-                product.getSecondaryCategory(),
-                product.getSephoraRating(),
-                null // personalScore
-        );
-    }
-
-    private ProductDetailDTO convertToDetailDTO(Product product) {
-        double avgRating = 0.0;
-        if (product.getRatings() != null && !product.getRatings().isEmpty()) {
-            avgRating = product.getRatings().stream()
-                    .filter(r -> r.getRating() != null)
-                    .mapToDouble(r -> r.getRating().doubleValue())
-                    .average()
-                    .orElse(0.0);
-        }
-
-        return new ProductDetailDTO(
-                product.getId(),
-                product.getName(),
-                product.getBrand(),
-                product.getIngredients(),
-                product.getQualityScore(),
-                avgRating,
-                product.getRatings() != null ? product.getRatings().size() : 0,
-                product.getPurchases() != null ? product.getPurchases().size() : 0,
-                null // personalScore
-        );
+    /**
+     * Tek SQL aggregate ile recommendRate hesaplar — collection iteration yerine
+     * DB-side AVG/SUM. N+1 önleme.
+     */
+    private Double computeRecommendRate(Product product) {
+        if (product.getId() == null)
+            return null;
+        return ratingRepository.getRecommendRateByProductId(product.getId());
     }
 }

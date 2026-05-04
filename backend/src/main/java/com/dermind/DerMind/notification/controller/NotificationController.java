@@ -1,12 +1,13 @@
 package com.dermind.DerMind.notification.controller;
 
-import com.dermind.DerMind.error.UserNotAuthenticatedException;
 import com.dermind.DerMind.notification.dto.NotificationResponseDTO;
 import com.dermind.DerMind.notification.service.NotificationService;
+import com.dermind.DerMind.security.CurrentUser;
+import com.dermind.DerMind.user.model.User;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,37 +16,38 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/notifications")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*") // Canlıda kendi domaininle değiştir
+@Validated
 public class NotificationController {
 
     private final NotificationService notificationService;
 
-    // Kullanıcının tüm bildirimlerini getir
     @GetMapping
-    public ResponseEntity<List<NotificationResponseDTO>> getMyNotifications(@AuthenticationPrincipal OidcUser principal) {
-        String userId = getUserId(principal);
-        return ResponseEntity.ok(notificationService.getUserNotifications(userId));
+    public ResponseEntity<List<NotificationResponseDTO>> getMyNotifications(@CurrentUser User user) {
+        return ResponseEntity.ok(notificationService.getUserNotifications(user.getId()));
     }
 
-    // Okunmamış bildirim sayısı (Uygulama ikonunda kırmızı sayı göstermek için)
     @GetMapping("/unread-count")
-    public ResponseEntity<Map<String, Long>> getUnreadCount(@AuthenticationPrincipal OidcUser principal) {
-        String userId = getUserId(principal);
-        return ResponseEntity.ok(Map.of("count", notificationService.getUnreadCount(userId)));
+    public ResponseEntity<Map<String, Long>> getUnreadCount(@CurrentUser User user) {
+        return ResponseEntity.ok(Map.of("count", notificationService.getUnreadCount(user.getId())));
     }
 
-    // Bildirimi okundu olarak işaretle
     @PutMapping("/{id}/read")
-    public ResponseEntity<Void> markAsRead(@AuthenticationPrincipal OidcUser principal, @PathVariable Long id) {
-        String userId = getUserId(principal);
-        notificationService.markAsRead(userId, id);
-        return ResponseEntity.ok().build();
+    @PreAuthorize("@authz.isNotificationOwner(#id)")
+    public ResponseEntity<Void> markAsRead(@CurrentUser User user, @PathVariable Long id) {
+        notificationService.markAsRead(user.getId(), id);
+        return ResponseEntity.noContent().build();
     }
 
-    private String getUserId(OidcUser principal) {
-        if (principal == null) {
-            throw new UserNotAuthenticatedException("Giriş yapmalısınız.");
-        }
-        return principal.getSubject();
+    @PutMapping("/read-all")
+    public ResponseEntity<Void> markAllAsRead(@CurrentUser User user) {
+        notificationService.markAllAsRead(user.getId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("@authz.isNotificationOwner(#id)")
+    public ResponseEntity<Void> deleteNotification(@CurrentUser User user, @PathVariable Long id) {
+        notificationService.deleteNotification(user.getId(), id);
+        return ResponseEntity.noContent().build();
     }
 }

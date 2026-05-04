@@ -351,6 +351,14 @@ product_vectors = sephora[vector_cols].copy()
 product_vectors["rating"] = product_vectors["rating"].fillna(product_vectors["rating"].median())
 product_vectors["price_usd"] = product_vectors["price_usd"].fillna(product_vectors["price_usd"].median())
 
+# Allergen text-matching için ingredients listesini "|" ile birleştirip kaydet.
+# Bu kolon /recommend ve /score'da kullanıcının allergen listesini ürün ingredients'ına
+# karşı sorgulamak için kullanılır (banned_count yetersiz — Sephora ingredient'ı CosIng'de
+# olmayabilir ama kullanıcı için hâlâ allergen olabilir).
+product_vectors["ingredients_text"] = sephora["clean_ingredients"].apply(
+    lambda lst: "|".join(lst) if isinstance(lst, list) else ""
+)
+
 output_path_vectors = os.path.join(BASE_DIR, "dermind_knn_product_vectors.csv")
 product_vectors.to_csv(output_path_vectors, index=False, encoding="utf-8-sig")
 print(f"  Kaydedildi: {output_path_vectors}")

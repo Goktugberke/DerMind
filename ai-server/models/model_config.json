@@ -1,10 +1,14 @@
 {
   "version": "2.0",
+  "best_model": "xgboost",
+  "total_products": 4692,
   "scoring_features": [
     "skin_dry",
     "skin_oily",
     "skin_combination",
     "skin_normal",
+    "rating",
+    "is_recommended",
     "ingredient_count",
     "banned_count",
     "restricted_count",
@@ -26,8 +30,7 @@
     "avoid_sensitive",
     "avoid_combination",
     "avoid_pregnancy",
-    "avoid_barrier",
-    "is_recommended"
+    "avoid_barrier"
   ],
   "knn_features": [
     "ingredient_count",
@@ -55,72 +58,126 @@
     "rating",
     "price_usd"
   ],
-  "target": "target_score",
-  "coldstart_metrics": {
-    "mae": 0.3613,
-    "r2": 0.9184
-  },
+  "xgb_best_iteration": 999,
   "xgb_metrics": {
-    "mae": 0.3912,
-    "rmse": 0.5194,
-    "r2": 0.853
+    "val_rmse": 0.0157,
+    "mae": 0.0097,
+    "rmse": 0.0157,
+    "r2": 0.9999,
+    "within_05_pct": 100.0,
+    "within_1_pct": 100.0,
+    "cv_r2_mean": 0.9985,
+    "cv_r2_std": 0.0009
   },
   "rf_metrics": {
-    "mae": 0.4039,
-    "rmse": 0.5265,
-    "r2": 0.8489
+    "mae": 0.0022,
+    "rmse": 0.0226,
+    "r2": 0.9997
   },
-  "cv_r2_mean": 0.8386,
-  "cv_r2_std": 0.0166,
-  "best_model": "xgboost",
-  "shap_top_features": [
+  "shap_top10": [
     {
-      "name": "is_recommended",
-      "importance": 1.324
+      "feature": "rating",
+      "mean_abs_shap": 0.67
     },
     {
-      "name": "base_score",
-      "importance": 0.7798
+      "feature": "base_score",
+      "mean_abs_shap": 0.5662
     },
     {
-      "name": "penalty_score",
-      "importance": 0.2988
+      "feature": "good_for_acne",
+      "mean_abs_shap": 0.1309
     },
     {
-      "name": "banned_count",
-      "importance": 0.1898
+      "feature": "good_for_oily",
+      "mean_abs_shap": 0.1296
     },
     {
-      "name": "good_for_acne",
-      "importance": 0.119
+      "feature": "skin_dry",
+      "mean_abs_shap": 0.0919
     },
     {
-      "name": "good_for_oily",
-      "importance": 0.1095
+      "feature": "good_for_dry",
+      "mean_abs_shap": 0.0604
     },
     {
-      "name": "skin_dry",
-      "importance": 0.0958
+      "feature": "is_recommended",
+      "mean_abs_shap": 0.0397
     },
     {
-      "name": "good_for_dry",
-      "importance": 0.0546
+      "feature": "good_for_texture",
+      "mean_abs_shap": 0.0396
     },
     {
-      "name": "restricted_count",
-      "importance": 0.0413
+      "feature": "penalty_score",
+      "mean_abs_shap": 0.0309
     },
     {
-      "name": "skin_normal",
-      "importance": 0.0395
+      "feature": "skin_normal",
+      "mean_abs_shap": 0.0305
     }
   ],
-  "categories": [
-    "Bath & Body",
-    "Makeup",
-    "Skincare"
+  "per_skin_mae": [
+    {
+      "skin_type": "dry",
+      "n": 27615,
+      "mae": 0.0162,
+      "true_mean": 6.3,
+      "pred_mean": 6.3
+    },
+    {
+      "skin_type": "oily",
+      "n": 17748,
+      "mae": 0.009,
+      "true_mean": 6.02,
+      "pred_mean": 6.02
+    },
+    {
+      "skin_type": "combination",
+      "n": 80227,
+      "mae": 0.0074,
+      "true_mean": 6.08,
+      "pred_mean": 6.08
+    },
+    {
+      "skin_type": "normal",
+      "n": 19334,
+      "mae": 0.0107,
+      "true_mean": 5.88,
+      "pred_mean": 5.88
+    }
   ],
-  "total_products": 4692,
-  "total_training_rows": 966157,
-  "total_synthetic_rows": 50000
+  "data_splits": {
+    "train": 676309,
+    "val": 144924,
+    "test": 144924
+  },
+  "hyperparameters": {
+    "xgboost": {
+      "objective": "reg:squarederror",
+      "n_estimators": 1000,
+      "learning_rate": 0.05,
+      "max_depth": 6,
+      "min_child_weight": 3,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8,
+      "reg_alpha": 0.1,
+      "reg_lambda": 1.0,
+      "tree_method": "hist",
+      "device": "cpu",
+      "n_jobs": -1,
+      "verbosity": 0
+    },
+    "random_forest": {
+      "n_estimators": 200,
+      "max_depth": null,
+      "min_samples_leaf": 5,
+      "n_jobs": -1,
+      "random_state": 42
+    },
+    "knn": {
+      "k": 10,
+      "metric": "cosine"
+    }
+  },
+  "random_seed": 42
 }

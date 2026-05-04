@@ -17,16 +17,29 @@ import java.util.List;
 import java.util.Set;
 
 @Entity
-@Table(name = "streaks")
+@Table(name = "streaks", indexes = {
+        @Index(name = "idx_streaks_user_id", columnList = "user_id"),
+        @Index(name = "idx_streaks_product_id", columnList = "product_id"),
+        @Index(name = "idx_streaks_user_product", columnList = "user_id,product_id", unique = true),
+        @Index(name = "idx_streaks_last_used", columnList = "last_used_date")
+})
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(of = "id")
+@ToString(exclude = {"user", "product"})
 public class Streak {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    /** Optimistic locking — recordUsage'da çift istek race condition'ı önler. */
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -36,9 +49,11 @@ public class Streak {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
+    @Builder.Default
     @Column(name = "current_streak", nullable = false)
     private Integer currentStreak = 0;
 
+    @Builder.Default
     @Column(name = "longest_streak", nullable = false)
     private Integer longestStreak = 0;
 
@@ -49,32 +64,35 @@ public class Streak {
     private LocalDate lastCompletedDate;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "usage_frequency")
+    @Column(name = "usage_frequency", length = 32)
     private UsageFrequency usageFrequency;
 
-    @ElementCollection(targetClass = UsageTime.class)
+    @ElementCollection(targetClass = UsageTime.class, fetch = FetchType.LAZY)
     @Enumerated(EnumType.STRING)
     @CollectionTable(name = "streak_usage_times", joinColumns = @JoinColumn(name = "streak_id"))
     @Column(name = "usage_time")
-    private java.util.Set<UsageTime> usageTimes;
+    private Set<UsageTime> usageTimes;
 
-    @ElementCollection(targetClass = java.time.DayOfWeek.class)
+    @ElementCollection(targetClass = DayOfWeek.class, fetch = FetchType.LAZY)
     @Enumerated(EnumType.STRING)
     @CollectionTable(name = "streak_days_of_week", joinColumns = @JoinColumn(name = "streak_id"))
     @Column(name = "day_of_week")
-    private java.util.Set<java.time.DayOfWeek> daysOfWeek;
+    private Set<DayOfWeek> daysOfWeek;
 
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "streak_custom_times", joinColumns = @JoinColumn(name = "streak_id"))
     @Column(name = "custom_time")
-    private java.util.List<java.time.LocalTime> customTimes;
+    private List<LocalTime> customTimes;
 
+    @Builder.Default
     @Column(name = "daily_usage_counter", nullable = false)
     private Integer dailyUsageCounter = 0;
 
+    @Builder.Default
     @Column(name = "total_uses", nullable = false)
     private Integer totalUses = 0;
 
+    @Builder.Default
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
