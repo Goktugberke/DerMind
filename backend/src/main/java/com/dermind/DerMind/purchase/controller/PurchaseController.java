@@ -5,6 +5,7 @@ import com.dermind.DerMind.purchase.dto.*;
 import com.dermind.DerMind.purchase.service.PurchaseService;
 import com.dermind.DerMind.security.CurrentUser;
 import com.dermind.DerMind.user.model.User;
+import com.dermind.DerMind.user.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
