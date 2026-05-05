@@ -19,6 +19,10 @@ import { CouponsScreen } from '@features/profile/CouponsScreen';
 import { SettingsScreen } from '@features/profile/SettingsScreen';
 import { PersonalInfoScreen } from '@features/profile/PersonalInfoScreen';
 import { PaymentMethodsScreen } from '@features/profile/PaymentMethodsScreen';
+import { MyRoutines } from '@features/profile/MyRoutines';
+import { EditRoutineScreen } from '@features/profile/EditRoutineScreen';
+import { MyReviewsScreen } from '@features/profile/MyReviewsScreen';
+import { EditReviewScreen } from '@features/profile/EditReviewScreen';
 
 // Tabs
 import { TabNavigator } from './TabNavigator';
@@ -65,6 +69,10 @@ export const RootNavigator = () => {
           <Stack.Screen name="Orders" component={OrdersScreen} />
           <Stack.Screen name="TrackOrder" component={TrackOrderScreen} />
           <Stack.Screen name="Coupons" component={CouponsScreen} />
+          <Stack.Screen name="MyRoutines" component={MyRoutines} />
+          <Stack.Screen name="MyReviews" component={MyReviewsScreen} />
+          <Stack.Screen name="EditReview" component={EditReviewScreen} />
+          <Stack.Screen name="EditRoutine" component={EditRoutineScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
           <Stack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
           <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />

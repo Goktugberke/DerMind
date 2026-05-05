@@ -61,6 +61,16 @@ export const ProfileScreen = () => {
             onPress={() => navigation.navigate('Coupons')}
           />
           <ProfileMenuItem
+            label="My Routines"
+            icon={<Settings size={22} color={theme.colors.text} />}
+            onPress={() => navigation.navigate('MyRoutines')}
+          />
+          <ProfileMenuItem
+            label="My Reviews"
+            icon={<Settings size={22} color={theme.colors.text} />}
+            onPress={() => navigation.navigate('MyReviews')}
+          />
+          <ProfileMenuItem
             label="Settings"
             icon={<Settings size={22} color={theme.colors.text} />}
             onPress={() => navigation.navigate('Settings')}
@@ -100,7 +110,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: 20,
     marginTop: 30,
-    marginBottom: 60,
+    marginBottom: 40,
   },
   textContainer: {
     marginLeft: 20,

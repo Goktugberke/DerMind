@@ -56,6 +56,8 @@ public class UserProductRatingService {
                 .pros(dto.getPros())
                 .cons(dto.getCons())
                 .verifiedPurchase(verifiedPurchase)
+                .usageFrequencyString(dto.getUsageFrequencyString())
+                .usageAmountString(dto.getUsageAmountString())
                 .build();
 
         return ratingMapper.toResponseDTO(ratingRepository.save(rating));

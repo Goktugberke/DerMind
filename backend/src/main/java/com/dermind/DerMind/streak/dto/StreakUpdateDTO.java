@@ -9,8 +9,11 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class StreakUpdateDTO {
-
     private UsageFrequency usageFrequency;
+
+    private java.util.List<java.time.LocalTime> customTimes;
+
+    private java.util.Set<java.time.DayOfWeek> daysOfWeek;
 
     private Boolean isActive;
 }

@@ -1,17 +1,74 @@
 // src/screens/CheckoutScreen.tsx
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, SafeAreaView, TextInput } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, SafeAreaView, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { PageHeader } from '@components/PageHeader';
 import { CustomButton } from '@components/CustomButton';
 import { PaymentCard } from '@components/PaymentCard';
 import { Lock, Info, ShieldCheck } from 'lucide-react-native';
 import { theme } from '@constants/theme';
 
+import { useCreatePurchase, useStartStreak, useClearCart } from '../../services/api';
+
 export const CheckoutScreen = ({ route, navigation }: any) => {
     // CartScreen'den gelen veriler
     const { subtotal, shipping, total, items, appliedCoupon, discount } = route.params || {};
     const [selectedCard, setSelectedCard] = useState('1');
     const [cardName, setCardName] = useState('');
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    const { mutateAsync: createPurchase } = useCreatePurchase();
+    const { mutateAsync: startStreak } = useStartStreak();
+    const { mutateAsync: clearCart } = useClearCart();
+
+    const handlePayment = async () => {
+        if (!items || items.length === 0) {
+            Alert.alert("Error", "Your cart is empty.");
+            return;
+        }
+
+        setIsProcessing(true);
+        try {
+            for (const item of items) {
+                const productId = item.productId || item.id;
+
+                // 1. Satın alma işlemini kaydet
+                await createPurchase({
+                    productId: productId,
+                    quantity: item.quantity || 1,
+                    unitPrice: item.price,
+                    paymentMethod: "CREDIT_CARD",
+                    shippingAddress: "Default Shipping Address",
+                    notes: "Mobile App Purchase"
+                });
+
+                // 2. Otomatik Streak başlat
+                await startStreak({
+                    productId: productId,
+                    usageFrequency: "DAILY"
+                });
+            }
+
+            // 3. Sepeti temizle
+            try {
+                await clearCart();
+            } catch (e) {
+                console.log("Could not clear cart on backend, continuing...", e);
+            }
+
+            Alert.alert(
+                "Payment Successful",
+                "Your products are purchased!",
+                [
+                    { text: "OK", onPress: () => navigation.navigate('MainApp') }
+                ]
+            );
+        } catch (error) {
+            console.error("Payment error:", error);
+            Alert.alert("Payment Failed", "An error occurred while processing your payment.");
+        } finally {
+            setIsProcessing(false);
+        }
+    };
 
     const savedCards = [
         { id: '1', type: 'Visa', lastFour: '4242', expiry: '05/26' },
@@ -112,7 +169,11 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
             </ScrollView>
 
             <View style={styles.footer}>
-                <CustomButton title="Pay Now" onPress={() => console.log('Payment Processed')} />
+                {isProcessing ? (
+                    <ActivityIndicator size="large" color="#8B2E6E" />
+                ) : (
+                    <CustomButton title="Pay Now" onPress={handlePayment} />
+                )}
             </View>
         </SafeAreaView>
     );

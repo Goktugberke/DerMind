@@ -53,8 +53,8 @@ export const SkinProfileScreen = () => {
                 profileData: {
                     skinType: selectedType,
                     allergens: allergens.trim() || undefined,
-                    name: authInstance.currentUser.displayName || 'User',
-                    picture: authInstance.currentUser.photoURL || '',
+                    name: currentUser?.name || authInstance.currentUser.displayName || undefined,
+                    picture: authInstance.currentUser.photoURL || undefined,
                 }
             });
 

@@ -23,6 +23,7 @@ import java.util.Map;
 public class PurchaseController {
 
     private final PurchaseService purchaseService;
+    private final UserService userService;
 
     @PostMapping
     public ResponseEntity<PurchaseResponseDTO> createPurchase(

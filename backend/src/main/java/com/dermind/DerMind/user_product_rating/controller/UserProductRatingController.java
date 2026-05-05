@@ -4,6 +4,10 @@ import com.dermind.DerMind.security.CurrentUser;
 import com.dermind.DerMind.user.model.User;
 import com.dermind.DerMind.user_product_rating.dto.*;
 import com.dermind.DerMind.user_product_rating.service.UserProductRatingService;
+import com.dermind.DerMind.user.service.UserService;
+import com.dermind.DerMind.error.UserNotAuthenticatedException;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
@@ -21,6 +25,7 @@ import java.util.List;
 public class UserProductRatingController {
 
     private final UserProductRatingService ratingService;
+    private final UserService userService;
 
     @PostMapping
     public ResponseEntity<RatingResponseDTO> createRating(
@@ -47,6 +52,21 @@ public class UserProductRatingController {
         return ResponseEntity.ok(ratingService.getRatingsByUserId(userId));
     }
 
+    /**
+     * Get my ratings (Güvenli Versiyon)
+     * GET /api/ratings/my-ratings
+     */
+    @GetMapping("/my-ratings")
+    public ResponseEntity<List<RatingResponseDTO>> getMyRatings(@AuthenticationPrincipal Object principal) {
+        String userId = getUserIdFromPrincipal(principal);
+        List<RatingResponseDTO> ratings = ratingService.getRatingsByUserId(userId);
+        return ResponseEntity.ok(ratings);
+    }
+
+    /**
+     * Get ratings by product ID
+     * GET /api/ratings/product/{productId}
+     */
     @GetMapping("/product/{productId}")
     public ResponseEntity<List<RatingResponseDTO>> getRatingsByProductId(@PathVariable Long productId) {
         return ResponseEntity.ok(ratingService.getRatingsByProductId(productId));
@@ -80,5 +100,24 @@ public class UserProductRatingController {
     public ResponseEntity<Void> deleteRating(@PathVariable Long id) {
         ratingService.deleteRating(id);
         return ResponseEntity.noContent().build();
+    }
+
+    private String getUserIdFromPrincipal(Object principal) {
+        if (principal == null) {
+            throw new UserNotAuthenticatedException("Bu işlemi gerçekleştirmek için giriş yapmalısınız.");
+        }
+
+        if (principal instanceof org.springframework.security.core.userdetails.UserDetails) {
+            String email = ((org.springframework.security.core.userdetails.UserDetails) principal).getUsername();
+            return userService.getUserByEmail(email).getId();
+        }
+
+        if (principal instanceof OidcUser) {
+            String providerId = ((OidcUser) principal).getSubject();
+            return "google_" + providerId;
+        }
+
+        throw new UserNotAuthenticatedException(
+                "Desteklenmeyen kimlik doğrulama türü: " + principal.getClass().getName());
     }
 }

@@ -102,12 +102,10 @@ export const RegisterScreen = ({ navigation, setIsRegistering }: { navigation: a
     }
 
     try {
-      // Backend kaydı tamamlanana kadar navigate’i bloke et
       setIsRegistering?.(true);
 
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const { uid } = userCredential.user;
-      // onAuthStateChanged bu noktada tetiklendi ama isRegistering=true olduğu için navigate olmaz
 
       const userData = {
         id: uid,
@@ -119,14 +117,15 @@ export const RegisterScreen = ({ navigation, setIsRegistering }: { navigation: a
         picture: ""
       };
 
-      await authService.register(userData);
-      // Backend kaydı tamam — artık navigate edilebilir
+      console.log('[Register] Backend\'e gönderilen:', JSON.stringify(userData));
+      const response = await authService.register(userData);
+      console.log('[Register] Backend\'den dönen:', JSON.stringify(response.data));
+
     } catch (error: any) {
       console.error("Kayıt Hatası:", error);
       const msg = error.code ? "Firebase: " + error.message : "Backend: Bağlantı hatası";
       Alert.alert("Hata", msg);
     } finally {
-      // Başarılı veya hatalı kayıt sonrası bloku kaldır
       setIsRegistering?.(false);
     }
   };

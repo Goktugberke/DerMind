@@ -40,4 +40,7 @@ public class RatingCreateDTO {
 
     @Size(max = 1000)
     private String cons;
+
+    private String usageFrequencyString;
+    private String usageAmountString;
 }
