@@ -3,8 +3,6 @@ package com.dermind.DerMind.product.service;
 import com.dermind.DerMind.ai.dto.AiScoreRequestDTO;
 import com.dermind.DerMind.ai.dto.AiScoreResponseDTO;
 import com.dermind.DerMind.ai.dto.UserProfileDTO;
-import com.dermind.DerMind.product.dto.ai.AiRecommendRequest;
-import com.dermind.DerMind.product.dto.ai.AiRecommendResponse;
 import com.dermind.DerMind.user.model.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -77,20 +75,6 @@ public class AiServiceClient {
             log.warn("AI /score call failed for product {}: {}", sephoraProductId, e.getMessage());
         }
 
-        return null;
-    }
-
-    public AiRecommendResponse getRecommendations(AiRecommendRequest request) {
-        if (request == null)
-            return null;
-
-        String url = "http://localhost:8000/recommend";
-        try {
-            log.info("Sending recommend request to AI server at: {}", url);
-            return restTemplate.postForObject(url, request, AiRecommendResponse.class);
-        } catch (Exception e) {
-            log.error("Exception occurred while calling AI server /recommend: {}", e.getMessage());
-        }
         return null;
     }
 }
