@@ -112,6 +112,15 @@ public class StreakService {
         if (dto.getUsageFrequency() != null) {
             streak.setUsageFrequency(dto.getUsageFrequency());
         }
+        if (dto.getCustomTimes() != null) {
+            streak.setCustomTimes(dto.getCustomTimes());
+        }
+        if (dto.getDaysOfWeek() != null) {
+            streak.setDaysOfWeek(dto.getDaysOfWeek());
+        }
+        if (dto.getIsActive() != null) {
+            streak.setIsActive(dto.getIsActive());
+        }
 
         // Check reset on update too
         checkAndResetStreak(streak);

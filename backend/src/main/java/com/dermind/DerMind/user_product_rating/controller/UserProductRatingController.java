@@ -2,6 +2,10 @@ package com.dermind.DerMind.user_product_rating.controller;
 
 import com.dermind.DerMind.user_product_rating.dto.*;
 import com.dermind.DerMind.user_product_rating.service.UserProductRatingService;
+import com.dermind.DerMind.user.service.UserService;
+import com.dermind.DerMind.error.UserNotAuthenticatedException;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -17,14 +21,19 @@ import java.util.List;
 public class UserProductRatingController {
 
     private final UserProductRatingService ratingService;
+    private final UserService userService;
 
     /**
      * Create new rating
      * POST /api/ratings
      */
     @PostMapping
-    public ResponseEntity<?> createRating(@Valid @RequestBody RatingCreateDTO dto) {
+    public ResponseEntity<?> createRating(
+            @AuthenticationPrincipal Object principal,
+            @Valid @RequestBody RatingCreateDTO dto) {
         try {
+            String userId = getUserIdFromPrincipal(principal);
+            dto.setUserId(userId);
             RatingResponseDTO createdRating = ratingService.createRating(dto);
             return ResponseEntity.status(HttpStatus.CREATED).body(createdRating);
         } catch (RuntimeException e) {
@@ -62,6 +71,17 @@ public class UserProductRatingController {
      */
     @GetMapping("/user/{userId}")
     public ResponseEntity<List<RatingResponseDTO>> getRatingsByUserId(@PathVariable String userId) {
+        List<RatingResponseDTO> ratings = ratingService.getRatingsByUserId(userId);
+        return ResponseEntity.ok(ratings);
+    }
+
+    /**
+     * Get my ratings (Güvenli Versiyon)
+     * GET /api/ratings/my-ratings
+     */
+    @GetMapping("/my-ratings")
+    public ResponseEntity<List<RatingResponseDTO>> getMyRatings(@AuthenticationPrincipal Object principal) {
+        String userId = getUserIdFromPrincipal(principal);
         List<RatingResponseDTO> ratings = ratingService.getRatingsByUserId(userId);
         return ResponseEntity.ok(ratings);
     }
@@ -138,5 +158,24 @@ public class UserProductRatingController {
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
+    }
+
+    private String getUserIdFromPrincipal(Object principal) {
+        if (principal == null) {
+            throw new UserNotAuthenticatedException("Bu işlemi gerçekleştirmek için giriş yapmalısınız.");
+        }
+
+        if (principal instanceof org.springframework.security.core.userdetails.UserDetails) {
+            String email = ((org.springframework.security.core.userdetails.UserDetails) principal).getUsername();
+            return userService.getUserByEmail(email).getId();
+        }
+
+        if (principal instanceof OidcUser) {
+            String providerId = ((OidcUser) principal).getSubject();
+            return "google_" + providerId;
+        }
+
+        throw new UserNotAuthenticatedException(
+                "Desteklenmeyen kimlik doğrulama türü: " + principal.getClass().getName());
     }
 }

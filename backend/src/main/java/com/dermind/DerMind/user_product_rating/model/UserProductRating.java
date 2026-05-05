@@ -59,6 +59,12 @@ public class UserProductRating {
     @Column(name = "verified_purchase")
     private Boolean verifiedPurchase = false; // Doğrulanmış alım mı?
 
+    @Column(name = "usage_frequency_string", length = 255)
+    private String usageFrequencyString;
+
+    @Column(name = "usage_amount_string", length = 255)
+    private String usageAmountString;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

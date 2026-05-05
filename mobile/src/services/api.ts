@@ -2,6 +2,7 @@ import axios from 'axios';
 import { Platform } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getAuth, getIdToken } from '@react-native-firebase/auth';
+import { queryClient } from './queryClient';
 
 import type { User, UserProfileData, UpdateUserProfilePayload, Product, CartItem, Favorite, Rating } from '../types/user';
 
@@ -58,6 +59,14 @@ export const productService = {
 
 export const purchaseService = {
   getPurchasesByUser: (userId: string) => api.get<any>(`/api/purchases/user/${userId}`),
+  createPurchase: (data: any) => api.post<any>('/api/purchases', data),
+};
+
+export const streakService = {
+  startStreak: (data: any = {}) => api.post<any>('/api/streaks', data),
+  getMyStreaks: () => api.get<any[]>('/api/streaks/my-streaks'),
+  updateStreak: (id: number, data: any) => api.put<any>(`/api/streaks/${id}`, data),
+  deleteStreak: (id: number) => api.delete<void>(`/api/streaks/${id}`),
 };
 
 export const cartService = {
@@ -76,7 +85,11 @@ export const favoriteService = {
 };
 
 export const ratingsService = {
-  getProductRatings: (productId: number) => api.get<Rating[]>(`/api/ratings/product/${productId}`),
+  getProductRatings: (productId: number) => api.get<any[]>(`/api/ratings/product/${productId}`),
+  createRating: (data: { productId: number, rating: number, review: string, wouldRecommend: boolean, usageFrequencyString?: string, usageAmountString?: string }) => api.post<any>('/api/ratings', data),
+  getMyRatings: () => api.get<any>(`/api/ratings/my-ratings`),
+  deleteRating: (id: number) => api.delete<void>(`/api/ratings/${id}`),
+  updateRating: (id: number, data: any) => api.put<any>(`/api/ratings/${id}`, data),
 };
 
 export const profileService = {
@@ -115,8 +128,9 @@ export const useGetProductById = (id: number, enabled = true) => {
 
 // Auth
 export const useGetCurrentUser = (enabled = true) => {
+  const uid = getAuth().currentUser?.uid;
   return useQuery<User, Error>({
-    queryKey: ['currentUser'],
+    queryKey: ['currentUser', uid],   // UID ile ayrı cache — farklı kullanıcılar karışmaz
     queryFn: async () => {
       try {
         console.log('Fetching current user...');
@@ -128,9 +142,9 @@ export const useGetCurrentUser = (enabled = true) => {
         throw error;
       }
     },
-    enabled,
+    enabled: enabled && !!uid,
     retry: 1,
-    staleTime: 5 * 60 * 1000, // 5 dakika cache'de tut
+    staleTime: 5 * 60 * 1000,
   });
 };
 
@@ -138,8 +152,10 @@ export const useRegister = () => {
   const queryClient = useQueryClient();
   return useMutation<User, Error, User & { password?: string }>({
     mutationFn: (userData) => authService.register(userData).then(res => res.data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+    onSuccess: (data) => {
+      // Yeni kullanıcı cache'e direkt yaz, gereksiz network call olmasın
+      const uid = getAuth().currentUser?.uid;
+      if (uid) queryClient.setQueryData(['currentUser', uid], data);
     },
   });
 };
@@ -148,8 +164,9 @@ export const useFirebaseLogin = () => {
   const queryClient = useQueryClient();
   return useMutation<User, Error, Record<string, string>>({
     mutationFn: (firebaseData) => authService.firebaseLogin(firebaseData).then(res => res.data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+    onSuccess: (data) => {
+      const uid = getAuth().currentUser?.uid;
+      if (uid) queryClient.setQueryData(['currentUser', uid], data);
     },
   });
 };
@@ -243,11 +260,51 @@ export const useClearCart = () => {
 };
 
 // Ratings
-export const useGetProductRatings = (productId: number, enabled = true) => {
-  return useQuery<Rating[], Error>({
-    queryKey: ['ratings', productId],
-    queryFn: () => ratingsService.getProductRatings(productId).then(res => res.data),
-    enabled: !!productId && enabled,
+export const useGetProductRatings = (productId: string) => {
+  return useQuery({
+    queryKey: ['productRatings', productId],
+    queryFn: () => ratingsService.getProductRatings(Number(productId)).then(res => res.data),
+    enabled: !!productId,
+  });
+};
+
+export const useCreateRating = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { productId: number, rating: number, review: string, wouldRecommend: boolean, usageFrequencyString?: string, usageAmountString?: string }) => ratingsService.createRating(data).then(res => res.data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['productRatings', variables.productId.toString()] });
+      queryClient.invalidateQueries({ queryKey: ['product'] });
+    },
+  });
+};
+
+export const useMyReviews = () => {
+  return useQuery({
+    queryKey: ['myReviews'],
+    queryFn: () => ratingsService.getMyRatings().then(res => res.data),
+  });
+};
+
+export const useDeleteReview = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => ratingsService.deleteRating(id).then(res => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['myReviews'] });
+    },
+  });
+};
+
+export const useUpdateRating = () => {
+  const queryClient = useQueryClient();
+  return useMutation<any, Error, { id: number, data: any }>({
+    mutationFn: ({ id, data }) => ratingsService.updateRating(id, data).then(res => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['productRatings'] });
+      queryClient.invalidateQueries({ queryKey: ['product'] });
+      queryClient.invalidateQueries({ queryKey: ['myReviews'] });
+    },
   });
 };
 
@@ -263,11 +320,64 @@ export const useGetUserById = (userId: string, enabled = true) => {
 export const useUpdateUserProfile = () => {
   const queryClient = useQueryClient();
   return useMutation<User, Error, UpdateUserProfilePayload>({
-    mutationFn: (payload: UpdateUserProfilePayload) => 
+    mutationFn: (payload: UpdateUserProfilePayload) =>
       profileService.updateUserProfile(payload.userId, payload.profileData).then(res => res.data),
     onSuccess: (_, payload) => {
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
       queryClient.invalidateQueries({ queryKey: ['user', payload.userId] });
+    },
+  });
+};
+
+// Purchases
+export const useCreatePurchase = () => {
+  const queryClient = useQueryClient();
+  return useMutation<any, Error, any>({
+    mutationFn: (data) => purchaseService.createPurchase(data).then(res => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['purchases'] });
+    },
+  });
+};
+
+// Streaks
+export const useStartStreak = () => {
+  const queryClient = useQueryClient();
+  return useMutation<any, Error, any>({
+    mutationFn: (data) => streakService.startStreak(data).then(res => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['streaks'] });
+      queryClient.invalidateQueries({ queryKey: ['myStreaks'] });
+    },
+  });
+};
+
+export const useMyStreaks = (enabled = true) => {
+  return useQuery<any[], Error>({
+    queryKey: ['myStreaks'],
+    queryFn: () => streakService.getMyStreaks().then(res => res.data),
+    enabled,
+  });
+};
+
+export const useUpdateStreak = () => {
+  const queryClient = useQueryClient();
+  return useMutation<any, Error, { id: number; data: any }>({
+    mutationFn: ({ id, data }) => streakService.updateStreak(id, data).then(res => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['streaks'] });
+      queryClient.invalidateQueries({ queryKey: ['myStreaks'] });
+    },
+  });
+};
+
+export const useDeleteStreak = () => {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, number>({
+    mutationFn: (id) => streakService.deleteStreak(id).then(res => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['streaks'] });
+      queryClient.invalidateQueries({ queryKey: ['myStreaks'] });
     },
   });
 };

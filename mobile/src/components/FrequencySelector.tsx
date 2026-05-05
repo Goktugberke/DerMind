@@ -1,30 +1,108 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Animated } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, TextInput } from 'react-native';
 import { theme } from '@constants/theme';
-import { Circle, CheckCircle2, Clock, RefreshCw } from 'lucide-react-native';
+import { Circle, CheckCircle2, Clock, Calendar } from 'lucide-react-native';
+
+export interface FrequencyData {
+    frequencyId: string;
+    usageFrequency: string;
+    time1: string;
+    time2: string;
+    day1: string;
+    day2: string;
+    isValid: boolean;
+}
+
+interface FrequencySelectorProps {
+    onChange?: (data: FrequencyData) => void;
+}
 
 const FREQUENCIES = [
-    { id: 'once_day', label: 'Once per day' },
-    { id: 'twice_day', label: 'Twice per day' },
-    { id: 'once_week', label: 'Once per week' },
-    { id: 'twice_week', label: 'Twice per week' },
-    { id: 'alternate', label: 'On alternate days' },
-    { id: 'twice_month', label: 'Twice in month' },
+    { id: 'once_day',   label: 'Once per day',     backendEnum: 'DAILY' },
+    { id: 'twice_day',  label: 'Twice per day',    backendEnum: 'TWICE_DAILY' },
+    { id: 'once_week',  label: 'Once per week',    backendEnum: 'ONCE_WEEKLY' },
+    { id: 'twice_week', label: 'Twice per week',   backendEnum: 'TWICE_WEEKLY' },
+    { id: 'alternate',  label: 'On alternate days', backendEnum: 'ALTERNATE_DAYS' },
 ];
 
-export const FrequencySelector = () => {
-    const [selected, setSelected] = useState('twice_day');
+const TIME_REGEX = /^([01]?[0-9]|2[0-3]):[0-5][0-9]\s?([AaPp][Mm])?$/;
+const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+const isValidTime = (val: string) => val ? TIME_REGEX.test(val.trim()) : false;
+const isValidDay = (val: string) => val ? DAYS.includes(val.trim().toLowerCase()) : false;
+
+const InputField = ({ 
+    value, 
+    onChange, 
+    placeholder, 
+    type 
+}: { 
+    value: string; 
+    onChange: (t: string) => void; 
+    placeholder: string; 
+    type: 'time' | 'day' 
+}) => {
+    const isValid = type === 'time' ? isValidTime(value) : isValidDay(value);
+    const showError = !isValid && value.length > 0;
+    const Icon = type === 'time' ? Clock : Calendar;
+
+    return (
+        <View style={{ flex: 1 }}>
+            <View style={[styles.timeInput, showError && styles.inputError]}>
+                <Icon size={18} color={theme.colors.text} style={styles.icon} />
+                <TextInput
+                    style={styles.timeText}
+                    value={value}
+                    onChangeText={onChange}
+                    placeholder={placeholder}
+                    placeholderTextColor="#94A3B8"
+                    autoCapitalize="words"
+                />
+            </View>
+            {showError && (
+                <Text style={styles.errorText}>
+                    {type === 'time' ? 'Format must be HH:MM or HH:MM AM/PM' : 'Please enter a valid day (e.g. Monday)'}
+                </Text>
+            )}
+        </View>
+    );
+};
+
+export const FrequencySelector = ({ onChange }: FrequencySelectorProps) => {
+    const [selected, setSelected] = useState('once_day');
+    const [time1, setTime1] = useState('10:00 AM');
+    const [time2, setTime2] = useState('10:00 PM');
+    const [day1, setDay1]   = useState('Monday');
+    const [day2, setDay2]   = useState('Thursday');
+
+    useEffect(() => {
+        const freq = FREQUENCIES.find(f => f.id === selected)!;
+        
+        let valid = true;
+        if (selected === 'once_day') valid = isValidTime(time1);
+        if (selected === 'twice_day') valid = isValidTime(time1) && isValidTime(time2);
+        if (selected === 'once_week') valid = isValidDay(day1);
+        if (selected === 'twice_week') valid = isValidDay(day1) && isValidDay(day2);
+        
+        onChange?.({
+            frequencyId: selected,
+            usageFrequency: freq.backendEnum,
+            time1,
+            time2,
+            day1,
+            day2,
+            isValid: valid
+        });
+    }, [selected, time1, time2, day1, day2]);
 
     return (
         <View style={styles.card}>
-            {/* Header Bölümü */}
             <View style={styles.header}>
                 <View style={styles.headerLeft}>
                     <Text style={styles.headerTitle}>How often will you use this?</Text>
                 </View>
             </View>
 
-            {/* Liste Bölümü */}
             <View style={styles.listContainer}>
                 {FREQUENCIES.map((item, index) => {
                     const isActive = selected === item.id;
@@ -47,17 +125,29 @@ export const FrequencySelector = () => {
                                 )}
                             </TouchableOpacity>
 
-                            {/* Twice per day seçiliyse açılan saat seçiciler */}
+                            {isActive && item.id === 'once_day' && (
+                                <View style={styles.timePickerContainer}>
+                                    <InputField value={time1} onChange={setTime1} placeholder="10:00 AM" type="time" />
+                                </View>
+                            )}
+
                             {isActive && item.id === 'twice_day' && (
                                 <View style={styles.timePickerContainer}>
-                                    <TouchableOpacity style={styles.timeInput}>
-                                        <Clock size={18} color={theme.colors.text} style={styles.clockIcon} />
-                                        <Text style={styles.timeText}>10:00 AM</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity style={styles.timeInput}>
-                                        <Clock size={18} color={theme.colors.text} style={styles.clockIcon} />
-                                        <Text style={styles.timeText}>10:00 PM</Text>
-                                    </TouchableOpacity>
+                                    <InputField value={time1} onChange={setTime1} placeholder="10:00 AM" type="time" />
+                                    <InputField value={time2} onChange={setTime2} placeholder="10:00 PM" type="time" />
+                                </View>
+                            )}
+
+                            {isActive && item.id === 'once_week' && (
+                                <View style={styles.timePickerContainer}>
+                                    <InputField value={day1} onChange={setDay1} placeholder="Monday" type="day" />
+                                </View>
+                            )}
+
+                            {isActive && item.id === 'twice_week' && (
+                                <View style={styles.timePickerContainer}>
+                                    <InputField value={day1} onChange={setDay1} placeholder="Monday" type="day" />
+                                    <InputField value={day2} onChange={setDay2} placeholder="Thursday" type="day" />
                                 </View>
                             )}
                         </View>
@@ -90,16 +180,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         flex: 1,
-    },
-    iconCircle: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        borderWidth: 2,
-        borderColor: theme.colors.secondary,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
     },
     headerTitle: {
         fontSize: 16,
@@ -137,20 +217,33 @@ const styles = StyleSheet.create({
         paddingTop: 4,
     },
     timeInput: {
-        flex: 1,
         flexDirection: 'row',
         backgroundColor: '#F1F5F9',
         height: 48,
         borderRadius: 24,
         alignItems: 'center',
         paddingHorizontal: 16,
+        borderWidth: 1,
+        borderColor: 'transparent',
     },
-    clockIcon: {
+    inputError: {
+        borderColor: '#EF4444',
+        backgroundColor: '#FEF2F2',
+    },
+    icon: {
         marginRight: 8,
     },
     timeText: {
+        flex: 1,
         fontSize: 14,
         fontWeight: '600',
         color: '#1E293B',
+        padding: 0,
     },
+    errorText: {
+        color: '#EF4444',
+        fontSize: 11,
+        marginTop: 4,
+        marginLeft: 16,
+    }
 });

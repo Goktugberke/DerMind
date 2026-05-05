@@ -58,6 +58,8 @@ public class UserProductRatingService {
                 .pros(dto.getPros())
                 .cons(dto.getCons())
                 .verifiedPurchase(verifiedPurchase)
+                .usageFrequencyString(dto.getUsageFrequencyString())
+                .usageAmountString(dto.getUsageAmountString())
                 .build();
 
         UserProductRating savedRating = ratingRepository.save(rating);
@@ -222,6 +224,8 @@ public class UserProductRatingService {
                 .pros(rating.getPros())
                 .cons(rating.getCons())
                 .verifiedPurchase(rating.getVerifiedPurchase())
+                .usageFrequencyString(rating.getUsageFrequencyString())
+                .usageAmountString(rating.getUsageAmountString())
                 .createdAt(rating.getCreatedAt())
                 .updatedAt(rating.getUpdatedAt())
                 .build();

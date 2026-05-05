@@ -24,6 +24,8 @@ public class RatingResponseDTO {
     private String pros;
     private String cons;
     private Boolean verifiedPurchase;
+    private String usageFrequencyString;
+    private String usageAmountString;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

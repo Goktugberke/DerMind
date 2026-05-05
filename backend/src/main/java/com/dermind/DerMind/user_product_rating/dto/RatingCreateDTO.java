@@ -8,7 +8,6 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class RatingCreateDTO {
-    @NotBlank(message = "User ID boş olamaz")
     private String userId;
 
     @NotNull(message = "Product ID boş olamaz")
@@ -35,4 +34,7 @@ public class RatingCreateDTO {
 
     @Size(max = 1000)
     private String cons;
+
+    private String usageFrequencyString;
+    private String usageAmountString;
 }

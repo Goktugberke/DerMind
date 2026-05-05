@@ -3,25 +3,25 @@ import { StyleSheet, Text, View, ScrollView, SafeAreaView, TextInput, TouchableO
 import { PageHeader } from '@components/PageHeader';
 import { CustomButton } from '@components/CustomButton';
 import { FeedbackInput } from '@components/FeedbackInput';
-import { StarRating } from '@components/StarRating'; // Yeni güncellediğimiz komponent
-import { ProductHeroCard } from '@components/ProductHeroCard'; // Streak sayfasındaki kart
+import { StarRating } from '@components/StarRating';
+import { ProductHeroCard } from '@components/ProductHeroCard';
 import { ShieldCheck, MessageSquare, Info } from 'lucide-react-native';
 import { theme } from '../../constants/theme';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { useCreateRating } from '../../services/api';
+import { useUpdateRating } from '../../services/api';
 import { Alert } from 'react-native';
 
-export const RateScreen = () => {
+export const EditReviewScreen = () => {
     const route = useRoute<any>();
     const navigation = useNavigation<any>();
     const { product } = route.params || {};
 
-    const [often, setOften] = useState('');
-    const [amount, setAmount] = useState('');
-    const [rating, setRating] = useState(0);
-    const [comment, setComment] = useState('');
+    const [often, setOften] = useState(product?.usageFrequencyString);
+    const [amount, setAmount] = useState(product?.usageAmountString);
+    const [rating, setRating] = useState(product?.rating);
+    const [comment, setComment] = useState(product?.review);
 
-    const { mutateAsync: createRating, isPending } = useCreateRating();
+    const { mutateAsync: updateRating, isPending } = useUpdateRating();
 
     const handleSubmit = async () => {
         if (!rating) {
@@ -30,14 +30,7 @@ export const RateScreen = () => {
         }
 
         try {
-            await createRating({
-                productId: product?.id || 0,
-                rating,
-                review: comment,
-                wouldRecommend: rating >= 6,
-                usageFrequencyString: often,
-                usageAmountString: amount
-            });
+            await updateRating({ id: product.id, data: { rating, review: comment, wouldRecommend: true, usageFrequencyString: often, usageAmountString: amount } });
             Alert.alert("Success", "Your review has been submitted!", [
                 { text: "OK", onPress: () => navigation.goBack() }
             ]);
@@ -48,11 +41,11 @@ export const RateScreen = () => {
 
     return (
         <SafeAreaView style={styles.safeArea}>
-            <PageHeader title="Write a Review" showBackButton align="left" />
+            <PageHeader title="Edit Your Review" showBackButton align="left" />
 
             <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
 
-                {/* 1. ÜRÜN BİLGİ KARTI (ProductHeroCard'ı tekrar kullanıyoruz) */}
+                {/* 1. ÜRÜN BİLGİ KARTI */}
                 <View style={styles.section}>
                     <ProductHeroCard
                         name={product?.name || "Moisturizer"}
@@ -68,13 +61,13 @@ export const RateScreen = () => {
 
                     <FeedbackInput
                         label="How often did you use it?"
-                        placeholder="e.g. Daily, 3 times a week..."
+                        placeholder=" "
                         value={often}
                         onChangeText={setOften}
                     />
                     <FeedbackInput
                         label="How much did you use?"
-                        placeholder="e.g. 2 hours per session, 500ml..."
+                        placeholder=" "
                         value={amount}
                         onChangeText={setAmount}
                     />
@@ -118,7 +111,7 @@ export const RateScreen = () => {
                         </View>
                         <TextInput
                             style={styles.commentInput}
-                            placeholder="Describe your results with the Moisturizer... Was it hydrating? Did it cause any irritation?"
+                            placeholder={""}
                             multiline
                             numberOfLines={4}
                             value={comment}
