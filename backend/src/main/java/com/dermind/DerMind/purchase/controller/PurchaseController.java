@@ -4,6 +4,7 @@ import com.dermind.DerMind.common.enums.OrderStatus;
 import com.dermind.DerMind.error.UserNotAuthenticatedException;
 import com.dermind.DerMind.purchase.dto.*;
 import com.dermind.DerMind.purchase.service.PurchaseService;
+import com.dermind.DerMind.user.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -23,6 +24,7 @@ import java.util.Map;
 public class PurchaseController {
 
     private final PurchaseService purchaseService;
+    private final UserService userService;
 
     /**
      * Create new purchase
@@ -30,13 +32,10 @@ public class PurchaseController {
      */
     @PostMapping
     public ResponseEntity<?> createPurchase(
-            @AuthenticationPrincipal OidcUser principal,
+            @AuthenticationPrincipal Object principal,
             @Valid @RequestBody PurchaseCreateDTO dto) {
         try {
-            // Token'dan userId'yi alıyoruz
             String userId = getUserIdFromPrincipal(principal);
-
-            // Service artık (userId, dto) kabul ediyor
             PurchaseResponseDTO createdPurchase = purchaseService.createPurchase(userId, dto);
             return ResponseEntity.status(HttpStatus.CREATED).body(createdPurchase);
         } catch (RuntimeException e) {
@@ -60,7 +59,7 @@ public class PurchaseController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<?> getPurchaseById(
-            @AuthenticationPrincipal OidcUser principal,
+            @AuthenticationPrincipal Object principal,
             @PathVariable Long id) {
 
         String userId = getUserIdFromPrincipal(principal);
@@ -168,10 +167,23 @@ public class PurchaseController {
         }
     }
 
-    private String getUserIdFromPrincipal(OidcUser principal) {
+    private String getUserIdFromPrincipal(Object principal) {
         if (principal == null) {
             throw new UserNotAuthenticatedException("Bu işlemi gerçekleştirmek için giriş yapmalısınız.");
         }
-        return principal.getSubject();
+
+        // Firebase JWT → Spring Security bunu UserDetails olarak parse eder (email = username)
+        if (principal instanceof org.springframework.security.core.userdetails.UserDetails) {
+            String email = ((org.springframework.security.core.userdetails.UserDetails) principal).getUsername();
+            return userService.getUserByEmail(email).getId();
+        }
+
+        // Google OAuth2 / OidcUser
+        if (principal instanceof OidcUser) {
+            return ((OidcUser) principal).getSubject();
+        }
+
+        throw new UserNotAuthenticatedException(
+                "Desteklenmeyen kimlik doğrulama türü: " + principal.getClass().getName());
     }
 }
