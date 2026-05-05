@@ -1,4 +1,4 @@
-package com.dermind.DerMind.product.dto.ai;
+package com.dermind.DerMind.mail.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,7 +9,8 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AiScoreRequest {
-    private String sephora_product_id;
-    private AiUserProfile user;
+public class MailRequestDto {
+    private String to;
+    private String subject;
+    private String text;
 }

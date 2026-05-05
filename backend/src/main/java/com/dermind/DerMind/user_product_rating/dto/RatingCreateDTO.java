@@ -1,5 +1,6 @@
 package com.dermind.DerMind.user_product_rating.dto;
 
+import com.dermind.DerMind.common.enums.UsageDurationUnit;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
@@ -8,6 +9,11 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class RatingCreateDTO {
+    /**
+     * @deprecated Backend authenticated user'dan alır (IDOR koruması).
+     * Body'den gönderilirse görmezden gelinir.
+     */
+    @Deprecated
     private String userId;
 
     @NotNull(message = "Product ID boş olamaz")
@@ -27,7 +33,7 @@ public class RatingCreateDTO {
     @Min(value = 0, message = "Kullanım süresi negatif olamaz")
     private Integer usageDuration;
 
-    private String usageDurationUnit;
+    private UsageDurationUnit usageDurationUnit;
 
     @Size(max = 1000)
     private String pros;

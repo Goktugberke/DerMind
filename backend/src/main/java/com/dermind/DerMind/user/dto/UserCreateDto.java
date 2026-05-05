@@ -6,6 +6,8 @@ import lombok.NoArgsConstructor;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
+import java.util.List;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -18,7 +20,8 @@ public class UserCreateDto {
     private String email;
 
     private String name;
-    private String allergens;
+    private List<String> allergens;
     private String skinType;
+    private boolean hasAcne = false;
     private String picture;
 }

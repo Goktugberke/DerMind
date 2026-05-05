@@ -43,6 +43,7 @@ const ProductDetail = () => {
   const [error, setError] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [favLoading, setFavLoading] = useState(false);
+  const [similarProducts, setSimilarProducts] = useState<import('../types/api').ProductResponseDTO[]>([]);
 
   const [reviewText, setReviewText] = useState('');
   const [reviewRating, setReviewRating] = useState(5);
@@ -102,6 +103,11 @@ const ProductDetail = () => {
           const ratingsData = await ratingApi.getRatingsByProductId(productId);
           setRatings(ratingsData);
         } catch (e) { console.error("Rating fetch error", e); }
+
+        try {
+          const similarData = await productApi.getSimilarProducts(productId);
+          setSimilarProducts(similarData);
+        } catch (e) { console.error("Similar products fetch error", e); }
 
         if (isAuthenticated) {
           try {
@@ -331,6 +337,45 @@ const ProductDetail = () => {
                 {isFavorite ? '❤️ Favorilerde' : '🤍 Favorilere Ekle'}
               </button>
             </div>
+
+            {similarProducts.length > 0 && (
+              <div className="similar-products-section" style={{ marginTop: '30px', marginBottom: '30px' }}>
+                <h3 style={{ fontSize: '1.2em', marginBottom: '15px', color: '#1f2937' }}>Benzer Ürün Önerileri</h3>
+                <div style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '10px' }}>
+                  {similarProducts.map((simProd) => (
+                    <Link
+                      key={simProd.id}
+                      to={`/products/${simProd.id}`}
+                      style={{
+                        minWidth: '200px',
+                        maxWidth: '200px',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        padding: '10px',
+                        textDecoration: 'none',
+                        color: 'inherit',
+                        backgroundColor: '#fff',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        transition: 'transform 0.2s',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.02)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                    >
+                      <div style={{ height: '150px', backgroundColor: '#f3f4f6', borderRadius: '4px', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                         {simProd.imageUrl ? <img src={simProd.imageUrl} alt={simProd.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> : <span style={{fontSize: '2em'}}>📦</span>}
+                      </div>
+                      <strong style={{ fontSize: '0.95em', marginBottom: '5px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', height: '40px' }}>{simProd.name}</strong>
+                      <span style={{ fontSize: '0.85em', color: '#6b7280', marginBottom: '5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{simProd.brand}</span>
+                      <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                         <span style={{ fontWeight: 'bold', color: '#10b981' }}>{simProd.price ? `${simProd.price.toFixed(2)} ₺` : 'Fiyat Yok'}</span>
+                         {simProd.qualityScore && <span style={{ fontSize: '0.8em', backgroundColor: '#e5e7eb', padding: '2px 6px', borderRadius: '4px' }}>⭐ {simProd.qualityScore.toFixed(1)}</span>}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* ROUTINE MODAL */}
             {showRoutineModal && (

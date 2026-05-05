@@ -1,148 +1,148 @@
 package com.dermind.DerMind.error;
 
-import lombok.extern.log4j.Log4j2;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.List;
 
-@Log4j2
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ResponseError> handleMethodArgumentNotValidException(MethodArgumentNotValidException exception) {
-        log.debug("Validation error: {}", exception.getMessage());
-
-        final var responseBody = ResponseError.builder()
+    public ResponseEntity<ResponseError> handleValidation(MethodArgumentNotValidException ex) {
+        log.debug("Validation error: {}", ex.getMessage());
+        return ResponseEntity.badRequest().body(ResponseError.builder()
                 .errorCode("VALIDATION_ERROR")
-                .errorMessages(exception.getFieldErrors().stream()
-                        .map(fieldError -> ResponseError.ErrorMessage.builder()
-                                .field(fieldError.getField())
-                                .message(fieldError.getDefaultMessage())
+                .errorMessages(ex.getFieldErrors().stream()
+                        .map(fe -> ResponseError.ErrorMessage.builder()
+                                .field(fe.getField())
+                                .message(fe.getDefaultMessage())
                                 .build())
                         .toList())
-                .build();
-
-        return ResponseEntity.badRequest().body(responseBody);
+                .build());
     }
 
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ResponseError> handleConstraintViolation(ConstraintViolationException ex) {
+        log.debug("Constraint violation: {}", ex.getMessage());
+        return error(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "constraint", ex.getMessage());
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ResponseError> handleMissingParam(MissingServletRequestParameterException ex) {
+        return error(HttpStatus.BAD_REQUEST, "MISSING_PARAMETER", ex.getParameterName(),
+                "Required parameter is missing: " + ex.getParameterName());
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ResponseError> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        return error(HttpStatus.BAD_REQUEST, "TYPE_MISMATCH", ex.getName(),
+                "Invalid value for parameter '" + ex.getName() + "'");
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ResponseError> handleIllegalArgument(IllegalArgumentException ex) {
+        return error(HttpStatus.BAD_REQUEST, "ILLEGAL_ARGUMENT", "argument", ex.getMessage());
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ResponseError> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+        return error(HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED", "method", ex.getMessage());
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ResponseError> handleAccessDenied(AccessDeniedException ex, HttpServletRequest req) {
+        log.warn("Access denied for {} {} : {}", req.getMethod(), req.getRequestURI(), ex.getMessage());
+        return error(HttpStatus.FORBIDDEN, "ACCESS_DENIED", "authorization",
+                "You do not have permission to access this resource");
+    }
+
+    @ExceptionHandler(AuthenticationCredentialsNotFoundException.class)
+    public ResponseEntity<ResponseError> handleAuthMissing(AuthenticationCredentialsNotFoundException ex) {
+        return error(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED", "authentication",
+                "Authentication required");
+    }
 
     @ExceptionHandler(UnauthorizedAccessException.class)
-    public ResponseEntity<ResponseError> handleUnauthorizedAccessException(UnauthorizedAccessException exception) {
-        log.warn("Unauthorized access attempt: {}", exception.getMessage());
-
-        ResponseError responseBody = ResponseError.builder()
-                .errorCode("FORBIDDEN")
-                .errorMessages(List.of(
-                        ResponseError.ErrorMessage.builder()
-                                .field("authorization")
-                                .message(exception.getMessage())
-                                .build()
-                ))
-                .build();
-
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(responseBody);
-    }
-
-
-    @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ResponseError> handleResourceNotFoundException(ResourceNotFoundException exception) {
-        log.warn("Resource not found: {}", exception.getMessage());
-
-        ResponseError responseBody = ResponseError.builder()
-                .errorCode("RESOURCE_NOT_FOUND")
-                .errorMessages(List.of(
-                        ResponseError.ErrorMessage.builder()
-                                .field("resource")
-                                .message(exception.getMessage())
-                                .build()
-                ))
-                .build();
-
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(responseBody);
-    }
-
-    @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ResponseError> handleBusinessException(BusinessException exception) {
-        log.warn("Business logic error: {}", exception.getMessage());
-
-        ResponseError responseBody = ResponseError.builder()
-                .errorCode("BUSINESS_ERROR")
-                .errorMessages(List.of(
-                        ResponseError.ErrorMessage.builder()
-                                .field("businessLogic")
-                                .message(exception.getMessage())
-                                .build()
-                ))
-                .build();
-
-        return ResponseEntity.badRequest().body(responseBody);
+    public ResponseEntity<ResponseError> handleUnauthorized(UnauthorizedAccessException ex) {
+        log.warn("Unauthorized access: {}", ex.getMessage());
+        return error(HttpStatus.FORBIDDEN, "FORBIDDEN", "authorization", ex.getMessage());
     }
 
     @ExceptionHandler(UserNotAuthenticatedException.class)
-    public ResponseEntity<ResponseError> handleUserNotAuthenticatedException(UserNotAuthenticatedException exception) {
-        log.warn("Authentication required: {}", exception.getMessage());
+    public ResponseEntity<ResponseError> handleNotAuthenticated(UserNotAuthenticatedException ex) {
+        return error(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED", "authentication",
+                ex.getMessage() != null ? ex.getMessage() : "Authentication required");
+    }
 
-        ResponseError responseBody = ResponseError.builder()
-                .errorCode("AUTHENTICATION_REQUIRED")
-                .errorMessages(List.of(
-                        ResponseError.ErrorMessage.builder()
-                                .field("authentication")
-                                .message(exception.getMessage() != null ? exception.getMessage() : "Authentication required")
-                                .build()
-                ))
-                .build();
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ResponseError> handleNotFound(ResourceNotFoundException ex) {
+        log.warn("Resource not found: {}", ex.getMessage());
+        return error(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "resource", ex.getMessage());
+    }
 
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseBody);
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ResponseError> handleBusiness(BusinessException ex) {
+        log.warn("Business error: {}", ex.getMessage());
+        return error(HttpStatus.BAD_REQUEST, "BUSINESS_ERROR", "businessLogic", ex.getMessage());
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ResponseError> handleOptimisticLock(OptimisticLockingFailureException ex) {
+        log.warn("Optimistic lock failure: {}", ex.getMessage());
+        return error(HttpStatus.CONFLICT, "CONCURRENT_MODIFICATION", "version",
+                "Resource was modified by another request. Please retry.");
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ResponseError> handleDataIntegrity(DataIntegrityViolationException ex) {
+        log.warn("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());
+        return error(HttpStatus.CONFLICT, "DATA_INTEGRITY_VIOLATION", "data",
+                "Operation conflicts with existing data (e.g. duplicate or missing reference)");
+    }
+
+    @ExceptionHandler(AiServerUnavailableException.class)
+    public ResponseEntity<ResponseError> handleAiUnavailable(AiServerUnavailableException ex) {
+        log.error("AI server unavailable: {}", ex.getMessage());
+        return error(HttpStatus.SERVICE_UNAVAILABLE, "AI_SERVER_UNAVAILABLE", "aiServer",
+                "AI service is temporarily unavailable. Please try again later.");
     }
 
     @ExceptionHandler(RestClientException.class)
-    public ResponseEntity<ResponseError> handleRestClientException(RestClientException exception) {
-        log.error("REST client error: {}", exception.getMessage());
-
-        String message = (exception instanceof HttpClientErrorException httpEx && !httpEx.getResponseBodyAsString().isBlank())
-                ? httpEx.getResponseBodyAsString()
-                : (exception.getMessage() == null || exception.getMessage().isBlank())
-                ? "A REST client error occurred."
-                : exception.getMessage();
-
-        ResponseError responseBody = ResponseError.builder()
-                .errorCode("REST_CLIENT_ERROR")
-                .errorMessages(List.of(
-                        ResponseError.ErrorMessage.builder()
-                                .field("externalService")
-                                .message(message)
-                                .build()
-                ))
-                .build();
-
-        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(responseBody);
+    public ResponseEntity<ResponseError> handleRestClient(RestClientException ex) {
+        log.error("Upstream service error: {}", ex.getMessage());
+        // Upstream'in raw response'unu client'a as-is dönmüyoruz (bilgi sızıntısı önleme)
+        return error(HttpStatus.BAD_GATEWAY, "UPSTREAM_ERROR", "externalService",
+                "An upstream service is unavailable. Please retry later.");
     }
 
-    @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<ResponseError> handleRuntimeException(RuntimeException exception) {
-        log.error("Runtime error: {}", exception.getMessage(), exception);
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ResponseError> handleGeneric(Exception ex) {
+        log.error("Unhandled exception", ex);
+        return error(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "general",
+                "An unexpected error occurred. Please try again later.");
+    }
 
-        String message = exception.getMessage() != null && !exception.getMessage().isBlank()
-                ? exception.getMessage()
-                : "An unexpected error occurred while processing your request.";
-
-        ResponseError responseBody = ResponseError.builder()
-                .errorCode("PROCESSING_ERROR")
-                .errorMessages(List.of(
-                        ResponseError.ErrorMessage.builder()
-                                .field("general")
-                                .message(message)
-                                .build()
-                ))
-                .build();
-
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(responseBody);
+    private ResponseEntity<ResponseError> error(HttpStatus status, String code, String field, String message) {
+        return ResponseEntity.status(status).body(ResponseError.builder()
+                .errorCode(code)
+                .errorMessages(List.of(ResponseError.ErrorMessage.builder()
+                        .field(field).message(message).build()))
+                .build());
     }
 }

@@ -1,16 +1,20 @@
 package com.dermind.DerMind.product.service;
 
-import com.dermind.DerMind.product.dto.ai.AiScoreRequest;
-import com.dermind.DerMind.product.dto.ai.AiScoreResponse;
-import com.dermind.DerMind.product.dto.ai.AiUserProfile;
+import com.dermind.DerMind.ai.dto.AiScoreRequestDTO;
+import com.dermind.DerMind.ai.dto.AiScoreResponseDTO;
+import com.dermind.DerMind.ai.dto.UserProfileDTO;
 import com.dermind.DerMind.user.model.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.Arrays;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -19,42 +23,56 @@ import java.util.List;
 public class AiServiceClient {
 
     private final RestTemplate restTemplate;
-    private final String AI_SERVER_URL = "http://localhost:8000/score";
 
-    public Double getPersonalScore(String sephoraProductId, User user) {
+    @Value("${ai.server.url:http://localhost:8000}")
+    private String aiServerUrl;
+
+    @Value("${ai.server.internal-key:}")
+    private String internalKey;
+
+    public Double getPersonalScore(String sephoraProductId, User user, Double isRecommended) {
         if (sephoraProductId == null || user == null) {
             return null;
         }
 
         try {
-            log.info("Preparing AI score request for product: {} and user skin type: {}", sephoraProductId, user.getSkinType());
-            List<String> userAllergies = Collections.emptyList();
-            if (user.getAllergens() != null && !user.getAllergens().isBlank()) {
-                userAllergies = Arrays.asList(user.getAllergens().split(","));
-            }
+            List<String> userAllergies = (user.getAllergens() != null && !user.getAllergens().isEmpty())
+                    ? new ArrayList<>(user.getAllergens())
+                    : List.of();
 
-            AiUserProfile aiProfile = AiUserProfile.builder()
-                    .skin_type(user.getSkinType() != null ? user.getSkinType().toLowerCase() : "normal")
-                    .has_acne(false)
+            UserProfileDTO aiProfile = UserProfileDTO.builder()
+                    .skinType(user.getSkinType() != null ? user.getSkinType().toLowerCase().trim() : "normal")
+                    .hasAcne(user.isHasAcne())
                     .allergies(userAllergies)
                     .build();
 
-            AiScoreRequest request = AiScoreRequest.builder()
-                    .sephora_product_id(sephoraProductId)
+            AiScoreRequestDTO request = AiScoreRequestDTO.builder()
+                    .sephoraProductId(sephoraProductId)
                     .user(aiProfile)
+                    .isRecommended(isRecommended)
                     .build();
 
-            log.info("Sending request to AI server at: {}", AI_SERVER_URL);
-            AiScoreResponse response = restTemplate.postForObject(AI_SERVER_URL, request, AiScoreResponse.class);
-
-            if (response != null) {
-                log.info("AI server response received. Personal score: {}", response.getPersonal_score());
-                return response.getPersonal_score();
-            } else {
-                log.error("AI server returned null response body");
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            if (internalKey != null && !internalKey.isBlank()) {
+                headers.set("X-Internal-Key", internalKey);
             }
+            HttpEntity<AiScoreRequestDTO> entity = new HttpEntity<>(request, headers);
+
+            String scoreUrl = aiServerUrl.replaceAll("/+$", "") + "/score";
+            log.debug("AI /score → {} (product={}, skin={}, acne={}, recRate={})",
+                    scoreUrl, sephoraProductId, aiProfile.getSkinType(), aiProfile.isHasAcne(), isRecommended);
+
+            ResponseEntity<AiScoreResponseDTO> response = restTemplate.postForEntity(
+                    scoreUrl, entity, AiScoreResponseDTO.class);
+
+            AiScoreResponseDTO body = response.getBody();
+            if (body != null) {
+                return body.getPersonalScore();
+            }
+            log.warn("AI server null response body for product {}", sephoraProductId);
         } catch (Exception e) {
-            log.error("Exception occurred while calling AI server: {}. StackTrace: {}", e.getMessage(), e.getStackTrace()[0]);
+            log.warn("AI /score call failed for product {}: {}", sephoraProductId, e.getMessage());
         }
 
         return null;

@@ -1,5 +1,6 @@
 package com.dermind.DerMind.user_product_rating.dto;
 
+import com.dermind.DerMind.common.enums.UsageDurationUnit;
 import lombok.*;
 import java.time.LocalDateTime;
 
@@ -20,7 +21,7 @@ public class RatingResponseDTO {
     private Boolean skinImprovement;
     private Boolean wouldRecommend;
     private Integer usageDuration;
-    private String usageDurationUnit;
+    private UsageDurationUnit usageDurationUnit;
     private String pros;
     private String cons;
     private Boolean verifiedPurchase;

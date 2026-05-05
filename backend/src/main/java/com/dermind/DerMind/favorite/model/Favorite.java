@@ -3,17 +3,21 @@ package com.dermind.DerMind.favorite.model;
 import com.dermind.DerMind.product.model.Product;
 import com.dermind.DerMind.user.model.User;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
+@Entity
+@Table(name = "favorites", indexes = {
+        @Index(name = "idx_favorites_user_id", columnList = "user_id"),
+        @Index(name = "idx_favorites_user_product", columnList = "user_id,product_id", unique = true)
+})
 @Getter
 @Setter
 @NoArgsConstructor
-@Entity
-@Table(name = "favorites")
+@EqualsAndHashCode(of = "id")
+@ToString(exclude = {"user", "product"})
 public class Favorite {
 
     @Id
@@ -28,11 +32,7 @@ public class Favorite {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
-    @Column(name = "created_at", nullable = false)
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
-
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-    }
 }
