@@ -579,6 +579,7 @@ def _score_single(
     print(f"İçerik Metni: {'Mevcut' if ing_text else 'YOK'}")
     print(f"Alerjenler: {user.allergies}")
 
+    allergen_matches = []
     if user.allergies and ing_text:
         allergen_matches = find_matching_allergens(ing_text, user.allergies)
 

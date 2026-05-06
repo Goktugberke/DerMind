@@ -35,8 +35,15 @@ const Login = () => {
       dispatch(mergeCartAsync());
       
       navigate('/');
-    } catch (err: unknown) {
+    } catch (err: any) {
       console.error('Google Auth error:', err);
+      // Firebase popup-closed-by-user etc.
+      if (err.code === 'auth/popup-closed-by-user') {
+        // No need to show error if user just closed the popup
+        return;
+      }
+      // For other errors, we can use a generic message
+      alert('Google ile giriş yapılırken bir hata oluştu. Lütfen tekrar deneyin.');
     }
   };
 

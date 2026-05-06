@@ -19,4 +19,5 @@ public class ProductDetailDTO {
     private int totalPurchases;
     private Double personalScore;
     private Double price;
+    private String imageUrl;
 }

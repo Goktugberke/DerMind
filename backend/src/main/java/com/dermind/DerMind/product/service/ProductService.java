@@ -45,6 +45,7 @@ public class ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
 
         ProductDetailDTO dto = productMapper.toDetailDTO(product);
+        dto.setPrice(product.getPrice());
         // Aggregates — tek SQL ile (lazy collection iteration yok, N+1 yok)
         productRepository.findProductStats(id).ifPresentOrElse(stats -> {
             dto.setAverageUserRating(stats.getAvgRating() != null ? stats.getAvgRating() : 0.0);
@@ -142,10 +143,19 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public List<ProductDetailDTO> getTopQualityProducts(int limit) {
-        return productRepository.findTopQualityProducts(Pageable.ofSize(Math.min(limit, 100)))
+        List<ProductDetailDTO> results = productRepository.findTopQualityProducts(Pageable.ofSize(Math.min(limit, 100)))
                 .getContent().stream()
-                .map(productMapper::toDetailDTO)
+                .map(p -> {
+                    ProductDetailDTO dto = productMapper.toDetailDTO(p);
+                    dto.setPrice(p.getPrice());
+                    return dto;
+                })
                 .collect(Collectors.toList());
+        
+        if (!results.isEmpty()) {
+            log.info("[ProductService] Top product: {}, Price: {}", results.get(0).getName(), results.get(0).getPrice());
+        }
+        return results;
     }
 
     @Transactional(readOnly = true)
@@ -199,10 +209,16 @@ public class ProductService {
         matchScore = Math.max(0.0, Math.min(100.0, matchScore));
 
         return new ProductRecommendationDTO(
-                product.getId(), product.getName(), product.getBrand(),
-                product.getQualityScore(), matchScore, recommendation,
-                reason.toString().trim().isEmpty() ? "Highly Recommended for your skin profile."
-                        : reason.toString().trim());
+            product.getId(),
+            product.getName(),
+            product.getBrand(),
+            product.getQualityScore(),
+            matchScore,
+            recommendation,
+            reason.toString().trim().isEmpty() ? "Highly Recommended for your skin profile." : reason.toString().trim(),
+            product.getPrice(),
+            null
+        );
     }
 
     /**
@@ -251,17 +267,26 @@ public class ProductService {
                 if (values.length > Math.max(pidIdx, priceIdx)) {
                     String pid = values[pidIdx].replace("\"", "");
                     String priceStr = values[priceIdx].replace("\"", "");
+                    String ratingStr = (ratingIdx != -1 && values.length > ratingIdx) ? values[ratingIdx].replace("\"", "") : null;
                     
                     try {
                         Double price = (priceStr == null || priceStr.isEmpty() || priceStr.equals("null")) ? null : Double.parseDouble(priceStr);
+                        Double rawRating = (ratingStr == null || ratingStr.isEmpty() || ratingStr.equals("null")) ? null : Double.parseDouble(ratingStr);
+                        Double scaledRating = (rawRating != null) ? rawRating * 2.0 : null;
                         
                         productRepository.findBySephoraProductId(pid).ifPresent(p -> {
-                            if (price != null) p.setPrice(price);
-                            productRepository.save(p);
+                            boolean changed = false;
+                            if (price != null) { p.setPrice(price); changed = true; }
+                            if (scaledRating != null) { p.setQualityScore(scaledRating); changed = true; }
+                            if (changed) productRepository.save(p);
                         });
                         count++;
+                        if (count % 100 == 0) {
+                            productRepository.flush();
+                            log.info("Synced {} products...", count);
+                        }
                     } catch (NumberFormatException e) {
-                        // Skip header or bad lines
+                        // Skip
                     }
                 }
             }

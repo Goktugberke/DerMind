@@ -14,7 +14,7 @@ const convertToProduct = (dto: ProductResponseDTO): Product => {
     id: dto.id.toString(),
     name: dto.name,
     brand: dto.brand,
-    price: dto.price || 0,
+    price: dto.price || (dto as any).price_usd || 0,
     description: dto.ingredients || '',
     rating: dto.qualityScore || 0,
     category: dto.category,
@@ -69,7 +69,8 @@ const Products = () => {
   };
 
   // Fetch products from API
-  const fetchProducts = useCallback(async (pageNum: number, isInitial = false) => {
+  const fetchProducts = useCallback(async (pageNum: number, isInitial = false, explicitQuery?: string) => {
+    const currentQuery = explicitQuery !== undefined ? explicitQuery : searchQuery;
     if (!hasMore && !isInitial) return;
     if (loading || loadingMore) return; // Prevent parallel fetches
 
@@ -83,7 +84,7 @@ const Products = () => {
       setError(null);
       
       const response: PageResponse<ProductResponseDTO> = await productApi.filterProducts({
-        query: searchQuery,
+        query: currentQuery,
         minPrice: filters.minPrice > 0 ? filters.minPrice : undefined,
         maxPrice: filters.maxPrice < 1000 ? filters.maxPrice : undefined,
         minQuality: filters.minRating > 0 ? filters.minRating : undefined, 
@@ -124,11 +125,9 @@ const Products = () => {
     pageRef.current = 0;
     setHasMore(true);
     
-    // Sycn search query from URL if changed
     const query = searchParams.get('search') || '';
     setSearchQuery(query);
-
-    fetchProducts(0, true);
+    fetchProducts(0, true, query);
   }, [searchParams, filters.sortBy, filters.minPrice, filters.maxPrice, filters.minRating]);
 
   // Loader Intersection Observer

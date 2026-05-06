@@ -172,8 +172,24 @@ public class StreakService {
         }
         LocalDate today = LocalDate.now();
         LocalDate lastCompleted = streak.getLastCompletedDate();
+
+        // New day detection (reset counter if it's a new day since last use)
+        if (streak.getLastUsedDate() != null && !streak.getLastUsedDate().isEqual(today)) {
+            streak.setDailyUsageCounter(0);
+            return true;
+        }
+
+        if (lastCompleted == null) {
+            if (streak.getCurrentStreak() > 0) {
+                streak.setCurrentStreak(0);
+                return true;
+            }
+            return false;
+        }
+
         if (lastCompleted.isEqual(today))
             return false;
+        
         if (lastCompleted.isBefore(today.minusDays(1))) {
             streak.setCurrentStreak(0);
             return true;

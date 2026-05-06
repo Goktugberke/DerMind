@@ -9,9 +9,9 @@ import type { ProductDetailDTO, RatingResponseDTO, AiExplainResponseDTO } from '
 const convertToProduct = (dto: any): Product => {
   const id = dto.id || dto.product_id;
   const name = dto.name || dto.product_name;
-  
-  // REAL DATA ONLY: Use database price if available, otherwise use AI-provided price_usd
-  const realPrice = dto.price || dto.price_usd || 0;
+
+  // REAL DATA ONLY: Use database price or AI-provided price_usd
+  const realPrice = dto.price || dto.price_usd || dto.priceUsd || 0;
 
   return {
     id: id.toString(),
@@ -55,7 +55,7 @@ const ProductDetail = () => {
   const [reviewRating, setReviewRating] = useState(5);
   const [editingRatingId, setEditingRatingId] = useState<number | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
-  
+
   // AI Explanation State
   const [explanation, setExplanation] = useState<string | null>(null);
   const [isExplaining, setIsExplaining] = useState(false);
@@ -69,7 +69,7 @@ const ProductDetail = () => {
   const calculateMLScore = useCallback((productData: ProductDetailDTO) => {
     // Quality score mapping to 0-100 baseline
     const qualityBase = (productData.qualityScore ?? 0) * 10;
-    
+
     // AI Personalized score (0-100)
     // Backend/AI returns 1-10, so we scale it.
     const personalScore = productData.personalScore ? (productData.personalScore * 10) : qualityBase;
@@ -322,13 +322,13 @@ const ProductDetail = () => {
                 {/* AI Explanation Button/Text */}
                 <div style={{ marginTop: '15px', borderTop: '1px solid #e5e7eb', paddingTop: '15px' }}>
                   {!explanation ? (
-                    <button 
-                      onClick={handleFetchExplanation} 
+                    <button
+                      onClick={handleFetchExplanation}
                       disabled={isExplaining}
                       className="btn"
-                      style={{ 
-                        width: '100%', 
-                        backgroundColor: '#6366f1', 
+                      style={{
+                        width: '100%',
+                        backgroundColor: '#6366f1',
                         color: 'white',
                         padding: '10px',
                         borderRadius: '8px',
@@ -348,12 +348,12 @@ const ProductDetail = () => {
                       )}
                     </button>
                   ) : (
-                    <div style={{ 
-                      backgroundColor: '#ffffff', 
-                      padding: '12px', 
-                      borderRadius: '8px', 
-                      fontSize: '0.9em', 
-                      lineHeight: '1.6', 
+                    <div style={{
+                      backgroundColor: '#ffffff',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      fontSize: '0.9em',
+                      lineHeight: '1.6',
                       color: '#374151',
                       borderLeft: '4px solid #6366f1'
                     }}>
@@ -438,13 +438,13 @@ const ProductDetail = () => {
                         onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
                       >
                         <div style={{ height: '150px', backgroundColor: '#f3f4f6', borderRadius: '4px', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                           {simProd.image ? <img src={simProd.image} alt={simProd.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> : <span style={{fontSize: '2em'}}>📦</span>}
+                          {simProd.image ? <img src={simProd.image} alt={simProd.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> : <span style={{ fontSize: '2em' }}>📦</span>}
                         </div>
                         <strong style={{ fontSize: '0.95em', marginBottom: '5px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', height: '40px' }}>{simProd.name}</strong>
                         <span style={{ fontSize: '0.85em', color: '#6b7280', marginBottom: '5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{simProd.brand}</span>
                         <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                           <span style={{ fontWeight: 'bold', color: '#10b981' }}>${simProd.price.toFixed(2)}</span>
-                           {simProd.rating > 0 && <span style={{ fontSize: '0.8em', backgroundColor: '#e5e7eb', padding: '2px 6px', borderRadius: '4px' }}>⭐ {simProd.rating.toFixed(1)}/10</span>}
+                          <span style={{ fontWeight: 'bold', color: '#10b981' }}>${simProd.price.toFixed(2)}</span>
+                          {simProd.rating > 0 && <span style={{ fontSize: '0.8em', backgroundColor: '#e5e7eb', padding: '2px 6px', borderRadius: '4px' }}>⭐ {simProd.rating.toFixed(1)}/10</span>}
                         </div>
                       </Link>
                     );
@@ -577,13 +577,13 @@ const ProductDetail = () => {
                     <textarea
                       value={reviewText}
                       onChange={(e) => setReviewText(e.target.value)}
-                      style={{ 
-                        width: '100%', 
-                        minHeight: '100px', 
-                        padding: '12px', 
-                        borderRadius: '8px', 
-                        border: '1px solid #e5e7eb', 
-                        backgroundColor: '#f9fafb', 
+                      style={{
+                        width: '100%',
+                        minHeight: '100px',
+                        padding: '12px',
+                        borderRadius: '8px',
+                        border: '1px solid #e5e7eb',
+                        backgroundColor: '#f9fafb',
                         color: '#1f2937',
                         fontSize: '0.95em',
                         outline: 'none',

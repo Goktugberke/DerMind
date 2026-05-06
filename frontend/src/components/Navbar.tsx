@@ -64,7 +64,7 @@ const Navbar = () => {
           {isAuthenticated ? (
             <>
               <Link to="/profile" className="user-name" onClick={closeMenu}>
-                {user?.name}
+                <span className="user-text">{user?.name}</span>
               </Link>
               <Link to="/orders" onClick={closeMenu}>Siparişlerim</Link>
               <button className="btn btn-secondary btn-sm" onClick={handleLogout}>

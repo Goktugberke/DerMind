@@ -213,7 +213,9 @@ public class AiController {
 
         List<AiRecommendItemDTO> mappedItems = new ArrayList<>();
         for (AiRecommendItemDTO item : response.getRecommendations()) {
-            productRepository.findBySephoraProductId(item.getProductId()).ifPresentOrElse(p -> {
+            String sId = item.getProductId();
+            productRepository.findBySephoraProductId(sId).ifPresentOrElse(p -> {
+                System.out.println("[AiController] Mapping product: " + sId + " to DB ID: " + p.getId() + " with Price: " + p.getPrice());
                 item.setProductId(p.getId().toString());
                 if (p.getPrice() != null) item.setPriceUsd(p.getPrice());
                 if (p.getName() != null) item.setProductName(p.getName());

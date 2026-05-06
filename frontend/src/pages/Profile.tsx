@@ -231,7 +231,9 @@ const Profile = () => {
             </div>
             <div className="stat-card">
               <h3>Siparişlerim</h3>
-              <p className="stat-placeholder">Yakında eklenecek</p>
+              <Link to="/orders" className="stat-link">
+                Siparişlerimi Görüntüle →
+              </Link>
             </div>
             <div className="stat-card">
               <h3>Favorilerim</h3>

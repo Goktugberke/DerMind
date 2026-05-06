@@ -223,10 +223,6 @@ const apiClient = axios.create({ baseURL: API_BASE_URL, headers: { 'Content-Type
 // Request Interceptor: Auth header'ı ekle
 apiClient.interceptors.request.use(
   async (config) => {
-    if (config.url === '/api/users' && config.method === 'post') {
-      return config;
-    }
-
     let token = localStorage.getItem('authHeader');
 
     // Firebase kullanıcısı varsa güncel token al

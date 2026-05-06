@@ -15,12 +15,14 @@ import org.mapstruct.NullValuePropertyMappingStrategy;
 public interface ProductMapper {
 
     @Mapping(target = "personalScore", ignore = true)
+    @Mapping(source = "price", target = "price")
     ProductResponseDTO toResponseDTO(Product product);
 
     @Mapping(target = "averageUserRating", ignore = true)
     @Mapping(target = "totalRatings",      ignore = true)
     @Mapping(target = "totalPurchases",    ignore = true)
     @Mapping(target = "personalScore",     ignore = true)
+    @Mapping(source = "price", target = "price")
     ProductDetailDTO toDetailDTO(Product product);
 
     @Mapping(target = "id",        ignore = true)

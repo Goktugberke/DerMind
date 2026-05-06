@@ -21,12 +21,12 @@ const Landing = () => {
         const converted = data.map(dto => ({
           id: dto.id.toString(),
           name: dto.name,
-          price: dto.price || (100 + (parseInt(dto.id.toString(), 10) * 12345 % 400)),
+          price: dto.price || 0,
           description: dto.ingredients 
             ? (dto.ingredients.length > 60 ? dto.ingredients.substring(0, 57) + '...' : dto.ingredients)
             : '',
           rating: dto.qualityScore || 0,
-          image: undefined
+          image: dto.imageUrl
         }));
         
         setTopProducts(converted);
@@ -123,9 +123,9 @@ const Landing = () => {
                       {product.description && (
                         <p className="product-description">{product.description}</p>
                       )}
-                      {product.rating && (
+                      {product.rating > 0 && (
                         <div className="product-rating">
-                          {'⭐'.repeat(Math.round(product.rating / 2))} {(product.rating / 2).toFixed(1)}
+                          ⭐ {product.rating.toFixed(1)}/10
                         </div>
                       )}
                     </div>
