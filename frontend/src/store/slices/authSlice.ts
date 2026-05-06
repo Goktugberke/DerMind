@@ -35,7 +35,7 @@ const convertToUser = (dto: UserResponseDTO): User => ({
   email: dto.email,
   name: dto.name,
   skinType: dto.skinType,
-  allergies: dto.allergens ? dto.allergens.split(',').map((a: string) => a.trim()) : [],
+  allergies: Array.isArray(dto.allergens) ? dto.allergens : [],
   picture: dto.picture,
 });
 
@@ -152,7 +152,7 @@ export const updateUserProfile = createAsyncThunk(
       const response = await userApi.updateUser(userData.id, {
         name: userData.name,
         skinType: userData.skinType,
-        allergens: userData.allergies?.join(', '),
+        allergens: userData.allergies,
       });
       return convertToUser(response);
     } catch (error: unknown) {

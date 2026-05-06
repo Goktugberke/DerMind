@@ -33,7 +33,7 @@ export interface UserResponseDTO {
   id: string;
   email: string;
   name: string;
-  allergens?: string;
+  allergens?: string[];
   skinType?: string;
   picture?: string;
 }
@@ -46,7 +46,7 @@ export interface UserCreateDto {
 }
 export interface UserUpdateDto {
   name?: string;
-  allergens?: string;
+  allergens?: string[];
   skinType?: string;
 }
 
