@@ -15,6 +15,8 @@ interface Rating {
     createdAt: string;
     comment: string;
     helpful: number;
+    usageFrequencyString?: string;
+    usageAmountString?: string;
 }
 
 export const CommentsTab = ({ productId }: { productId: string }) => {
@@ -143,6 +145,13 @@ export const CommentsTab = ({ productId }: { productId: string }) => {
                                         <Text style={styles.commentDate}>
                                             {comment.createdAt ? new Date(comment.createdAt).toLocaleDateString() : 'Date not available'}
                                         </Text>
+                                        {(comment.usageFrequencyString || comment.usageAmountString) && (
+                                            <Text style={styles.usageFeedbackText}>
+                                                {comment.usageFrequencyString ? `Used: ${comment.usageFrequencyString}` : ''}
+                                                {comment.usageFrequencyString && comment.usageAmountString ? ' • ' : ''}
+                                                {comment.usageAmountString ? `Amount: ${comment.usageAmountString}` : ''}
+                                            </Text>
+                                        )}
                                     </View>
                                     <StarRating score={comment.rating} outOf={10} size={12} color="#FFB500" />
                                 </View>
@@ -344,6 +353,12 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: theme.colors.text,
         lineHeight: 20,
+    },
+    usageFeedbackText: {
+        fontSize: 11,
+        color: '#94A3B8',
+        marginTop: 2,
+        fontStyle: 'italic',
     },
     helpfulText: {
         fontSize: 11,

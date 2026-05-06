@@ -138,15 +138,36 @@ python train_models_v2.py --skip-rf --skip-cv
 
 ### 5. Ürünleri Veritabanına Aktar (ilk kurulumda bir kez)
 
+İki yol var. **Lokal geliştirme için doğrudan-DB önerilir** — backend ayağa kaldırmaya, admin Firebase token üretmeye gerek yok.
+
+#### A) Doğrudan DB (önerilen, lokal/CI)
+
 ```bash
-# Spring Boot backend çalışıyorken
-python seed_products.py
+# PostgreSQL ayakta olmalı (backend/compose.yaml veya manuel docker run).
+python seed_products_direct.py --truncate
+# Farklı port ise:
+python seed_products_direct.py --truncate \
+    --db-url postgresql://postgres:postgres@localhost:5432/dermind
+```
 
-# Önce dry-run ile kontrol et
-python seed_products.py --dry-run
+`--truncate` mevcut `products` satırlarını siler ve `cart_items / favorites / purchases / streaks / user_product_ratings` FK'leri CASCADE ile temizlenir. CSV → 4692 ürün → `INSERT ... ON CONFLICT (sephora_product_id) DO UPDATE` ile yazılır. Tipik süre: ~2 sn.
 
-# Firebase token gerekiyorsa
-python seed_products.py --token "Bearer eyJhb..."
+Beklenen log:
+```
+CSV yüklendi: 4,692 ürün
+Yazılacak benzersiz satır: 4,692
+TRUNCATE products CASCADE çalıştırılıyor...
+TAMAMLANDI — 4,692 satır 1.7s'de yazıldı
+```
+
+#### B) Backend HTTP üzerinden (prod / remote DB)
+
+`POST /api/products` `hasRole("ADMIN")` ister, geçerli admin Firebase token gerekir.
+
+```bash
+python seed_products.py                              # backend localhost:8080
+python seed_products.py --dry-run                    # önizleme
+python seed_products.py --backend-url http://host:8080 --token "Bearer eyJhb..."
 ```
 
 ### 6. Sunucuyu Başlat
@@ -155,12 +176,25 @@ python seed_products.py --token "Bearer eyJhb..."
 uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
+Beklenen başlangıç log'ları (sırayla):
+
 ```
+INFO:     Started server process [...]
+INFO:     Waiting for application startup.
+[INFO] dermind-ai: ─── Startup: modeller yükleniyor... ───
+[INFO] dermind-ai: Dataset medians: {'ingredient_count': 29.0, 'rating': 4.27, ...}
+[INFO] dermind-ai: Allergen matching: ingredients_text kolonu mevcut (4,692 ürün)
+[INFO] dermind-ai: XGBoost  : OK  (best_iter=999)
+[INFO] dermind-ai: SHAP     : OK
+[INFO] dermind-ai: KNN      : OK  (4,692 ürün, 24 özellik)
+[INFO] dermind-ai: Index    : 4,692 ürün indekslendi
+[INFO] dermind-ai: ─── Tüm modeller hazır. ───
+[INFO] dermind-ai: LLM health: Ollama (llama3.1) @ http://localhost:11434 erişilebilir.
 INFO:     Application startup complete.
-─── Tüm modeller hazır. ───
-LLM health: Ollama (llama3.1) @ http://localhost:11434 erişilebilir.
-Allergen matching: ingredients_text kolonu mevcut (4,692 ürün)
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
 ```
+
+Bu satırları görüyorsan model ve LLM hazır. `Allergen matching: ingredients_text kolonu YOK` görünürse `python build_dataset_v2.py` ile CSV'yi yeniden üret.
 
 ---
 
@@ -196,9 +230,9 @@ Sunucu ve model sağlık kontrolü. Auth gerektirmez.
 {
   "status": "ok",
   "model": "xgboost",
-  "version": "2.2",
+  "version": "2.0",
   "total_products": 4692,
-  "xgb_r2": 0.853
+  "xgb_r2": 0.9999
 }
 ```
 
@@ -233,23 +267,23 @@ curl -X POST http://localhost:8000/score \
   -H "Content-Type: application/json" \
   -H "X-Internal-Key: <secret>" \
   -d '{
-    "sephora_product_id": "P476416",
+    "sephora_product_id": "P398965",
     "user": {
       "skin_type": "oily",
-      "has_acne": true,
-      "allergies": ["paraben", "fragrance"]
+      "has_acne": false,
+      "allergies": ["fragrance"]
     },
-    "is_recommended": 0.83
+    "is_recommended": 0.5
   }'
 ```
 
 ```json
 {
-  "product_id": "P476416",
-  "product_name": "AFRICAN Beauty Butter",
-  "brand": "54 Thrones",
-  "base_score": 5.4,
-  "personal_score": 4.1,
+  "product_id": "P398965",
+  "product_name": "Rose Lip Conditioner",
+  "brand": "AERIN",
+  "base_score": 5.1,
+  "personal_score": 5.8,
   "skin_type": "oily",
   "allergen_warnings": ["fragrance"]
 }
@@ -257,7 +291,7 @@ curl -X POST http://localhost:8000/score \
 
 - `is_recommended` (opsiyonel, 0.0–1.0): Backend'in `UserProductRating.wouldRecommend` ortalaması. Verilmezse 0.5 (nötr) — cold-start.
 - `allergen_warnings`: Ürün ingredients metninde geçen kullanıcı allergen'leri.
-- `skin_type`: `dry | oily | combination | normal | sensitive`
+- `skin_type`: `dry | oily | combination | normal` (model bu 4 tip için eğitildi; `sensitive` 422 döner).
 
 ---
 
@@ -295,11 +329,11 @@ curl -X POST http://localhost:8000/recommend \
 }
 ```
 
-**Allergic kullanıcılar için 4 katmanlı filtre** (otomatik):
+**Allergic kullanıcılar için 3 katmanlı filtre + son çare fallback** (sırayla, ilk yeterli olan uygulanır):
 1. **Text-level match** — ürün ingredients metninde allergen geçenleri çıkar (en sıkı)
 2. CosIng `banned=0 AND restricted=0`
 3. CosIng `banned=0`
-4. `penalty_score` median altı (son çare)
+4. *Son çare:* `penalty_score` median altı
 
 **Performans:** Kategori veya allergy filtresi yoksa, startup'ta fit edilmiş `knn_model` yeniden kullanılır — istek başına refit yok.
 
@@ -434,28 +468,28 @@ OpenTelemetry paketleri kurulu değilse `OTEL_ENABLED=true` olsa bile **graceful
 
 ## Model Performansı
 
-### XGBoost Regresyon Metrikleri (Test: 193K satır)
+### XGBoost Regresyon Metrikleri (Test: 144,924 satır; train 676,309 / val 144,924)
 
 | Metrik | Değer |
 |--------|-------|
-| MAE | **0.3912** |
-| RMSE | **0.5194** |
-| R² | **0.8530** |
-| 5-Fold CV R² | **0.8386 ± 0.017** |
-| ±1 puan | **%94.9** |
-| ±0.5 puan | **%72.5** |
+| MAE | **0.0097** |
+| RMSE | **0.0157** |
+| R² | **0.9999** |
+| 5-Fold CV R² | **0.9985 ± 0.0009** |
+| ±1 puan | **%100** |
+| ±0.5 puan | **%100** |
 
-### En Etkili Özellikler (SHAP)
+### En Etkili Özellikler (SHAP — `models/model_config.json` `shap_top10`)
 
-| # | Özellik | Ortalama Etki |
+| # | Özellik | Ortalama \|SHAP\| |
 |---|---------|---------------|
-| 1 | is_recommended | 1.3240 |
-| 2 | base_score | 0.7798 |
-| 3 | penalty_score | 0.2988 |
-| 4 | banned_count | 0.1898 |
-| 5 | good_for_acne | 0.1190 |
+| 1 | rating | 0.6700 |
+| 2 | base_score | 0.5662 |
+| 3 | good_for_acne | 0.1309 |
+| 4 | good_for_oily | 0.1296 |
+| 5 | skin_dry | 0.0919 |
 
-> Bu yüzden backend `UserProductRating.wouldRecommend` ortalamasını `is_recommended` olarak göndermek **kritik**. Cold-start kullanıcısı için 0.5 (nötr) kullanılır.
+> Backend `UserProductRating.wouldRecommend` ortalamasını `is_recommended` olarak göndermeye devam eder; cold-start kullanıcı için 0.5 (nötr).
 
 ---
 
@@ -498,9 +532,10 @@ ai-server/
 ├── features.py                      ← SCORING_FEATURES + KNN_FEATURES (tek doğru kaynak)
 ├── train_models_v2.py               ← Eğitim pipeline (XGBoost + RF + KNN + SHAP + 5-fold CV)
 ├── build_dataset_v2.py              ← Sephora + CosIng + SkinCare → CSV (ingredients_text dahil)
-├── seed_products.py                 ← CSV → Spring Boot backend POST /api/products
+├── seed_products.py                 ← CSV → Spring Boot backend POST /api/products (admin token)
+├── seed_products_direct.py          ← CSV → PostgreSQL doğrudan (psycopg2, lokal/CI)
 ├── .env.example                     ← Tüm env vars şablonu
-├── requirements.txt                 ← FastAPI + ML + slowapi + opentelemetry
+├── requirements.txt                 ← FastAPI + ML + slowapi + opentelemetry + psycopg2-binary
 ├── Dockerfile                       ← Build-time artefakt guard'ı dahil
 ├── pytest.ini                       ← Test ayarları
 ├── TODO.md                          ← Yapılacaklar / bilinen sorunlar

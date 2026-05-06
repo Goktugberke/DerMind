@@ -21,8 +21,8 @@ import java.util.List;
 public class UserProfileDTO {
 
     @NotBlank(message = "Cilt tipi boş olamaz")
-    @Pattern(regexp = "^(dry|oily|combination|normal|sensitive)$",
-             message = "Cilt tipi dry, oily, combination, normal veya sensitive olmalıdır")
+    @Pattern(regexp = "^(dry|oily|combination|normal)$",
+             message = "Cilt tipi dry, oily, combination veya normal olmalıdır")
     @JsonProperty("skin_type")
     private String skinType;
 

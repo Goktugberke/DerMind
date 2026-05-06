@@ -3,7 +3,14 @@ import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { theme } from '@constants/theme';
 import { Star, Flame, MessageSquare } from 'lucide-react-native';
 
-export const PurchasedProductCard = ({ item, onRate, onStartStreak }: any) => {
+export const PurchasedProductCard = ({ 
+  item, 
+  onRate, 
+  onStartStreak,
+  primaryAction,
+  secondaryAction,
+  children
+}: any) => {
   return (
     <View style={styles.card}>
       {/* Ürün Görseli ve Bilgisi */}
@@ -23,17 +30,37 @@ export const PurchasedProductCard = ({ item, onRate, onStartStreak }: any) => {
         </View>
       </View>
 
+      {children && (
+        <View style={styles.childrenContainer}>
+          {children}
+        </View>
+      )}
+
       {/* Hızlı İşlem Butonları */}
       <View style={styles.actionRow}>
-        <TouchableOpacity style={styles.actionButton} onPress={onRate}>
-          <MessageSquare size={18} color={theme.colors.primary} />
-          <Text style={styles.actionLabel}>Rate</Text>
-        </TouchableOpacity>
+        {primaryAction ? (
+          <TouchableOpacity style={styles.actionButton} onPress={primaryAction.onPress}>
+            {primaryAction.icon}
+            <Text style={styles.actionLabel}>{primaryAction.label}</Text>
+          </TouchableOpacity>
+        ) : onRate ? (
+          <TouchableOpacity style={styles.actionButton} onPress={onRate}>
+            <MessageSquare size={18} color={theme.colors.primary} />
+            <Text style={styles.actionLabel}>Rate</Text>
+          </TouchableOpacity>
+        ) : null}
 
-        <TouchableOpacity style={[styles.actionButton, styles.actionButton]} onPress={onStartStreak}>
-          <Flame size={18} color={theme.colors.primary} />
-          <Text style={styles.actionLabel}>Start Streak</Text>
-        </TouchableOpacity>
+        {secondaryAction ? (
+          <TouchableOpacity style={styles.actionButton} onPress={secondaryAction.onPress}>
+            {secondaryAction.icon}
+            <Text style={styles.actionLabel}>{secondaryAction.label}</Text>
+          </TouchableOpacity>
+        ) : onStartStreak ? (
+          <TouchableOpacity style={styles.actionButton} onPress={onStartStreak}>
+            <Flame size={18} color={theme.colors.primary} />
+            <Text style={styles.actionLabel}>Start Streak</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
     </View>
   );
@@ -80,4 +107,7 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   actionLabel: { marginLeft: 6, fontSize: 14, fontWeight: '600', color: theme.colors.text },
+  childrenContainer: {
+    marginTop: 15,
+  }
 });
