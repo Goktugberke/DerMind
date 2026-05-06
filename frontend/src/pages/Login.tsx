@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { registerUser, loginUser, clearError } from '../store/slices/authSlice';
+import { mergeCartAsync } from '../store/slices/cartSlice';
 import { auth, googleProvider } from '../firebase';
 import { signInWithPopup } from 'firebase/auth';
 
@@ -29,6 +30,10 @@ const Login = () => {
         picture: user.photoURL || '',
         uid: user.uid
       })).unwrap();
+      
+      // Giriş sonrası sepeti senkronize et
+      dispatch(mergeCartAsync());
+      
       navigate('/');
     } catch (err: unknown) {
       console.error('Google Auth error:', err);
@@ -64,9 +69,11 @@ const Login = () => {
         }
 
         await dispatch(registerUser({ email, name, password })).unwrap();
+        dispatch(mergeCartAsync());
         navigate('/');
       } else {
         await dispatch(loginUser({ email, password })).unwrap();
+        dispatch(mergeCartAsync());
         navigate('/');
       }
     } catch (err) {

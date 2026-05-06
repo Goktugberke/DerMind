@@ -13,6 +13,8 @@ import org.springframework.stereotype.Repository;
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
         Page<Product> findByBrand(String brand, Pageable pageable);
+        
+        java.util.Optional<Product> findBySephoraProductId(String sephoraProductId);
 
         @Query("SELECT p FROM Product p WHERE LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%'))")
         Page<Product> searchByName(@Param("name") String name, Pageable pageable);

@@ -20,6 +20,7 @@ public class AppConfig {
         return builder
                 .connectTimeout(Duration.ofSeconds(3))
                 .readTimeout(Duration.ofSeconds(10))
+                .requestFactory(() -> new org.springframework.http.client.SimpleClientHttpRequestFactory())
                 .build();
     }
 
@@ -32,6 +33,7 @@ public class AppConfig {
         return builder
                 .connectTimeout(Duration.ofSeconds(3))
                 .readTimeout(Duration.ofSeconds(45))
+                .requestFactory(() -> new org.springframework.http.client.SimpleClientHttpRequestFactory())
                 .build();
     }
 }

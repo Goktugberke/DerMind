@@ -31,8 +31,17 @@ public class StreakController {
     }
 
     @GetMapping("/my-streaks")
-    public ResponseEntity<List<StreakResponseDTO>> getMyStreaks(@CurrentUser User user) {
-        return ResponseEntity.ok(streakService.getStreaksByUserId(user.getId()));
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> getMyStreaks(@CurrentUser User user) {
+        try {
+            if (user == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User not found in session");
+            }
+            return ResponseEntity.ok(streakService.getStreaksByUserId(user.getId()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Streak Error: " + e.getMessage());
+        }
     }
 
     @GetMapping("/my-streaks/active")
@@ -60,10 +69,15 @@ public class StreakController {
 
     @PutMapping("/{id}")
     @PreAuthorize("@authz.isStreakOwner(#id)")
-    public ResponseEntity<StreakResponseDTO> updateStreak(
+    public ResponseEntity<?> updateStreak(
             @PathVariable Long id,
             @Valid @RequestBody StreakUpdateDTO dto) {
-        return ResponseEntity.ok(streakService.updateStreak(id, dto));
+        try {
+            return ResponseEntity.ok(streakService.updateStreak(id, dto));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Update Error: " + e.getMessage());
+        }
     }
 
     @DeleteMapping("/{id}")

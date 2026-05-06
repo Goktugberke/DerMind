@@ -15,21 +15,21 @@ import java.util.Optional;
 @Repository
 public interface StreakRepository extends JpaRepository<Streak, Long> {
 
-    @EntityGraph(attributePaths = {"user", "product"})
+    @EntityGraph(attributePaths = {"user", "product", "customTimes", "usageTimes", "daysOfWeek"})
     List<Streak> findByUserId(String userId);
 
-    @EntityGraph(attributePaths = {"user", "product"})
+    @EntityGraph(attributePaths = {"user", "product", "customTimes", "usageTimes", "daysOfWeek"})
     List<Streak> findByProductId(Long productId);
 
-    @EntityGraph(attributePaths = {"user", "product"})
+    @EntityGraph(attributePaths = {"user", "product", "customTimes", "usageTimes", "daysOfWeek"})
     @Query("SELECT s FROM Streak s WHERE s.user.id = :userId ORDER BY s.currentStreak DESC")
     List<Streak> findTopStreaksByUserId(@Param("userId") String userId);
 
-    @EntityGraph(attributePaths = {"user", "product"})
+    @EntityGraph(attributePaths = {"user", "product", "customTimes", "usageTimes", "daysOfWeek"})
     @Query("SELECT s FROM Streak s WHERE s.lastUsedDate = :date AND s.isActive = true")
     List<Streak> findActiveStreaksByDate(@Param("date") LocalDate date);
 
-    @EntityGraph(attributePaths = {"user", "product"})
+    @EntityGraph(attributePaths = {"user", "product", "customTimes", "usageTimes", "daysOfWeek"})
     @Query("SELECT s FROM Streak s WHERE s.user.id = :userId AND s.currentStreak > 0 ORDER BY s.currentStreak DESC")
     List<Streak> findActiveStreaksByUser(@Param("userId") String userId);
 
@@ -45,7 +45,7 @@ public interface StreakRepository extends JpaRepository<Streak, Long> {
      * Tehlikedeki seriler — bugün kullanılmamış, ama dün kullanılmış (1 gün boşluk).
      * DB-side filtre, RAM'a tüm streak'leri yüklemekten kaçınır.
      */
-    @EntityGraph(attributePaths = {"user", "product"})
+    @EntityGraph(attributePaths = {"user", "product", "customTimes", "usageTimes", "daysOfWeek"})
     @Query("SELECT s FROM Streak s WHERE s.currentStreak > 0 AND s.isActive = true " +
            "AND s.lastUsedDate = :yesterday")
     List<Streak> findStreaksAtRisk(@Param("yesterday") LocalDate yesterday);
@@ -53,7 +53,7 @@ public interface StreakRepository extends JpaRepository<Streak, Long> {
     /**
      * Bozulmuş seriler — son kullanım tarihi 2+ gün önce ve currentStreak hâlâ > 0.
      */
-    @EntityGraph(attributePaths = {"user", "product"})
+    @EntityGraph(attributePaths = {"user", "product", "customTimes", "usageTimes", "daysOfWeek"})
     @Query("SELECT s FROM Streak s WHERE s.currentStreak > 0 " +
            "AND s.lastUsedDate IS NOT NULL AND s.lastUsedDate < :cutoff")
     List<Streak> findExpiredStreaks(@Param("cutoff") LocalDate cutoff);
@@ -61,7 +61,7 @@ public interface StreakRepository extends JpaRepository<Streak, Long> {
     /**
      * Çoklu kullanıcı için tek sorguda streak yükle — N+1 önleme (scheduler için).
      */
-    @EntityGraph(attributePaths = {"user", "product"})
+    @EntityGraph(attributePaths = {"user", "product", "customTimes", "usageTimes", "daysOfWeek"})
     @Query("SELECT s FROM Streak s WHERE s.user.id IN :userIds")
     List<Streak> findByUserIdIn(@Param("userIds") Collection<String> userIds);
 }

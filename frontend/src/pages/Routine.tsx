@@ -16,10 +16,12 @@ const Routine = () => {
   const [allProducts, setAllProducts] = useState<ProductResponseDTO[]>([]);
   const [backendStreaks, setBackendStreaks] = useState<StreakResponseDTO[]>([]);
   const [loading, setLoading] = useState(false);
+  
   // Form State
   const [selectedProduct, setSelectedProduct] = useState('');
   const [dailyFrequency, setDailyFrequency] = useState<1 | 2>(1); // 1 or 2 times daily
   const [customTimes, setCustomTimes] = useState<string[]>(['08:00']); // Default 1 time
+  const [editingStreakId, setEditingStreakId] = useState<number | null>(null);
 
   // Fetch streaks function - simplified to separate loading state
   const fetchStreaks = async (silent = false) => {
@@ -77,25 +79,43 @@ const Routine = () => {
     setCustomTimes(newTimes);
   };
 
+  const handleEditClick = (streak: StreakResponseDTO) => {
+    setEditingStreakId(streak.id);
+    setSelectedProduct(streak.productId.toString());
+    setDailyFrequency(streak.usageFrequency === 'TWICE_DAILY' ? 2 : 1);
+    setCustomTimes(streak.customTimes && streak.customTimes.length > 0 ? streak.customTimes : (streak.usageFrequency === 'TWICE_DAILY' ? ['08:00', '20:00'] : ['08:00']));
+    setShowAddTask(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleAddTask = async () => {
     if (!selectedProduct) {
       alert('Lütfen bir ürün seçin');
       return;
     }
 
-    // Map logic to DTO
     let finalFrequency: UsageFrequency = UsageFrequency.DAILY;
     if (dailyFrequency === 2) finalFrequency = UsageFrequency.TWICE_DAILY;
 
     try {
-      await streakApi.createStreak({
-        productId: parseInt(selectedProduct),
-        usageFrequency: finalFrequency,
-        customTimes: customTimes, // Send specific times (HH:mm)
-      });
+      if (editingStreakId) {
+        // Update existing
+        await streakApi.updateStreak(editingStreakId, {
+          usageFrequency: finalFrequency,
+          customTimes: customTimes,
+        });
+      } else {
+        // Create new
+        await streakApi.createStreak({
+          productId: parseInt(selectedProduct),
+          usageFrequency: finalFrequency,
+          customTimes: customTimes,
+        });
+      }
 
       // Reset form
       setShowAddTask(false);
+      setEditingStreakId(null);
       setSelectedProduct('');
       setDailyFrequency(1);
       setCustomTimes(['08:00']);
@@ -103,8 +123,8 @@ const Routine = () => {
       // Refresh
       fetchStreaks();
     } catch (err) {
-      console.error('Error creating routin:', err);
-      alert('Rutin oluşturulurken bir hata oluştu.');
+      console.error('Error saving routine:', err);
+      alert('Rutin kaydedilirken bir hata oluştu.');
     }
   };
 
@@ -166,7 +186,7 @@ const Routine = () => {
 
         {showAddTask && (
           <div className="add-task-card">
-            <h3>Yeni Rutin Oluştur</h3>
+            <h3>{editingStreakId ? 'Rutin Düzenle' : 'Yeni Rutin Oluştur'}</h3>
 
             {/* 1. Ürün Seçimi */}
             <div className="form-group">
@@ -175,6 +195,7 @@ const Routine = () => {
                 className="form-select"
                 value={selectedProduct}
                 onChange={(e) => setSelectedProduct(e.target.value)}
+                disabled={!!editingStreakId}
               >
                 <option value="">Bir ürün seçin...</option>
                 {allProducts.map(p => (
@@ -221,7 +242,7 @@ const Routine = () => {
             </div>
 
             <button className="btn btn-success full-width" onClick={handleAddTask}>
-              Rutin Ekle
+              {editingStreakId ? 'Güncelle' : 'Rutin Ekle'}
             </button>
           </div>
         )}
@@ -291,7 +312,13 @@ const Routine = () => {
                     )}
                   </div>
                   {/* Separate Delete Button */}
-                  <div style={{ marginTop: '10px', textAlign: 'right' }}>
+                  <div className="task-footer" style={{ marginTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <button
+                      className="btn btn-text-primary"
+                      onClick={() => handleEditClick(streak)}
+                    >
+                      Düzenle
+                    </button>
                     <button
                       className="btn btn-text-danger"
                       onClick={() => handleDeleteStreak(streak.id)}
@@ -358,7 +385,9 @@ const Routine = () => {
         .stat { display: flex; flex-direction: column; align-items: center; }
         .stat .value { font-size: 1.2em; font-weight: bold; }
         .stat .label { font-size: 0.8em; color: #666; }
-        .btn-text-danger { background: none; border: none; color: #dc3545; cursor: pointer; }
+        .btn-text-danger { background: none; border: none; color: #dc3545; cursor: pointer; font-size: 0.9em; }
+        .btn-text-primary { background: none; border: none; color: #0d6efd; cursor: pointer; font-size: 0.9em; }
+
         .btn-outline-success { 
           background: white; border: 1px solid #198754; color: #198754; padding: 8px 16px; border-radius: 6px; cursor: pointer;
         }

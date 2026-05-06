@@ -3,19 +3,25 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { addToCartAsync } from '../store/slices/cartSlice';
 import type { Product } from '../store/slices/cartSlice';
-import { productApi, ratingApi, streakApi, favoriteApi, UsageFrequency } from '../types/api';
-import type { ProductDetailDTO, RatingResponseDTO } from '../types/api';
+import { productApi, ratingApi, streakApi, favoriteApi, aiApi, UsageFrequency } from '../types/api';
+import type { ProductDetailDTO, RatingResponseDTO, AiExplainResponseDTO } from '../types/api';
 
-const convertToProduct = (dto: ProductDetailDTO): Product => {
-  const mockPrice = dto.price || (100 + (parseInt(dto.id.toString(), 10) * 12345 % 400));
+const convertToProduct = (dto: any): Product => {
+  const id = dto.id || dto.product_id;
+  const name = dto.name || dto.product_name;
+  
+  // REAL DATA ONLY: Use database price if available, otherwise use AI-provided price_usd
+  const realPrice = dto.price || dto.price_usd || 0;
+
   return {
-    id: dto.id.toString(),
-    name: dto.name,
+    id: id.toString(),
+    name: name,
     brand: dto.brand,
-    price: mockPrice,
+    price: realPrice,
     description: dto.ingredients || '',
-    rating: dto.averageUserRating || dto.qualityScore || 0,
-    image: dto.imageUrl
+    rating: dto.averageUserRating || dto.qualityScore || dto.base_score || dto.rating || 0,
+    category: dto.category,
+    image: dto.imageUrl || dto.image_url
   };
 };
 
@@ -43,12 +49,16 @@ const ProductDetail = () => {
   const [error, setError] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [favLoading, setFavLoading] = useState(false);
-  const [similarProducts, setSimilarProducts] = useState<import('../types/api').ProductResponseDTO[]>([]);
+  const [similarProducts, setSimilarProducts] = useState<import('../types/api').AiRecommendItemDTO[]>([]);
 
   const [reviewText, setReviewText] = useState('');
   const [reviewRating, setReviewRating] = useState(5);
   const [editingRatingId, setEditingRatingId] = useState<number | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
+  
+  // AI Explanation State
+  const [explanation, setExplanation] = useState<string | null>(null);
+  const [isExplaining, setIsExplaining] = useState(false);
 
   // Routine Modal State
   const [showRoutineModal, setShowRoutineModal] = useState(false);
@@ -69,7 +79,7 @@ const ProductDetail = () => {
       skinTypeMatch: productData.personalScore ? (productData.personalScore > 7 ? 95 : 75) : (productData.qualityScore && productData.qualityScore > 7 ? 90 : 60),
       allergySafe: 100, // This is calculated by backend usually but for now placeholder
       ingredientQuality: qualityBase,
-      userRating: (productData.averageUserRating || 5.0) * 20,
+      userRating: (productData.averageUserRating || 5.0) * 10,
       mlScore: personalScore,
     });
   }, []);
@@ -80,6 +90,8 @@ const ProductDetail = () => {
     setProductDetail(null);
     setScore(null);
     setError(null);
+    setExplanation(null);
+    setIsExplaining(false);
 
     const fetchProduct = async () => {
       if (!id) return;
@@ -96,6 +108,7 @@ const ProductDetail = () => {
         console.log(`[ProductDetail] Fetching product ${productId}. Auth status: ${isAuthenticated}, Profile exists: ${!!user}, Header present: ${!!currentToken}`);
 
         const productData = await productApi.getProductById(productId);
+        console.log("[ProductDetail] Product data received:", productData);
         setProductDetail(productData);
         setProduct(convertToProduct(productData));
 
@@ -135,6 +148,20 @@ const ProductDetail = () => {
 
     fetchProduct();
   }, [id, user, calculateMLScore, isAuthenticated]);
+
+  const handleFetchExplanation = async () => {
+    if (!id || isExplaining) return;
+    try {
+      setIsExplaining(true);
+      const res = await aiApi.getExplanation(parseInt(id, 10));
+      setExplanation(res.explanation);
+    } catch (err) {
+      console.error("Explanation error", err);
+      setExplanation("Analiz alınırken bir hata oluştu. Lütfen Ollama sunucusunun çalıştığından emin olun.");
+    } finally {
+      setIsExplaining(false);
+    }
+  };
 
   const handleAddToRoutine = async () => {
     if (!isAuthenticated) {
@@ -272,7 +299,7 @@ const ProductDetail = () => {
             <h1>{product.name}</h1>
             {productDetail?.brand && <div className="product-brand">Marka: {productDetail.brand}</div>}
             {productDetail?.qualityScore && <div>Kalite Puanı: {productDetail.qualityScore.toFixed(1)}/10</div>}
-            <div className="product-price-large">{product.price.toFixed(2)} ₺</div>
+            <div className="product-price-large">${product.price.toFixed(2)}</div>
 
             {score && (
               <div className="product-scoring" style={{ marginTop: '15px', padding: '15px', backgroundColor: '#f3f4f6', borderRadius: '12px' }}>
@@ -281,15 +308,61 @@ const ProductDetail = () => {
                 </h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                   <div className="score-main" style={{
-                    fontSize: '2em',
+                    fontSize: '2.5em',
                     fontWeight: 'bold',
                     color: score.overallScore > 70 ? '#10b981' : score.overallScore > 30 ? '#f59e0b' : '#ef4444'
                   }}>
-                    %{score.overallScore.toFixed(0)}
+                    {(score.overallScore / 10).toFixed(1)}<span style={{ fontSize: '0.5em', color: '#9ca3af' }}>/10</span>
                   </div>
-                  <div className="score-desc" style={{ fontSize: '0.9em', color: '#4b5563' }}>
+                  <div className="score-desc" style={{ fontSize: '0.95em', color: '#4b5563' }}>
                     Bu ürün cilt tipin ve tercihlerine göre <strong>{score.overallScore > 70 ? 'yüksek' : score.overallScore > 30 ? 'orta' : 'düşük'}</strong> uyumluluk gösteriyor.
                   </div>
+                </div>
+
+                {/* AI Explanation Button/Text */}
+                <div style={{ marginTop: '15px', borderTop: '1px solid #e5e7eb', paddingTop: '15px' }}>
+                  {!explanation ? (
+                    <button 
+                      onClick={handleFetchExplanation} 
+                      disabled={isExplaining}
+                      className="btn"
+                      style={{ 
+                        width: '100%', 
+                        backgroundColor: '#6366f1', 
+                        color: 'white',
+                        padding: '10px',
+                        borderRadius: '8px',
+                        fontSize: '0.9em',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      {isExplaining ? (
+                        <>
+                          <span className="loader-dots">Analiz Ediliyor...</span>
+                        </>
+                      ) : (
+                        <>✨ DerMind AI Analizi Al</>
+                      )}
+                    </button>
+                  ) : (
+                    <div style={{ 
+                      backgroundColor: '#ffffff', 
+                      padding: '12px', 
+                      borderRadius: '8px', 
+                      fontSize: '0.9em', 
+                      lineHeight: '1.6', 
+                      color: '#374151',
+                      borderLeft: '4px solid #6366f1'
+                    }}>
+                      <div style={{ fontWeight: 'bold', marginBottom: '8px', color: '#4f46e5', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <span>✨ AI Analizi:</span>
+                      </div>
+                      {explanation}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -342,37 +415,40 @@ const ProductDetail = () => {
               <div className="similar-products-section" style={{ marginTop: '30px', marginBottom: '30px' }}>
                 <h3 style={{ fontSize: '1.2em', marginBottom: '15px', color: '#1f2937' }}>Benzer Ürün Önerileri</h3>
                 <div style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '10px' }}>
-                  {similarProducts.map((simProd) => (
-                    <Link
-                      key={simProd.id}
-                      to={`/products/${simProd.id}`}
-                      style={{
-                        minWidth: '200px',
-                        maxWidth: '200px',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px',
-                        padding: '10px',
-                        textDecoration: 'none',
-                        color: 'inherit',
-                        backgroundColor: '#fff',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        transition: 'transform 0.2s',
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.02)')}
-                      onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-                    >
-                      <div style={{ height: '150px', backgroundColor: '#f3f4f6', borderRadius: '4px', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                         {simProd.imageUrl ? <img src={simProd.imageUrl} alt={simProd.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> : <span style={{fontSize: '2em'}}>📦</span>}
-                      </div>
-                      <strong style={{ fontSize: '0.95em', marginBottom: '5px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', height: '40px' }}>{simProd.name}</strong>
-                      <span style={{ fontSize: '0.85em', color: '#6b7280', marginBottom: '5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{simProd.brand}</span>
-                      <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                         <span style={{ fontWeight: 'bold', color: '#10b981' }}>{simProd.price ? `${simProd.price.toFixed(2)} ₺` : 'Fiyat Yok'}</span>
-                         {simProd.qualityScore && <span style={{ fontSize: '0.8em', backgroundColor: '#e5e7eb', padding: '2px 6px', borderRadius: '4px' }}>⭐ {simProd.qualityScore.toFixed(1)}</span>}
-                      </div>
-                    </Link>
-                  ))}
+                  {similarProducts.map((simDto) => {
+                    const simProd = convertToProduct(simDto);
+                    return (
+                      <Link
+                        key={simProd.id}
+                        to={`/products/${simProd.id}`}
+                        style={{
+                          minWidth: '200px',
+                          maxWidth: '200px',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          padding: '10px',
+                          textDecoration: 'none',
+                          color: 'inherit',
+                          backgroundColor: '#fff',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          transition: 'transform 0.2s',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.02)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                      >
+                        <div style={{ height: '150px', backgroundColor: '#f3f4f6', borderRadius: '4px', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                           {simProd.image ? <img src={simProd.image} alt={simProd.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> : <span style={{fontSize: '2em'}}>📦</span>}
+                        </div>
+                        <strong style={{ fontSize: '0.95em', marginBottom: '5px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', height: '40px' }}>{simProd.name}</strong>
+                        <span style={{ fontSize: '0.85em', color: '#6b7280', marginBottom: '5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{simProd.brand}</span>
+                        <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                           <span style={{ fontWeight: 'bold', color: '#10b981' }}>${simProd.price.toFixed(2)}</span>
+                           {simProd.rating > 0 && <span style={{ fontSize: '0.8em', backgroundColor: '#e5e7eb', padding: '2px 6px', borderRadius: '4px' }}>⭐ {simProd.rating.toFixed(1)}/10</span>}
+                        </div>
+                      </Link>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -465,26 +541,57 @@ const ProductDetail = () => {
               {isAuthenticated ? (
                 <form onSubmit={handleReviewSubmit} style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
                   <h4 style={{ margin: '0 0 10px 0', color: '#333' }}>{editingRatingId ? 'Yorumu Düzenle' : 'Yorum Yap'}</h4>
-                  <div style={{ marginBottom: '10px' }}>
-                    <label style={{ display: 'block', marginBottom: '5px', color: '#555' }}>Puan:</label>
-                    <select
-                      value={reviewRating}
-                      onChange={(e) => setReviewRating(Number(e.target.value))}
-                      style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', width: '100px', backgroundColor: '#fff', color: '#333' }}
-                    >
-                      {[5, 4, 3, 2, 1].map(num => (
-                        <option key={num} value={num}>{num} Yıldız</option>
-                      ))}
-                    </select>
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', marginBottom: '10px', color: '#374151', fontWeight: '600', fontSize: '0.95em' }}>Ürün Puanı:</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexWrap: 'wrap' }}>
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((starIdx) => {
+                        const isSelected = reviewRating >= starIdx;
+                        return (
+                          <button
+                            key={starIdx}
+                            type="button"
+                            onClick={() => setReviewRating(starIdx)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              padding: '2px',
+                              fontSize: '1.5rem',
+                              color: isSelected ? '#fbbf24' : '#d1d5db',
+                              transition: 'transform 0.1s ease',
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.2)')}
+                            onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                          >
+                            ★
+                          </button>
+                        );
+                      })}
+                      <span style={{ marginLeft: '10px', fontSize: '1.1em', fontWeight: 'bold', color: '#f59e0b', backgroundColor: '#fef3c7', padding: '2px 8px', borderRadius: '6px' }}>
+                        {reviewRating}/10
+                      </span>
+                    </div>
                   </div>
                   <div style={{ marginBottom: '10px' }}>
                     <label style={{ display: 'block', marginBottom: '5px', color: '#555' }}>Yorumunuz:</label>
                     <textarea
                       value={reviewText}
                       onChange={(e) => setReviewText(e.target.value)}
-                      style={{ width: '100%', minHeight: '80px', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', backgroundColor: '#fff', color: '#333' }}
-                      placeholder="Ürün hakkındaki düşüncelerinizi paylaşın..."
-                      required
+                      style={{ 
+                        width: '100%', 
+                        minHeight: '100px', 
+                        padding: '12px', 
+                        borderRadius: '8px', 
+                        border: '1px solid #e5e7eb', 
+                        backgroundColor: '#f9fafb', 
+                        color: '#1f2937',
+                        fontSize: '0.95em',
+                        outline: 'none',
+                        transition: 'border-color 0.2s'
+                      }}
+                      onFocus={(e) => (e.currentTarget.style.borderColor = '#3b82f6')}
+                      onBlur={(e) => (e.currentTarget.style.borderColor = '#e5e7eb')}
+                      placeholder="Ürün hakkındaki düşüncelerinizi paylaşın (isteğe bağlı)..."
                     />
                   </div>
                   <div style={{ display: 'flex', gap: '10px' }}>
@@ -511,7 +618,7 @@ const ProductDetail = () => {
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                         <div>
                           <strong style={{ fontSize: '1.1em', color: '#333' }}>{rating.userName || 'Kullanıcı'}</strong>
-                          <span style={{ marginLeft: '10px', color: '#ffb400' }}>{'★'.repeat(rating.rating)}{'☆'.repeat(5 - rating.rating)}</span>
+                          <span style={{ marginLeft: '10px', color: '#ffb400', fontWeight: 'bold' }}>⭐ {rating.rating}/10</span>
                         </div>
                         {user && rating.userId === user.id && (
                           <div style={{ display: 'flex', gap: '10px' }}>

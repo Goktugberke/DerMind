@@ -30,7 +30,7 @@ public class AiServiceClient {
     @Value("${ai.server.internal-key:}")
     private String internalKey;
 
-    public Double getPersonalScore(String sephoraProductId, User user, Double isRecommended) {
+    public AiScoreResponseDTO getAiScoreResponse(String sephoraProductId, User user, Double isRecommended) {
         if (sephoraProductId == null || user == null) {
             return null;
         }
@@ -60,21 +60,21 @@ public class AiServiceClient {
             HttpEntity<AiScoreRequestDTO> entity = new HttpEntity<>(request, headers);
 
             String scoreUrl = aiServerUrl.replaceAll("/+$", "") + "/score";
-            log.debug("AI /score → {} (product={}, skin={}, acne={}, recRate={})",
+            log.info("AI /score request → {} (product={}, skin={}, acne={}, recRate={})",
                     scoreUrl, sephoraProductId, aiProfile.getSkinType(), aiProfile.isHasAcne(), isRecommended);
 
             ResponseEntity<AiScoreResponseDTO> response = restTemplate.postForEntity(
                     scoreUrl, entity, AiScoreResponseDTO.class);
 
-            AiScoreResponseDTO body = response.getBody();
-            if (body != null) {
-                return body.getPersonalScore();
-            }
-            log.warn("AI server null response body for product {}", sephoraProductId);
+            return response.getBody();
         } catch (Exception e) {
             log.warn("AI /score call failed for product {}: {}", sephoraProductId, e.getMessage());
+            return null;
         }
+    }
 
-        return null;
+    public Double getPersonalScore(String sephoraProductId, User user, Double isRecommended) {
+        AiScoreResponseDTO response = getAiScoreResponse(sephoraProductId, user, isRecommended);
+        return response != null ? response.getPersonalScore() : null;
     }
 }

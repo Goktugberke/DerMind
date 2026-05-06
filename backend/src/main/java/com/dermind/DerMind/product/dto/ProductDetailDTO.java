@@ -18,4 +18,5 @@ public class ProductDetailDTO {
     private int totalRatings;
     private int totalPurchases;
     private Double personalScore;
+    private Double price;
 }

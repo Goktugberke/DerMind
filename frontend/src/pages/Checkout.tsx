@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { clearCart, selectCartItems, selectTotalPrice } from '../store/slices/cartSlice';
+import { clearCartAsync, selectCartItems, selectTotalPrice } from '../store/slices/cartSlice';
 import { purchaseApi, type PurchaseCreateDTO } from '../types/api';
 
 const Checkout = () => {
@@ -52,7 +52,7 @@ const Checkout = () => {
       }
 
       alert('Siparişiniz alındı! E-posta ile bilgilendirme yapılmıştır.');
-      dispatch(clearCart());
+      dispatch(clearCartAsync());
       navigate('/orders'); // Siparişlerim sayfasına yönlendir
     } catch (error) {
       console.error("Sipariş oluşturulurken hata:", error);
@@ -212,7 +212,7 @@ const Checkout = () => {
             </section>
 
             <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
-              {loading ? 'İşleniyor...' : `Siparişi Tamamla (${totalPrice.toFixed(2)} ₺)`}
+              {loading ? 'İşleniyor...' : `Siparişi Tamamla ($${totalPrice.toFixed(2)})`}
             </button>
           </form>
 
@@ -223,13 +223,13 @@ const Checkout = () => {
                 {cart.map((item) => (
                   <div key={item.id} className="order-item">
                     <span>{item.name} x {item.quantity}</span>
-                    <span>{(item.price * item.quantity).toFixed(2)} ₺</span>
+                    <span>${(item.price * item.quantity).toFixed(2)}</span>
                   </div>
                 ))}
               </div>
               <div className="summary-row summary-total">
                 <span>Toplam:</span>
-                <span>{totalPrice.toFixed(2)} ₺</span>
+                <span>${totalPrice.toFixed(2)}</span>
               </div>
             </div>
           </div>

@@ -107,4 +107,10 @@ public class ProductController {
     public ResponseEntity<List<ProductRecommendationDTO>> getMyRecommendations(@CurrentUser User user) {
         return ResponseEntity.ok(productService.getRecommendationsForUser(user.getId()));
     }
+
+    @PostMapping("/sync-prices")
+    public ResponseEntity<String> syncPrices() {
+        productService.syncPricesFromCsv();
+        return ResponseEntity.ok("Prices synced successfully from CSV.");
+    }
 }

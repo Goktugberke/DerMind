@@ -8,6 +8,7 @@ import com.dermind.DerMind.product.repository.ProductRepository;
 import com.dermind.DerMind.user.model.User;
 import com.dermind.DerMind.user.repository.UserRepository;
 import com.dermind.DerMind.user_product_rating.repository.UserProductRatingRepository;
+import com.dermind.DerMind.ai.dto.AiScoreResponseDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -34,7 +35,6 @@ public class ProductService {
     private final ProductMapper productMapper;
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "products-page", key = "#pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort.toString()")
     public Page<ProductResponseDTO> getAllProducts(Pageable pageable) {
         return productRepository.findAll(pageable).map(productMapper::toResponseDTO);
     }
@@ -62,14 +62,24 @@ public class ProductService {
             String email = auth.getName();
             userRepository.findByEmail(email).ifPresent(user -> {
                 Double recommendRate = computeRecommendRate(product);
-                Double personalScore = aiServiceClient.getPersonalScore(
+                AiScoreResponseDTO aiResponse = aiServiceClient.getAiScoreResponse(
                         product.getSephoraProductId(), user, recommendRate);
-                if (personalScore != null) {
+                if (aiResponse != null) {
+                    Double personalScore = aiResponse.getPersonalScore();
+                    log.info("[ProductService] Fetched personalScore {} for product {} and user {}", personalScore, product.getSephoraProductId(), email);
                     dto.setPersonalScore(personalScore);
+                    
+                    // REAL PRICE ENRICHMENT: If DB price is missing, use AI server price
+                    if (dto.getPrice() == null || dto.getPrice() == 0.0) {
+                        dto.setPrice(aiResponse.getPriceUsd());
+                    }
+                } else {
+                    log.warn("[ProductService] AI response returned null for product {} and user {}", product.getSephoraProductId(), email);
                 }
             });
         }
         if (dto.getPersonalScore() == null) {
+            log.info("[ProductService] Using qualityScore fallback for product {}", product.getId());
             dto.setPersonalScore(product.getQualityScore());
         }
         return dto;
@@ -124,12 +134,13 @@ public class ProductService {
     @Transactional(readOnly = true)
     public Page<ProductResponseDTO> filterProducts(String searchTerm, Double minPrice, Double maxPrice,
             Double minQuality, Pageable pageable) {
-        return productRepository.filterProducts(searchTerm, minPrice, maxPrice, minQuality, pageable)
-                .map(productMapper::toResponseDTO);
+        Page<Product> products = productRepository.filterProducts(searchTerm, minPrice, maxPrice, minQuality, pageable);
+        log.info("[ProductService] Filter results: {} products found for term='{}', minPrice={}, maxPrice={}, minQuality={}", 
+                 products.getTotalElements(), searchTerm, minPrice, maxPrice, minQuality);
+        return products.map(productMapper::toResponseDTO);
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "top-quality", key = "#limit")
     public List<ProductDetailDTO> getTopQualityProducts(int limit) {
         return productRepository.findTopQualityProducts(Pageable.ofSize(Math.min(limit, 100)))
                 .getContent().stream()
@@ -138,7 +149,6 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "most-purchased", key = "#limit")
     public List<ProductDetailDTO> getMostPurchasedProducts(int limit) {
         return productRepository.findMostPurchasedProducts(Pageable.ofSize(Math.min(limit, 100)))
                 .getContent().stream()
@@ -203,5 +213,61 @@ public class ProductService {
         if (product.getId() == null)
             return null;
         return ratingRepository.getRecommendRateByProductId(product.getId());
+    }
+
+    @Transactional
+    public void syncPricesFromCsv() {
+        // Path should be relative to project root or use absolute
+        String infoPath = "ai-server/datasets/sephora_dataset/product_info.csv";
+        java.io.File file = new java.io.File(infoPath);
+        if (!file.exists()) {
+            log.error("CSV file not found at: {}", infoPath);
+            return;
+        }
+
+        try (java.io.BufferedReader br = new java.io.BufferedReader(new java.io.FileReader(file))) {
+            String line;
+            String headerLine = br.readLine();
+            if (headerLine == null) return;
+            
+            String[] headers = headerLine.split(",");
+            int pidIdx = -1, priceIdx = -1, ratingIdx = -1;
+            
+            for (int i = 0; i < headers.length; i++) {
+                if (headers[i].equals("product_id")) pidIdx = i;
+                if (headers[i].equals("price_usd")) priceIdx = i;
+                if (headers[i].equals("rating")) ratingIdx = i;
+            }
+
+            if (pidIdx == -1 || priceIdx == -1) {
+                log.error("Required columns missing in CSV");
+                return;
+            }
+
+            int count = 0;
+            while ((line = br.readLine()) != null) {
+                // Robust CSV split: ignore commas inside quotes
+                String[] values = line.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
+                if (values.length > Math.max(pidIdx, priceIdx)) {
+                    String pid = values[pidIdx].replace("\"", "");
+                    String priceStr = values[priceIdx].replace("\"", "");
+                    
+                    try {
+                        Double price = (priceStr == null || priceStr.isEmpty() || priceStr.equals("null")) ? null : Double.parseDouble(priceStr);
+                        
+                        productRepository.findBySephoraProductId(pid).ifPresent(p -> {
+                            if (price != null) p.setPrice(price);
+                            productRepository.save(p);
+                        });
+                        count++;
+                    } catch (NumberFormatException e) {
+                        // Skip header or bad lines
+                    }
+                }
+            }
+            log.info("Successfully synced {} prices from CSV", count);
+        } catch (java.io.IOException e) {
+            log.error("Error reading CSV for price sync: {}", e.getMessage());
+        }
     }
 }

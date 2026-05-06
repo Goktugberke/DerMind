@@ -10,13 +10,11 @@ import type { ProductResponseDTO, PageResponse } from '../types/api';
 
 // Convert ProductResponseDTO to Product (for cart)
 const convertToProduct = (dto: ProductResponseDTO): Product => {
-  const mockPrice = dto.price || (100 + (parseInt(dto.id.toString(), 10) * 12345 % 400));
-
   return {
     id: dto.id.toString(),
     name: dto.name,
     brand: dto.brand,
-    price: mockPrice,
+    price: dto.price || 0,
     description: dto.ingredients || '',
     rating: dto.qualityScore || 0,
     category: dto.category,
@@ -70,18 +68,10 @@ const Products = () => {
     }
   };
 
-  // Reset when sort or search or filters change
-  useEffect(() => {
-    setProducts([]);
-    pageRef.current = 0;
-    setHasMore(true);
-    const query = searchParams.get('search') || '';
-    setSearchQuery(query);
-  }, [searchParams, filters.sortBy, filters.minPrice, filters.maxPrice, filters.minRating]);
-
   // Fetch products from API
   const fetchProducts = useCallback(async (pageNum: number, isInitial = false) => {
     if (!hasMore && !isInitial) return;
+    if (loading || loadingMore) return; // Prevent parallel fetches
 
     try {
       if (isInitial) {
@@ -96,21 +86,29 @@ const Products = () => {
         query: searchQuery,
         minPrice: filters.minPrice > 0 ? filters.minPrice : undefined,
         maxPrice: filters.maxPrice < 1000 ? filters.maxPrice : undefined,
-        minQuality: filters.minRating > 0 ? filters.minRating * 2 : undefined, // Convert 5-star back to 0-10
+        minQuality: filters.minRating > 0 ? filters.minRating : undefined, 
         page: pageNum,
         size: 12,
         sort: getSortString(filters.sortBy)
       });
+
+      console.log(`[Products] Page ${pageNum} received. Total elements: ${response.page.totalElements}, Total pages: ${response.page.totalPages}`);
 
       const convertedProducts = response.content.map(convertToProduct);
       
       if (isInitial) {
         setProducts(convertedProducts);
       } else {
-        setProducts(prev => [...prev, ...convertedProducts]);
+        setProducts(prev => {
+          // Deduplicate based on product ID to prevent React "duplicate key" warnings
+          const existingIds = new Set(prev.map(p => p.id));
+          const newOnes = convertedProducts.filter(p => !existingIds.has(p.id));
+          return [...prev, ...newOnes];
+        });
       }
       
-      setHasMore(response.number + 1 < response.totalPages);
+      const more = response.page.number + 1 < response.page.totalPages;
+      setHasMore(more);
     } catch (err) {
       setError('Ürünler yüklenirken bir hata oluştu');
       console.error('Error fetching products:', err);
@@ -118,12 +116,20 @@ const Products = () => {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [searchQuery, filters, hasMore]);
+  }, [searchQuery, filters, hasMore, loading, loadingMore]);
 
-  // Initial fetch
+  // Handle Search and Filter changes
   useEffect(() => {
+    setProducts([]);
+    pageRef.current = 0;
+    setHasMore(true);
+    
+    // Sycn search query from URL if changed
+    const query = searchParams.get('search') || '';
+    setSearchQuery(query);
+
     fetchProducts(0, true);
-  }, [fetchProducts, searchQuery, filters.sortBy, filters.minPrice, filters.maxPrice, filters.minRating]);
+  }, [searchParams, filters.sortBy, filters.minPrice, filters.maxPrice, filters.minRating]);
 
   // Loader Intersection Observer
   const handleObserver = useCallback((entries: IntersectionObserverEntry[]) => {
@@ -317,13 +323,13 @@ const Products = () => {
                     )}
                     {product.rating !== undefined && (
                       <div className="product-rating">
-                        {'⭐'.repeat(Math.round(product.rating / 2))} {(product.rating / 2).toFixed(1)}
+                        ⭐ {product.rating.toFixed(1)}/10
                       </div>
                     )}
                   </div>
                 </Link>
                 <div className="product-footer">
-                  <span className="product-price">{product.price.toFixed(2)} ₺</span>
+                  <span className="product-price">${product.price.toFixed(2)}</span>
                   <button
                     className="btn btn-primary btn-sm"
                     onClick={() => dispatch(addToCartAsync(product))}

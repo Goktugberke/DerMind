@@ -124,7 +124,7 @@ const Favorites = () => {
                     </div>
                   </Link>
                   <div className="product-footer">
-                    <span className="product-price">{product.price.toFixed(2)} ₺</span>
+                    <span className="product-price">${product.price.toFixed(2)}</span>
                     <button
                       className="btn btn-primary btn-sm"
                       onClick={() => dispatch(addToCartAsync(product))}

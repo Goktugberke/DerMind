@@ -63,10 +63,12 @@ export interface ProductResponseDTO {
 }
 export interface PageResponse<T> {
   content: T[];
-  totalPages: number;
-  totalElements: number;
-  size: number;
-  number: number;
+  page: {
+    totalPages: number;
+    totalElements: number;
+    size: number;
+    number: number;
+  };
 }
 export interface ProductDetailDTO extends ProductResponseDTO {
   description?: string;
@@ -114,7 +116,12 @@ export interface StreakCreateDTO {
   customTimes?: string[];
   daysOfWeek?: string[];
 }
-export interface StreakUpdateDTO { usageFrequency?: UsageFrequency; }
+export interface StreakUpdateDTO {
+  usageFrequency?: UsageFrequency;
+  customTimes?: string[];
+  daysOfWeek?: string[];
+  isActive?: boolean;
+}
 
 // --- RATING & PURCHASE & NOTIFICATION ---
 export interface RatingResponseDTO {
@@ -143,8 +150,8 @@ export interface CartItemAddDTO {
 }
 
 
-export interface PurchaseResponseDTO { 
-  id: number; 
+export interface PurchaseResponseDTO {
+  id: number;
   userId: string;
   userName?: string;
   productId: number;
@@ -162,7 +169,7 @@ export interface PurchaseResponseDTO {
   purchasedAt: string;
   deliveredAt?: string;
 }
-export interface PurchaseCreateDTO { 
+export interface PurchaseCreateDTO {
   productId: number;
   quantity: number;
   unitPrice: number;
@@ -176,6 +183,36 @@ export interface PurchaseStatsDTO { totalPurchases: number; totalSpent: number; 
 
 export interface NotificationResponseDTO { id: number; message: string; isRead: boolean; createdAt: string; }
 export interface NotificationUnreadCountDTO { count: number; }
+
+// --- AI TYPES ---
+export interface AiRecommendItemDTO {
+  product_id: string;
+  product_name: string;
+  brand: string;
+  category: string;
+  base_score: number;
+  similarity: number;
+  rating: number;
+  price_usd: number;
+  image_url?: string;
+}
+
+export interface AiRecommendResponseDTO {
+  user_skin_type: string;
+  category_filter: string;
+  recommendations: AiRecommendItemDTO[];
+}
+
+export interface AiExplainResponseDTO {
+  product_id: string;
+  product_name: string;
+  brand: string;
+  base_score: number;
+  personal_score: number;
+  explanation: string;
+  skin_type: string;
+  allergen_warnings: string[];
+}
 
 // --- API CONFIGURATION ---
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
@@ -278,13 +315,41 @@ export const productApi = {
     return (await apiClient.get<PageResponse<ProductResponseDTO>>(url)).data;
   },
   getTopQualityProducts: async (limit = 10) => (await apiClient.get<ProductDetailDTO[]>(`/api/products/top/quality?limit=${limit}`)).data,
-  getRecommendationsForUser: async (userId: string) => (await apiClient.get<ProductRecommendationDTO[]>(`/api/products/recommendations/${userId}`)).data,
-  getSimilarProducts: async (id: number) => (await apiClient.get<ProductResponseDTO[]>(`/api/products/${id}/similar`)).data,
+  getRecommendationsForUser: async () => (await apiClient.get<ProductRecommendationDTO[]>('/api/products/recommendations/me')).data,
+  getSimilarProducts: async (id: number) => {
+    try {
+      // Use the new AI-based similarity endpoint
+      const aiResponse = await apiClient.get<AiRecommendResponseDTO>(`/api/ai/similar/${id}`);
+      
+      if (!aiResponse.data || !aiResponse.data.recommendations) {
+        console.warn("[API] AI similar products returned null or empty");
+        return [];
+      }
+
+      return aiResponse.data.recommendations;
+    } catch (error) {
+      console.error("Similar products AI fetch error:", error);
+      return [];
+    }
+  },
+};
+
+export const aiApi = {
+  getRecommendations: async (category?: string, secondaryCategory?: string, topK: number = 5) => {
+    let url = `/api/ai/recommend?topK=${topK}`;
+    if (category) url += `&category=${encodeURIComponent(category)}`;
+    if (secondaryCategory) url += `&secondaryCategory=${encodeURIComponent(secondaryCategory)}`;
+    return (await apiClient.get<AiRecommendResponseDTO>(url)).data;
+  },
+  getExplanation: async (productId: number, language: string = 'tr') => {
+    return (await apiClient.get<AiExplainResponseDTO>(`/api/ai/explain/${productId}?language=${language}`)).data;
+  },
 };
 
 export const streakApi = {
   getMyStreaks: async () => (await apiClient.get<StreakResponseDTO[]>('/api/streaks/my-streaks')).data,
   createStreak: async (data: StreakCreateDTO) => (await apiClient.post<StreakResponseDTO>('/api/streaks', data)).data,
+  updateStreak: async (id: number, data: StreakUpdateDTO) => (await apiClient.put<StreakResponseDTO>(`/api/streaks/${id}`, data)).data,
   recordUsage: async (id: number) => (await apiClient.post(`/api/streaks/${id}/use`)).data,
   deleteStreak: async (id: number) => (await apiClient.delete(`/api/streaks/${id}`)).data,
 };
@@ -316,5 +381,5 @@ export const cartApi = {
 
 export const purchaseApi = {
   createPurchase: async (data: PurchaseCreateDTO) => (await apiClient.post<PurchaseResponseDTO>('/api/purchases', data)).data,
-  getPurchasesByUserId: async (userId: string) => (await apiClient.get<PurchaseResponseDTO[]>(`/api/purchases/user/${userId}`)).data,
+  getPurchasesByUserId: async () => (await apiClient.get<PurchaseResponseDTO[]>('/api/purchases/my-purchases')).data,
 };

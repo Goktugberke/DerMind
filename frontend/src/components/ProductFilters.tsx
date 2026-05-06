@@ -73,12 +73,21 @@ const ProductFilters = ({
           <div className="filter-section">
             <h3>Minimum Puan</h3>
             <div className="rating-filter">
-              {[1, 2, 3, 4, 5].map((rating) => (
+            <div className="rating-filter" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((rating) => (
                 <button
                   key={rating}
                   className={`rating-btn ${
-                    filters.minRating >= rating ? 'active' : ''
+                    filters.minRating === rating ? 'active' : ''
                   }`}
+                  style={{
+                    padding: '8px 4px',
+                    fontSize: '0.9em',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '2px'
+                  }}
                   onClick={() =>
                     handleChange(
                       'minRating',
@@ -86,9 +95,11 @@ const ProductFilters = ({
                     )
                   }
                 >
-                  {'⭐'.repeat(rating)}
+                  <span style={{ fontSize: '1.2em' }}>⭐</span>
+                  <span>{rating}</span>
                 </button>
               ))}
+            </div>
             </div>
           </div>
 

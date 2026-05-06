@@ -243,6 +243,19 @@ def _load_models() -> None:
     scaler         = joblib.load(os.path.join(MODELS_DIR, "feature_scaler.pkl"))
 
     product_df     = pd.read_csv(os.path.join(BASE_DIR, "dermind_knn_product_vectors.csv"))
+    
+    # Alerjen kontrolü için gerçek içerik metinlerini (ingredients) yükle
+    info_path = os.path.join(BASE_DIR, "datasets", "sephora_dataset", "product_info.csv")
+    if os.path.exists(info_path):
+        info_df = pd.read_csv(info_path)
+        # Hızlı erişim için dict'e çevir: {product_id: ingredients_text}
+        global _product_ingredients_map
+        _product_ingredients_map = dict(zip(info_df["product_id"].astype(str), info_df["ingredients"].fillna("")))
+        logger.info(f"Loaded {len(_product_ingredients_map)} product ingredients for allergen matching.")
+    else:
+        _product_ingredients_map = {}
+        logger.warn(f"product_info.csv not found at {info_path}. Allergen matching will be disabled.")
+
 
     # O(1) lookup index — pandas boolean mask yerine dict
     _product_index = {pid: i for i, pid in enumerate(product_df["product_id"].astype(str))}
@@ -348,6 +361,39 @@ limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    exc_str = f'{exc}'.replace('\n', ' ').replace('   ', ' ')
+    logger.error(f"Validation error: {exc_str} - Body: {exc.body}")
+    content = {'status_code': 422, 'message': exc_str, 'data': None}
+    return JSONResponse(content=content, status_code=422)
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    if request.method in ["POST", "PUT"]:
+        body = await request.body()
+        # Reset the request stream for Starlette/FastAPI
+        async def receive():
+            return {"type": "http.request", "body": body, "more_body": False}
+        request._receive = receive
+        
+        # Also set the cached body property
+        request._body = body
+        
+        try:
+            body_str = body.decode()
+            logger.info(f"Incoming {request.method} {request.url.path} - Body: {body_str}")
+        except:
+            logger.info(f"Incoming {request.method} {request.url.path} - Body: <binary>")
+    else:
+        logger.info(f"Incoming {request.method} {request.url.path}")
+    
+    response = await call_next(request)
+    return response
+
 # ── CORS ──
 app.add_middleware(
     CORSMiddleware,
@@ -409,27 +455,22 @@ class UserProfile(BaseModel):
 
 
 class ScoreRequest(BaseModel):
-    sephora_product_id: str = Field(..., description="Örn: 'P476416'")
+    sephora_product_id: str
     user:               UserProfile
-    is_recommended:     Optional[float] = Field(
-        None, ge=0.0, le=1.0,
-        description="Ürünün gerçek öneri oranı (0-1). "
-                    "Belirtilmezse 0.5 (nötr) kullanılır. "
-                    "Backend'den UserProductRating.wouldRecommend ortalaması gönderilebilir.",
-    )
+    is_recommended:     Optional[float] = None
 
 
 class BatchScoreRequest(BaseModel):
-    sephora_product_ids: list[str] = Field(..., min_length=1, max_length=MAX_BATCH_SIZE)
+    sephora_product_ids: list[str]
     user:                UserProfile
-    is_recommended:      Optional[float] = Field(None, ge=0.0, le=1.0)
+    is_recommended:      Optional[float] = None
 
 
 class RecommendRequest(BaseModel):
     user:               UserProfile
-    category:           Optional[str] = Field(None, description="Skincare | Makeup | Bath & Body")
-    secondary_category: Optional[str] = Field(None, description="Sunscreen | Moisturizers | ...")
-    top_k:              int = Field(5, ge=1, le=20)
+    category:           Optional[str] = None
+    secondary_category: Optional[str] = None
+    top_k:              Optional[int] = 5
 
 
 class ExplainRequest(BaseModel):
@@ -526,23 +567,36 @@ def _score_single(
     with _trace_span("xgb.predict"):
         x = build_scoring_input(product, user, is_recommended)
         personal_score = float(np.clip(xgb_model.predict(x)[0], 1, 10))
-    base_score     = float(product.get("base_score", personal_score))
+    
+    base_score = float(product.get("base_score", personal_score))
 
-    # Allergen text matching — ürün kullanıcı için tehlikeli mi?
-    allergen_matches: list[str] = []
-    if user.allergies and "ingredients_text" in product.index:
-        ing_text = product.get("ingredients_text", "")
-        if isinstance(ing_text, str) and ing_text:
-            allergen_matches = find_matching_allergens(ing_text, user.allergies)
+    # Gerçek içerik metnine _product_ingredients_map üzerinden eriş (O(1))
+    pid_str = str(product.get("product_id", ""))
+    ing_text = _product_ingredients_map.get(pid_str, "")
 
+    print(f"\n--- DEBUG: ALERJEN KONTROLÜ ---")
+    print(f"Ürün ID: {pid_str}")
+    print(f"İçerik Metni: {'Mevcut' if ing_text else 'YOK'}")
+    print(f"Alerjenler: {user.allergies}")
+
+    if user.allergies and ing_text:
+        allergen_matches = find_matching_allergens(ing_text, user.allergies)
+
+    if allergen_matches:
+        personal_score = 3.0
+        print(f"!!! MATCH !!! -> {allergen_matches}")
+    print(f"-------------------------------\n")
+    
     return {
-        "product_id":     str(product["product_id"]),
-        "product_name":   product["product_name"],
-        "brand":          product["brand_name"],
+        "product_id":     pid_str,
+        "product_name":   product.get("product_name", "Unknown"),
+        "brand":          product.get("brand_name", "Unknown"),
         "base_score":     round(base_score, 1),
         "personal_score": round(personal_score, 1),
         "skin_type":      user.skin_type,
-        "allergen_warnings": allergen_matches,  # Boş list = güvenli
+        "allergen_warnings": allergen_matches,
+        "price_usd":      None if pd.isna(product.get("price_usd")) else float(product["price_usd"]),
+        "rating":         None if pd.isna(product.get("rating")) else float(product["rating"]),
     }
 
 
@@ -608,7 +662,6 @@ def metrics():
 # ENDPOINT — POST /score
 # ─────────────────────────────────────────────
 @app.post("/score", dependencies=[Depends(verify_internal_key)])
-@limiter.limit(SCORE_RATE_LIMIT)
 async def score(request: Request, req: ScoreRequest):
     """
     Bir ürünün base ve kişiselleştirilmiş puanını döner.
@@ -755,14 +808,76 @@ def _recommend_sync(req: "RecommendRequest") -> dict:
     }
 
 
+def _similar_sync(req: ScoreRequest, top_k: int = 5):
+    """Bir ürüne benzer diğer ürünleri bulur (KNN)."""
+    try:
+        ref_row = get_product_row(req.sephora_product_id)
+    except HTTPException:
+        return {"recommendations": []}
+
+    # Referans ürünün vektörünü hazırla
+    ref_vector = ref_row[KNN_FEATURES].fillna(0).to_frame().T
+    ref_scaled = scaler.transform(ref_vector)
+
+    # Aynı kategoriden ürünleri filtrele (opsiyonel ama benzerlik için daha iyi)
+    cat = ref_row["primary_category"]
+    filtered = product_df[product_df["primary_category"] == cat]
+    
+    if len(filtered) < top_k + 1:
+        filtered = product_df  # Kategori çok küçükse genele bak
+    
+    # Kendi ID'sini sonuçlardan çıkar
+    filtered = filtered[filtered["product_id"].astype(str) != req.sephora_product_id]
+
+    # Alerji filtresi uygula (seçiliyse)
+    if req.user.allergies:
+        text_safe = filter_by_allergens(filtered, req.user.allergies)
+        if len(text_safe) >= top_k:
+            filtered = text_safe
+
+    knn_data_scaled = scaler.transform(filtered[KNN_FEATURES].fillna(0))
+    k = min(top_k, len(filtered))
+    
+    knn_temp = NearestNeighbors(n_neighbors=k, metric="cosine", algorithm="brute")
+    knn_temp.fit(knn_data_scaled)
+    distances, indices = knn_temp.kneighbors(ref_scaled)
+
+    results = []
+    for local_idx, dist in zip(indices[0], distances[0]):
+        row = filtered.iloc[local_idx]
+        results.append({
+            "product_id":   str(row["product_id"]),
+            "product_name": row["product_name"],
+            "brand":        row["brand_name"],
+            "category":     row.get("secondary_category") or row.get("primary_category"),
+            "base_score":   round(float(row.get("base_score", 0)), 1),
+            "similarity":   round(float(1 - dist), 3),
+            "rating":       round(float(row["rating"]), 1),
+            "price_usd":    None if pd.isna(row["price_usd"]) else float(row["price_usd"]),
+        })
+
+    return {
+        "reference_product": req.sephora_product_id,
+        "recommendations": results,
+    }
+
+
 @app.post("/recommend", dependencies=[Depends(verify_internal_key)])
-@limiter.limit(RECOMMEND_RATE_LIMIT)
 async def recommend(request: Request, req: RecommendRequest):
     """
     Kullanıcı profiline KNN ile en uygun ürünleri önerir.
     Kategori filtresi opsiyoneldir.
     """
     return await asyncio.to_thread(_recommend_sync, req)
+
+
+@app.post("/similar", dependencies=[Depends(verify_internal_key)])
+async def similar(request: Request, req: ScoreRequest, top_k: int = 5):
+    """
+    Bir ürüne benzer diğer ürünleri KNN ile bulur.
+    ScoreRequest kullanılır çünkü hem sephora_product_id hem de user (profil filtresi için) gerekiyor.
+    """
+    return await asyncio.to_thread(_similar_sync, req, top_k)
 
 
 # ─────────────────────────────────────────────
@@ -837,6 +952,7 @@ def _build_llm_prompt(
     has_acne: bool,
     top_factors: list[dict],
     language: str,
+    allergen_warnings: list[str] = None,
 ) -> str:
     labels       = FEATURE_LABELS_TR if language == "tr" else FEATURE_LABELS_EN
     factor_lines = []
@@ -848,14 +964,24 @@ def _build_llm_prompt(
 
     if language == "tr":
         acne_note = "ve sivilceye meyilli" if has_acne else ""
+        
+        # EĞER ALERJEN VARSA: Tüm olumlu faktörleri gizle ve sadece tehlikeye odaklan
+        if allergen_warnings:
+            return (
+                f"Sistem: KRİTİK GÜVENLİK UYARISI!\n"
+                f"Kullanıcı '{product_name}' ürününü incelemek istiyor ama bu ürün kullanıcının alerjisi olan şu maddeleri içeriyor: {', '.join(allergen_warnings)}.\n"
+                f"Kişiselleştirilmiş Puan: {personal_score:.1f}/10 (Çok Riskli).\n\n"
+                f"GÖREV: Kullanıcıya bu ürünün kendisi için neden TEHLİKELİ olduğunu açıkla. "
+                f"Diğer hiçbir özelliğinden bahsetme. Kesinlikle önerme. "
+                f"Dermatolojik ve uyarıcı bir dil kullan. Maksimum 2-3 cümle."
+            )
+
         return (
-            f"Sen bir dermatoloji asistanısın. "
-            f"Kullanıcının cildi {skin_type} {acne_note}. "
-            f"'{product_name}' ürününün genel kalite puanı {base_score:.1f}/10, "
-            f"bu kullanıcıya özel puan ise {personal_score:.1f}/10.\n"
-            f"Puanı etkileyen başlıca faktörler:\n{factors_text}\n\n"
-            f"Bu bilgiyi kullanıcıya nazik, anlaşılır ve dermatolojik bir dille açıkla. "
-            f"Maksimum 3 cümle. Teknik terimler kullanma, sade Türkçe kullan."
+            f"Sen bir dermatoloji asistanısın. Görevin dürüst analiz yapmaktır.\n"
+            f"Kullanıcı Profili: Cilt: {skin_type} {acne_note}.\n"
+            f"Ürün: '{product_name}' (Genel Puan: {base_score:.1f}/10, Kişiselleştirilmiş Puan: {personal_score:.1f}/10).\n\n"
+            f"Puanı etkileyen faktörler:\n{factors_text}\n\n"
+            f"Analizini samimi ama uzman bir dille, maksimum 3 cümle olacak şekilde yap."
         )
     return (
         f"You are a dermatology assistant. "
@@ -870,10 +996,10 @@ def _build_llm_prompt(
 
 def _call_llm(prompt: str, cache_key: str) -> tuple[str, bool, bool]:
     """LLM çağrısı. (yanıt, cache_hit, llm_error) döner. Hata durumunda cache'lenmez."""
-    cached = _cache_get(cache_key)
-    if cached is not None:
-        _inc_cache_hit()
-        return cached, True, False
+    # cached = _cache_get(cache_key)
+    # if cached is not None:
+    #    _inc_cache_hit()
+    #    return cached, True, False
 
     _inc_cache_miss()
     _inc_llm_call()
@@ -911,65 +1037,22 @@ async def explain(request: Request, req: ExplainRequest):
     """
     SHAP ile puanı etkileyen faktörleri hesaplar,
     LLM (Ollama / OpenAI) ile kullanıcıya doğal dilde açıklar.
-
-    Cache: product_id + skin_type + has_acne + allergies + language kombinasyonu için
-    tekrar LLM çağrısı yapılmaz (TTL: {_CACHE_TTL}s).
     """
-    product = get_product_row(req.sephora_product_id)
-    x       = build_scoring_input(product, req.user, req.is_recommended)
-
-    # CPU-bound XGBoost + SHAP: thread pool'a al
-    def _predict_and_shap():
-        ps = float(np.clip(xgb_model.predict(x)[0], 1, 10))
-        sv = shap_explainer(x)
-        return ps, sv.values[0]
-
-    personal_score, effects = await asyncio.to_thread(_predict_and_shap)
-    base_score = float(product.get("base_score", personal_score))
-
-    lang = req.language if req.language in ("tr", "en") else "tr"
-
-    factors = []
-    for feat, effect in zip(SCORING_FEATURES, effects):
-        if abs(effect) > SHAP_EFFECT_THRESHOLD:
-            direction = (
-                ("INCREASES" if effect > 0 else "DECREASES")
-                if lang == "en"
-                else ("ARTIRAN" if effect > 0 else "DUSUREN")
-            )
-            factors.append({
-                "feature":   feat,
-                "effect":    round(float(effect), 3),
-                "direction": direction,
-            })
-    factors.sort(key=lambda f: abs(f["effect"]), reverse=True)
-
-    allergies_key = "_".join(sorted(req.user.allergies))
-    cache_key     = hashlib.md5(
-        f"{req.sephora_product_id}|{req.user.skin_type}|{req.user.has_acne}"
-        f"|{allergies_key}|{req.is_recommended}|{lang}".encode()
-    ).hexdigest()
-
-    prompt       = _build_llm_prompt(
-        product_name=product["product_name"],
-        base_score=base_score,
-        personal_score=personal_score,
-        skin_type=req.user.skin_type,
-        has_acne=req.user.has_acne,
-        top_factors=factors,
-        language=lang,
-    )
+    # Merkezi hesaplama mantığını kullan (Score + SHAP + Allergen + Prompt)
+    ctx = await asyncio.to_thread(_build_explain_context, req)
+    
+    # LLM Çağrısı
     explanation, was_cached, llm_error = await asyncio.to_thread(
-        _call_llm, prompt, cache_key
+        _call_llm, ctx["prompt"], ctx["cache_key"]
     )
 
     return {
         "product_id":     req.sephora_product_id,
-        "product_name":   product["product_name"],
-        "base_score":     round(base_score, 1),
-        "personal_score": round(personal_score, 1),
-        "language":       lang,
-        "shap_factors":   factors[:10],
+        "product_name":   ctx["product_name"],
+        "base_score":     ctx["base_score"],
+        "personal_score": ctx["personal_score"],
+        "language":       ctx["language"],
+        "shap_factors":   ctx["shap_factors"],
         "explanation":    explanation,
         "cached":         was_cached,
         "llm_error":      llm_error,
@@ -982,8 +1065,14 @@ async def explain(request: Request, req: ExplainRequest):
 def _build_explain_context(req: ExplainRequest) -> dict:
     """SHAP + scoring + cache key — sync hesaplama, streaming başlamadan önce."""
     product = get_product_row(req.sephora_product_id)
-    x       = build_scoring_input(product, req.user, req.is_recommended)
-    personal_score = float(np.clip(xgb_model.predict(x)[0], 1, 10))
+    
+    # Tutarlılık için _score_single'ı kullan (Alerjen override burada yapılıyor)
+    scored_result = _score_single(product, req.user, req.is_recommended)
+    personal_score = scored_result["personal_score"]
+    allergen_warnings = scored_result["allergen_warnings"]
+    
+    # SHAP için hala ham input gerekiyor
+    x = build_scoring_input(product, req.user, req.is_recommended)
     base_score     = float(product.get("base_score", personal_score))
     shap_values = shap_explainer(x)
     effects     = shap_values.values[0]
@@ -1007,7 +1096,7 @@ def _build_explain_context(req: ExplainRequest) -> dict:
     allergies_key = "_".join(sorted(req.user.allergies))
     cache_key     = hashlib.md5(
         f"{req.sephora_product_id}|{req.user.skin_type}|{req.user.has_acne}"
-        f"|{allergies_key}|{req.is_recommended}|{lang}".encode()
+        f"|{allergies_key}|{req.is_recommended}|{lang}|v3".encode()
     ).hexdigest()
 
     prompt = _build_llm_prompt(
@@ -1018,6 +1107,7 @@ def _build_explain_context(req: ExplainRequest) -> dict:
         has_acne=req.user.has_acne,
         top_factors=factors,
         language=lang,
+        allergen_warnings=allergen_warnings,
     )
     return {
         "product_id":     req.sephora_product_id,
@@ -1059,13 +1149,13 @@ async def explain_stream(request: Request, req: ExplainRequest):
         }
         yield f"data: {json.dumps(meta, ensure_ascii=False)}\n\n"
 
-        # 2) Cache hit'te streaming yapmadan tek seferde dön
-        cached = _cache_get(ctx["cache_key"])
-        if cached is not None:
-            _inc_cache_hit()
-            yield f"data: {json.dumps({'type': 'token', 'text': cached}, ensure_ascii=False)}\n\n"
-            yield f"data: {json.dumps({'type': 'done', 'cached': True, 'llm_error': False}, ensure_ascii=False)}\n\n"
-            return
+        # 2) Cache hit'te streaming yapmadan tek seferde dön (GEÇİCİ OLARAK DEVRE DIŞI)
+        # cached = _cache_get(ctx["cache_key"])
+        # if cached is not None:
+        #    _inc_cache_hit()
+        #    yield f"data: {json.dumps({'type': 'token', 'text': cached}, ensure_ascii=False)}\n\n"
+        #    yield f"data: {json.dumps({'type': 'done', 'cached': True, 'llm_error': False}, ensure_ascii=False)}\n\n"
+        #    return
 
         # 3) Cache miss → LLM streaming
         _inc_cache_miss()

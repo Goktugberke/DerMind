@@ -43,8 +43,10 @@ export const fetchCart = createAsyncThunk(
       return response.map(item => ({
         id: item.product.id,
         name: item.product.name,
-        price: 0, // Backend base price'ı vermiyor olabilir, gerekirse Product API'dan alınır veya DTO güncellenir.
         brand: item.product.brand,
+        price: item.product.price || 0,
+        image: item.product.imageUrl,
+        description: item.product.ingredients,
         quantity: item.quantity
       })) as CartItem[];
     } catch (error: unknown) {
@@ -144,7 +146,9 @@ export const mergeCartAsync = createAsyncThunk(
         id: item.product.id,
         name: item.product.name,
         brand: item.product.brand,
-        price: 0,
+        price: item.product.price || 0,
+        image: item.product.imageUrl,
+        description: item.product.ingredients,
         quantity: item.quantity
       })) as CartItem[];
     } catch (error: unknown) {

@@ -15,7 +15,7 @@ const MyOrders = () => {
     if (isAuthenticated && user?.id) {
       const fetchOrders = async () => {
         try {
-          const data = await purchaseApi.getPurchasesByUserId(user.id);
+          const data = await purchaseApi.getPurchasesByUserId();
           // Sort by purchase date descending
           const sorted = data.sort((a, b) => new Date(b.purchasedAt).getTime() - new Date(a.purchasedAt).getTime());
           setOrders(sorted);
@@ -88,7 +88,7 @@ const MyOrders = () => {
                 </div>
                 <div>
                   <div style={{ color: '#6b7280', fontSize: '0.9em' }}>Toplam Tutar</div>
-                  <div style={{ fontWeight: '500' }}>{order.totalPrice.toFixed(2)} ₺</div>
+                  <div style={{ fontWeight: '500' }}>${order.totalPrice.toFixed(2)}</div>
                 </div>
                 <div>
                   <div style={{ color: '#6b7280', fontSize: '0.9em' }}>Sipariş No</div>
@@ -109,7 +109,7 @@ const MyOrders = () => {
                     </Link>
                   </h3>
                   <div style={{ color: '#6b7280', fontSize: '0.9em', marginBottom: '5px' }}>{order.productBrand}</div>
-                  <div style={{ fontSize: '0.95em' }}>Adet: {order.quantity} | Birim Fiyat: {order.unitPrice.toFixed(2)} ₺</div>
+                  <div style={{ fontSize: '0.95em' }}>Adet: {order.quantity} | Birim Fiyat: ${order.unitPrice.toFixed(2)}</div>
                 </div>
                 
                 {order.trackingNumber && (

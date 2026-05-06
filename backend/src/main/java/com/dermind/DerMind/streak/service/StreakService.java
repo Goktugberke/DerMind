@@ -88,9 +88,11 @@ public class StreakService {
     private List<StreakResponseDTO> processAndMapStreaks(List<Streak> streaks) {
         boolean needsSave = false;
         for (Streak streak : streaks) {
-            if (checkAndResetStreak(streak)) needsSave = true;
+            if (checkAndResetStreak(streak))
+                needsSave = true;
         }
-        if (needsSave) streakRepository.saveAll(streaks);
+        if (needsSave)
+            streakRepository.saveAll(streaks);
         return streaks.stream().map(this::mapToResponseDTO).collect(Collectors.toList());
     }
 
@@ -118,11 +120,11 @@ public class StreakService {
     }
 
     /**
-     * Optimistic lock retry: çift tap durumunda OptimisticLockingFailureException fırlar,
+     * Optimistic lock retry: çift tap durumunda OptimisticLockingFailureException
+     * fırlar,
      * 3 kez 50ms backoff ile yeniden dener (counter doğru artar).
      */
-    @Retryable(retryFor = OptimisticLockingFailureException.class,
-               maxAttempts = 3, backoff = @Backoff(delay = 50, multiplier = 2))
+    @Retryable(retryFor = OptimisticLockingFailureException.class, maxAttempts = 3, backoff = @Backoff(delay = 50, multiplier = 2))
     @Transactional
     public StreakResponseDTO recordUsage(String userId, Long streakId) {
         Streak streak = streakRepository.findById(streakId)
@@ -170,7 +172,8 @@ public class StreakService {
         }
         LocalDate today = LocalDate.now();
         LocalDate lastCompleted = streak.getLastCompletedDate();
-        if (lastCompleted.isEqual(today)) return false;
+        if (lastCompleted.isEqual(today))
+            return false;
         if (lastCompleted.isBefore(today.minusDays(1))) {
             streak.setCurrentStreak(0);
             return true;

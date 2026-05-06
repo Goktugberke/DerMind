@@ -54,7 +54,7 @@ const Cart = () => {
                   <h3>{item.name}</h3>
                   {item.description && <p>{item.description}</p>}
                   <div className="cart-item-price">
-                    {((item.price || 0) * item.quantity).toFixed(2)} ₺
+                    ${((item.price || 0) * item.quantity).toFixed(2)}
                   </div>
                 </div>
                 <div className="cart-item-controls">
@@ -89,7 +89,7 @@ const Cart = () => {
               <h2>Sipariş Özeti</h2>
               <div className="summary-row">
                 <span>Ara Toplam:</span>
-                <span>{totalPrice.toFixed(2)} ₺</span>
+                <span>${totalPrice.toFixed(2)}</span>
               </div>
               <div className="summary-row">
                 <span>Kargo:</span>
@@ -97,7 +97,7 @@ const Cart = () => {
               </div>
               <div className="summary-row summary-total">
                 <span>Toplam:</span>
-                <span>{totalPrice.toFixed(2)} ₺</span>
+                <span>${totalPrice.toFixed(2)}</span>
               </div>
               <Link to="/checkout" className="btn btn-primary btn-block">
                 Satın Al
@@ -111,5 +111,3 @@ const Cart = () => {
 };
 
 export default Cart;
-
-
