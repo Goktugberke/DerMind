@@ -7,7 +7,9 @@ import { Clock, Truck } from 'lucide-react-native';
 import { theme } from '@constants/theme';
 import { CourierCard } from '@components/CourierCard';
 
-export const TrackOrderScreen = () => {
+export const TrackOrderScreen = ({ route }: any) => {
+    const { order } = route.params || {};
+
     return (
         <SafeAreaView style={styles.safeArea}>
             <PageHeader
@@ -21,15 +23,15 @@ export const TrackOrderScreen = () => {
                 {/* ÜRÜN ÖZET KARTI */}
                 <View style={styles.productSummary}>
                     <Image
-                        source={{ uri: 'https://images.unsplash.com/photo-1612817288484-6f916006741a?q=80&w=400&auto=format&fit=crop' }}
+                        source={{ uri: order?.image || 'https://via.placeholder.com/100' }}
                         style={styles.productImage}
                     />
                     <View style={styles.productInfo}>
-                        <Text style={styles.productName}>Hydro-Glow Moisturizer Set</Text>
-                        <Text style={styles.brandName}>Lumiere Botanics</Text>
+                        <Text style={styles.productName}>{order?.name || 'Product Name'}</Text>
+                        <Text style={styles.brandName}>{order?.specs || order?.brand || 'Brand'}</Text>
                         <View style={styles.priceRow}>
-                            <Text style={styles.price}>$84.50</Text>
-                            <Text style={styles.qty}>Qty: 1</Text>
+                            <Text style={styles.price}>{order?.price ? `${order.price} TL` : '0.00 TL'}</Text>
+                            <Text style={styles.qty}>Qty: {order?.quantity || 1}</Text>
                         </View>
                     </View>
                 </View>
@@ -70,12 +72,6 @@ export const TrackOrderScreen = () => {
 
                 <View style={{ height: 120 }} />
             </ScrollView>
-
-            {/* FOOTER BUTONU */}
-            <View style={styles.footer}>
-                <CustomButton title="Contact Support" onPress={() => console.log('Support contacted')} />
-                <Text style={styles.footerNote}>Need help? Our specialists are available 24/7 for order inquiries.</Text>
-            </View>
         </SafeAreaView>
     );
 };
