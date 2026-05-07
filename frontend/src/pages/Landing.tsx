@@ -17,10 +17,10 @@ const Landing = () => {
       try {
         setLoading(true);
         const data = await productApi.getTopQualityProducts(6);
-        
+
         // Convert DTO to UI Product type
         const converted = data.map(convertToProduct);
-        
+
         setTopProducts(converted);
       } catch (error) {
         console.error('Anasayfa ürünleri yüklenirken hata:', error);
@@ -90,7 +90,7 @@ const Landing = () => {
           <p className="section-subtitle">
             Kullanıcılarımızın en çok beğendiği ve ML modelimizin en yüksek puan verdiği ürünler
           </p>
-          
+
           {loading ? (
             <div style={{ textAlign: 'center', padding: '40px' }}>
               <p>Ürünler yükleniyor...</p>
@@ -102,9 +102,9 @@ const Landing = () => {
                   <Link to={`/products/${product.id}`} className="product-link">
                     <div className="product-image">
                       {product.image ? (
-                        <img 
-                          src={product.image} 
-                          alt={product.name} 
+                        <img
+                          src={product.image}
+                          alt={product.name}
                           onError={(e) => {
                             (e.target as HTMLImageElement).style.display = 'none';
                             (e.target as HTMLImageElement).parentElement?.classList.add('show-placeholder');
@@ -120,6 +120,7 @@ const Landing = () => {
                     </div>
                     <div className="product-info">
                       <h3 className="product-name">{product.name}</h3>
+                      {product.brand && <p className="product-brand">{product.brand}</p>}
                       {product.description && (
                         <p className="product-description">{product.description}</p>
                       )}

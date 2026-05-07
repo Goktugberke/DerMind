@@ -100,3 +100,14 @@ CHOICES.md
 fetch_products_images.py
 fetch_products_images_parallel.py 
 chromedriver.exe
+
+# Python Virtual Environment
+ai-server/.venv/
+.venv/
+venv/
+ENV/
+env/
+bin/
+lib/
+include/
+Scripts/

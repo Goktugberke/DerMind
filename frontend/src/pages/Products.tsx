@@ -309,12 +309,12 @@ const Products = () => {
                   </div>
                   <div className="product-info">
                     <h3 className="product-name">{product.name}</h3>
-                    {product.brand && <p className="product-brand" style={{ fontSize: '0.85em', color: '#666' }}>{product.brand}</p>}
+                    {product.brand && <p className="product-brand">{product.brand}</p>}
                     {product.description && (
-                      <p className="product-description" style={{ maxHeight: '40px', overflow: 'hidden' }}>{product.description}</p>
+                      <p className="product-description">{product.description}</p>
                     )}
                     <div className="product-rating" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>⭐ {product.rating.toFixed(1)}</span>
+                      <span>⭐ {product.rating ? product.rating.toFixed(1) : '0.0'}</span>
                       {isAuthenticated && product.personalScore !== undefined && (
                         <span style={{ 
                           fontSize: '0.8em', 
