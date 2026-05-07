@@ -7,6 +7,7 @@ import com.dermind.DerMind.streak.model.Streak;
 import com.dermind.DerMind.streak.repository.StreakRepository;
 import com.dermind.DerMind.user.model.User;
 import com.dermind.DerMind.user.repository.UserRepository;
+import com.dermind.DerMind.mail.service.MailServiceClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
@@ -34,6 +36,7 @@ public class NotificationScheduler {
     private final UserRepository userRepository;
     private final StreakRepository streakRepository;
     private final PurchaseRepository purchaseRepository;
+    private final MailServiceClient mailServiceClient;
 
     private static final String[] MORNING_MESSAGES = {
             "Cildin sana teşekkür ediyor! Bugün de rutinini sürdürmeyi unutma. 💚",
@@ -229,5 +232,43 @@ public class NotificationScheduler {
         }
         return String.format("Bu hafta %d aktif serin var! 🎯 En uzun serin: %d gün. %d yeni ürün satın aldın.",
                 totalActive, longest, purchases);
+    }
+
+    @Scheduled(cron = "0 0/5 * * * *") // Her 5 dakikada bir çalışır
+    @SchedulerLock(name = "streakReminders", lockAtMostFor = "4m", lockAtLeastFor = "1m")
+    public void checkAndSendStreakReminders() {
+        log.info("Checking for streak reminders...");
+        LocalDate today = LocalDate.now();
+        LocalTime now = LocalTime.now();
+
+        List<Streak> streaksNeedingReminder = streakRepository.findStreaksNeedingReminder(today);
+        int sentCount = 0;
+
+        for (Streak streak : streaksNeedingReminder) {
+            if (streak.getCustomTimes() == null || streak.getCustomTimes().isEmpty()) {
+                continue;
+            }
+
+            for (LocalTime customTime : streak.getCustomTimes()) {
+                // Eğer şimdiki zaman, belirlenen süreyi 10 dakika geçmişse ve 15 dakika aralığındaysa
+                // (örneğin 10:00 ayarlıysa, 10:10 ile 10:15 arasında tetiklensin)
+                LocalTime reminderTimeStart = customTime.plusMinutes(10);
+                LocalTime reminderTimeEnd = customTime.plusMinutes(15);
+
+                if (now.isAfter(reminderTimeStart) && now.isBefore(reminderTimeEnd)) {
+                    User user = streak.getUser();
+                    if (user.getEmail() != null && !user.getEmail().isBlank()) {
+                        mailServiceClient.sendStreakReminderMail(user.getEmail(), user.getName(), streak.getProduct().getName());
+                        
+                        // Aynı gün bir daha atılmasın diye kaydet
+                        streak.setLastReminderSentDate(today);
+                        streakRepository.save(streak);
+                        sentCount++;
+                    }
+                    break; // Bu streak için bir tane atmamız yeterli
+                }
+            }
+        }
+        log.info("{} streak reminders sent", sentCount);
     }
 }

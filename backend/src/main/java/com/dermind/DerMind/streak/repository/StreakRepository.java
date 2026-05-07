@@ -64,4 +64,10 @@ public interface StreakRepository extends JpaRepository<Streak, Long> {
     @EntityGraph(attributePaths = {"user", "product", "customTimes", "usageTimes", "daysOfWeek"})
     @Query("SELECT s FROM Streak s WHERE s.user.id IN :userIds")
     List<Streak> findByUserIdIn(@Param("userIds") Collection<String> userIds);
+
+    @EntityGraph(attributePaths = {"user", "product", "customTimes", "usageTimes", "daysOfWeek"})
+    @Query("SELECT s FROM Streak s WHERE s.isActive = true " +
+           "AND (s.lastUsedDate IS NULL OR s.lastUsedDate < :today) " +
+           "AND (s.lastReminderSentDate IS NULL OR s.lastReminderSentDate < :today)")
+    List<Streak> findStreaksNeedingReminder(@Param("today") LocalDate today);
 }
