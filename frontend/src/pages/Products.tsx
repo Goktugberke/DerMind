@@ -81,7 +81,7 @@ const Products = () => {
         sort: getSortString(filters.sortBy)
       });
 
-      console.log(`[Products] Page ${pageNum} received. Total elements: ${response.page.totalElements}, Total pages: ${response.page.totalPages}`);
+
 
       const convertedProducts = response.content.map(convertToProduct);
       

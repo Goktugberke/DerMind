@@ -88,10 +88,10 @@ const ProductDetail = () => {
         }
 
         const currentToken = localStorage.getItem('authHeader');
-        console.log(`[ProductDetail] Fetching product ${productId}. Auth status: ${isAuthenticated}, Profile exists: ${!!user}, Header present: ${!!currentToken}`);
+
 
         const productData = await productApi.getProductById(productId);
-        console.log("[ProductDetail] Product data received:", productData);
+
         setProductDetail(productData);
         setProduct(convertToProduct(productData));
 

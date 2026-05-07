@@ -2140,4 +2140,56 @@ body {
 .summary-total { border-top: 2px solid var(--bg-light); padding-top: 1.25rem; margin-top: 1.25rem; font-weight: 800; color: var(--text-color); font-size: 1.4rem; }
 .footer { background-color: var(--bg-color); border-top: 1px solid var(--border-color); padding: 3rem 0; margin-top: auto; text-align: center; color: var(--text-light); font-size: 0.95rem; }
 @media (max-width: 1024px) { .cart-content { grid-template-columns: 1fr; } .summary-card { position: static; } }
-@media (max-width: 640px) { .cart-item { flex-direction: column; text-align: center; padding: 2rem; } .cart-item-controls { align-items: center; width: 100%; } }
+@media (max-width: 640px) { .cart-item { flex-direction: column; text-align: center; padding: 2rem; } .cart-item-controls { align-items: center; width: 100%; } }
+
+/* Profile Concerns Styles */
+.concerns-card {
+  grid-column: span 1;
+}
+
+.concerns-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.concern-btn {
+  padding: 0.6rem;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-light);
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--text-color);
+  text-align: center;
+}
+
+.concern-btn:hover {
+  border-color: var(--primary-color);
+  background-color: var(--bg-color);
+}
+
+.concern-btn.active {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+  color: white;
+  box-shadow: 0 2px 4px rgba(99, 102, 241, 0.2);
+}
+
+/* 7. butonun (Hamilelik) tam genişlikte durması için */
+.concern-btn:nth-child(7) {
+  grid-column: span 2;
+}
+
+@media (max-width: 480px) {
+  .concerns-grid {
+    grid-template-columns: 1fr;
+  }
+  .concern-btn:nth-child(7) {
+    grid-column: span 1;
+  }
+}
+

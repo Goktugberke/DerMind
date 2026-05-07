@@ -13,6 +13,7 @@ const Profile = () => {
     email: user?.email || '',
     skinType: user?.skinType || '',
     allergies: user?.allergies?.join(', ') || '',
+    concerns: [] as string[],
   });
 
   const skinTypeLabels: Record<string, string> = {
@@ -33,14 +34,23 @@ const Profile = () => {
     });
   };
 
-  // Fetch current user on mount
+  // Fetch current user on mount and load concerns from localStorage
   useEffect(() => {
-    if (user) {
-      // User already loaded from Redux persist
+    if (!user) {
+      dispatch(fetchCurrentUser());
       return;
     }
-    // Try to fetch from API (for OAuth users)
-    dispatch(fetchCurrentUser());
+
+    // localStorage'dan bu kullanıcıya ait endişeleri yükle
+    const savedConcerns = localStorage.getItem(`dermind_concerns_${user.id}`);
+    if (savedConcerns) {
+      try {
+        const parsed = JSON.parse(savedConcerns);
+        setFormData(prev => ({ ...prev, concerns: parsed }));
+      } catch (err) {
+        console.error('Error parsing saved concerns:', err);
+      }
+    }
   }, [dispatch, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -211,6 +221,7 @@ const Profile = () => {
                           email: user.email,
                           skinType: user.skinType || '',
                           allergies: user.allergies?.join(', ') || '',
+                          concerns: formData.concerns,
                         });
                       }
                     }}
@@ -223,6 +234,38 @@ const Profile = () => {
           </div>
 
           <div className="profile-stats">
+            <div className="stat-card concerns-card">
+              <h3>Cilt Endişelerim</h3>
+              <div className="concerns-grid">
+                {[
+                  { id: 'acne', label: 'Akne' },
+                  { id: 'wrinkles', label: 'Kırışıklık' },
+                  { id: 'spots', label: 'Lekeler' },
+                  { id: 'redness', label: 'Kızarıklık' },
+                  { id: 'texture', label: 'Doku Bozukluğu' },
+                  { id: 'pores', label: 'Geniş Gözenekler' },
+                  { id: 'pregnancy', label: 'Hamilelik / Emzirme' }
+                ].map((concern) => (
+                  <button
+                    key={concern.id}
+                    className={`concern-btn ${formData.concerns?.includes(concern.id) ? 'active' : ''}`}
+                    onClick={() => {
+                      if (!user) return;
+                      const currentConcerns = formData.concerns || [];
+                      const newConcerns = currentConcerns.includes(concern.id)
+                        ? currentConcerns.filter(id => id !== concern.id)
+                        : [...currentConcerns, concern.id];
+                      
+                      setFormData({ ...formData, concerns: newConcerns });
+                      // Önbelleğe kaydet
+                      localStorage.setItem(`dermind_concerns_${user.id}`, JSON.stringify(newConcerns));
+                    }}
+                  >
+                    {concern.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="stat-card">
               <h3>Rutinlerim</h3>
               <Link to="/routine" className="stat-link">
