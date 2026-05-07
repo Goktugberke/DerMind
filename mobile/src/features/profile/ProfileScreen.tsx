@@ -6,10 +6,14 @@ import { ProfileMenuItem } from '@components/ProfileMenuItem';
 import { PageHeader } from '@components/PageHeader';
 import { theme } from '@constants/theme';
 import { useNavigation } from '@react-navigation/native';
+import { useGetCurrentUser, useUnreadCount } from '@services/api';
 
 export const ProfileScreen = () => {
   const authInstance = getAuth();
   const navigation = useNavigation<any>();
+  const { data: unreadCount } = useUnreadCount();
+  const { data: userData } = useGetCurrentUser();
+
 
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [
@@ -26,7 +30,18 @@ export const ProfileScreen = () => {
         fontSize={24}
         fontWeight="400"
         align="center"
-        rightIcon={<Bell size={22} color={theme.colors.gray} />}
+        rightIcon={
+          <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
+            <View>
+              <Bell size={22} color={theme.colors.gray} />
+              {unreadCount !== undefined && unreadCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
+        }
       />
 
       <ScrollView style={{ paddingHorizontal: 20 }}>
@@ -38,8 +53,8 @@ export const ProfileScreen = () => {
             <Image source={{ uri: 'https://i.pravatar.cc/300' }} style={styles.avatar} />
           </View>
           <View style={styles.textContainer}>
-            <Text style={styles.userName}>{authInstance.currentUser?.displayName || 'Ayşe Yılmaz'}</Text>
-            <Text style={styles.userEmail}>{authInstance.currentUser?.email || 'ayse@example.com'}</Text>
+            <Text style={styles.userName}>{userData?.name || 'Kullanıcı'}</Text>
+            <Text style={styles.userEmail}>{userData?.email || '...'}</Text>
           </View>
         </View>
 
@@ -128,5 +143,24 @@ const styles = StyleSheet.create({
   imageLetter: { fontSize: 32, fontWeight: 'bold', color: '#64748B' },
   userName: { fontSize: 22, fontWeight: 'bold', color: '#1E293B' },
   userEmail: { fontSize: 14, color: theme.colors.gray, marginTop: 4 },
-  avatar: { width: 100, height: 100, borderRadius: 50 }
+  avatar: { width: 100, height: 100, borderRadius: 50 },
+  badge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: theme.colors.primary,
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#FFF',
+  },
+  badgeText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+  }
 });

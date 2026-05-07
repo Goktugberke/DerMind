@@ -104,21 +104,20 @@ export const RegisterScreen = ({ navigation, setIsRegistering }: { navigation: a
     try {
       setIsRegistering?.(true);
 
+      // Firebase'de kullanıcı oluştur
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const { uid } = userCredential.user;
 
-      const userData = {
-        id: uid,
+      // /api/users/firebase endpoint'ine kaydet (public endpoint, uid+email+name+picture bekler)
+      const firebaseData = {
+        uid: uid,
         email: email,
         name: fullName,
-        password: "",
-        skinType: "",
-        allergens: "",
-        picture: ""
+        picture: '',
       };
 
-      console.log('[Register] Backend\'e gönderilen:', JSON.stringify(userData));
-      const response = await authService.register(userData);
+      console.log('[Register] Backend\'e gönderilen (firebase):', JSON.stringify({ uid, email, name: fullName }));
+      const response = await authService.firebaseLogin(firebaseData);
       console.log('[Register] Backend\'den dönen:', JSON.stringify(response.data));
 
     } catch (error: any) {
