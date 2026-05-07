@@ -3,13 +3,21 @@ import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { theme } from '@constants/theme';
 import { StarRating } from '@components/StarRating';
 
-export const ProductCard = ({ item, onPress }: any) => {
+export const ProductCard = ({ item, onPress, ratings }: any) => {
+
+  const avgRating = ratings && ratings.length > 0
+    ? ratings.reduce((acc: number, r: any) => acc + r.rating, 0) / ratings.length
+    : null;
+
+  const avgPersonal = ratings && ratings.length > 0
+    ? ratings.reduce((acc: number, r: any) => acc + (r.personalizedRating || 0), 0) / ratings.length
+    : null;
 
   const getScoreColor = (score: string | number) => {
     const numScore = parseFloat(score as string);
     if (isNaN(numScore)) return '#E0E0E0'; // Gray fallback
-    if (numScore < 5) return '#FFA8A8'; // Light Red
-    if (numScore < 8.5) return '#FDE68A'; // Yellow
+    if (numScore < 4) return '#FFA8A8'; // Light Red
+    if (numScore < 5) return '#FDE68A'; // Yellow
     return '#86EFAC'; // Light Green
   };
 
@@ -33,25 +41,39 @@ export const ProductCard = ({ item, onPress }: any) => {
       {/* Orta taraf: Ürün Bilgileri */}
       <View style={styles.infoContainer}>
         <Text style={styles.brand}>{item.brand}</Text>
-        <Text style={styles.productName}>{item.name} {item.volume}ml</Text>
+        <Text style={styles.productName}>{item.name}</Text>
 
         <View style={styles.starRow}>
-          <StarRating score={item.generalScore} outOf={10} size={14} />
+          <StarRating
+            score={avgRating ? avgRating * 2 : item.generalScore}
+            outOf={10}
+            size={14}
+          />
+          {avgPersonal ? (
+            <View style={styles.aiStarRow}>
+              <Text style={styles.aiLabel}>AI</Text>
+              <StarRating score={avgPersonal * 2} outOf={10} size={10} />
+            </View>
+          ) : null}
         </View>
       </View>
 
       {/* Sağ taraf: Skorlar ve Fiyat */}
       <View style={styles.rightContainer}>
         <View style={styles.scoreRow}>
-          <View style={[styles.scoreBox, { backgroundColor: getScoreColor(item.generalScore) }]}>
-            <Text style={styles.scoreText}>{item.generalScore}</Text>
+          <View style={[styles.scoreBox, { backgroundColor: getScoreColor(item.base_score ?? item.generalScore) }]}>
+            <Text style={styles.scoreText}>{item.base_score ?? item.generalScore ?? '—'}</Text>
           </View>
-          <Text style={styles.arrow}>→</Text>
-          <View style={[styles.scoreBox, { backgroundColor: getScoreColor(item.aiScore) }]}>
-            <Text style={styles.scoreText}>{item.aiScore}</Text>
-          </View>
+          {item.personal_score && item.personal_score !== 'null' ? (
+            <>
+              <Text style={styles.arrow}>→</Text>
+              <View style={[styles.scoreBox, { backgroundColor: getScoreColor(item.personal_score) }]}>
+                <Text style={styles.scoreText}>{item.personal_score}</Text>
+              </View>
+            </>
+          ) : null}
         </View>
-        <Text style={styles.price}>${item.price}</Text>
+        <Text style={styles.price}>${item.price && item.price !== 'null' ? item.price : '0'}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -81,10 +103,25 @@ const styles = StyleSheet.create({
     marginLeft: 15,
   },
   brand: { fontSize: 16, fontWeight: 'bold', color: theme.colors.text },
-  productName: { fontSize: 14, fontWeight: '700', color: theme.colors.gray },
+  productName: { fontSize: 14, fontWeight: '400', color: theme.colors.gray },
   starRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     marginTop: 5,
+  },
+  aiStarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 10,
+    paddingLeft: 10,
+    borderLeftWidth: 1,
+    borderLeftColor: '#E2E8F0',
+  },
+  aiLabel: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: theme.colors.primary,
+    marginRight: 4,
   },
   rightContainer: {
     alignItems: 'flex-end',
@@ -94,11 +131,15 @@ const styles = StyleSheet.create({
   scoreRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
   },
   scoreBox: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
+    minWidth: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scoreText: {
     fontSize: 13,

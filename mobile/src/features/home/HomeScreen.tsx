@@ -17,7 +17,7 @@ export const HomeScreen = ({ navigation }: any) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [userName, setUserName] = useState('Kullanıcı');
   const [products, setProducts] = useState<any[]>([]);
-  const [page, setPage] = useState(0);
+  const [currentPage, setCurrentPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [isSortModalVisible, setSortModalVisible] = useState(false);
@@ -26,7 +26,7 @@ export const HomeScreen = ({ navigation }: any) => {
   const headerAnimValue = useSharedValue(0);
   const scrollY = useSharedValue(0);
   const insets = useSafeAreaInsets();
-  
+
   // Get current user from DB - with error handling for new registrations
   const { data: currentUser, error: userError, isLoading: userLoading } = useGetCurrentUser();
 
@@ -36,7 +36,8 @@ export const HomeScreen = ({ navigation }: any) => {
   ];
 
   const loadProducts = async (pageNumber: number, currentQuery: string) => {
-    if (isLoading || (!hasMore && pageNumber !== 0)) return;
+    if (isLoading) return;
+
     setIsLoading(true);
     try {
       const fetchCall = currentQuery.trim().length > 0
@@ -49,20 +50,22 @@ export const HomeScreen = ({ navigation }: any) => {
         return;
       }
       const productsList = prodRes?.data?.content || (Array.isArray(prodRes?.data) ? prodRes.data : []);
-      const totalPages = prodRes?.data?.totalPages || 1;
+      const totalPages = prodRes?.data?.totalPages;
 
       if (productsList.length > 0) {
         const apiProducts = productsList.map((p: any) => ({
           id: p.id ? p.id.toString() : Math.random().toString(),
           brand: p.brand != null ? p.brand : 'null',
           name: p.name != null ? p.name : 'null',
-          category: p.category || '', // Bunu ekle
+          category: p.category || '',
           secondaryCategory: p.secondaryCategory || '',
           volume: p.volume != null ? p.volume : 'null',
           generalScore: p.qualityScore != null ? p.qualityScore.toString() : 'null',
           aiScore: p.baseScore != null ? p.baseScore.toString() : 'null',
+          base_score: (p.baseScore != null ? p.baseScore.toString() : null) || (p.base_score != null ? p.base_score.toString() : null) || (p.qualityScore?.toString() ?? null),
+          personal_score: p.personalScore != null ? p.personalScore.toString() : (p.personal_score != null ? p.personal_score.toString() : null),
           price: p.price != null ? p.price.toString() : 'null',
-          image: p.image || null
+          image: p.image || p.imageUrl || p.productImageUrl || null
         }));
 
         if (pageNumber === 0) {
@@ -71,9 +74,12 @@ export const HomeScreen = ({ navigation }: any) => {
           setProducts(prev => [...prev, ...apiProducts]);
         }
 
-        if (pageNumber + 1 >= totalPages) {
-          setHasMore(false);
-        }
+        // Determine if there are more pages
+        const isLastPage = totalPages !== undefined
+          ? pageNumber + 1 >= totalPages
+          : productsList.length < 15;
+
+        setHasMore(!isLastPage);
       } else {
         if (pageNumber === 0) setProducts([]);
         setHasMore(false);
@@ -102,9 +108,17 @@ export const HomeScreen = ({ navigation }: any) => {
     }
   }, [currentUser, userError]);
 
+  // İlk açılışta page 0 yükle
+  useEffect(() => {
+    setCurrentPage(0);
+    setHasMore(true);
+    loadProducts(0, searchQuery);
+  }, []);
+
+  // Arama sorgusu değiştiğinde page 0 ile yeniden yükle
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
-      setPage(0);
+      setCurrentPage(0);
       setHasMore(true);
       loadProducts(0, searchQuery);
     }, 500);
@@ -216,8 +230,8 @@ export const HomeScreen = ({ navigation }: any) => {
         showsVerticalScrollIndicator={false}
         onEndReached={() => {
           if (!isLoading && hasMore) {
-            const nextPage = page + 1;
-            setPage(nextPage);
+            const nextPage = currentPage + 1;
+            setCurrentPage(nextPage);
             loadProducts(nextPage, searchQuery);
           }
         }}
