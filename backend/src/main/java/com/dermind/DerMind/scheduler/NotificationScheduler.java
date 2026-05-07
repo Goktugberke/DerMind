@@ -235,9 +235,9 @@ public class NotificationScheduler {
     }
 
     @Scheduled(cron = "0 0/5 * * * *") // Her 5 dakikada bir çalışır
-    @SchedulerLock(name = "duolingoReminders", lockAtMostFor = "4m", lockAtLeastFor = "1m")
-    public void checkAndSendDuolingoReminders() {
-        log.info("Checking for Duolingo style reminders...");
+    @SchedulerLock(name = "streakReminders", lockAtMostFor = "4m", lockAtLeastFor = "1m")
+    public void checkAndSendStreakReminders() {
+        log.info("Checking for streak reminders...");
         LocalDate today = LocalDate.now();
         LocalTime now = LocalTime.now();
 
@@ -258,7 +258,7 @@ public class NotificationScheduler {
                 if (now.isAfter(reminderTimeStart) && now.isBefore(reminderTimeEnd)) {
                     User user = streak.getUser();
                     if (user.getEmail() != null && !user.getEmail().isBlank()) {
-                        mailServiceClient.sendDuolingoReminderMail(user.getEmail(), user.getName(), streak.getProduct().getName());
+                        mailServiceClient.sendStreakReminderMail(user.getEmail(), user.getName(), streak.getProduct().getName());
                         
                         // Aynı gün bir daha atılmasın diye kaydet
                         streak.setLastReminderSentDate(today);
@@ -269,6 +269,6 @@ public class NotificationScheduler {
                 }
             }
         }
-        log.info("{} Duolingo reminders sent", sentCount);
+        log.info("{} streak reminders sent", sentCount);
     }
 }

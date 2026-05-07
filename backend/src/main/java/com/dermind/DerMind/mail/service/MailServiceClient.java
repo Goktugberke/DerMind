@@ -57,7 +57,7 @@ public class MailServiceClient {
         }
     }
 
-    public void sendDuolingoReminderMail(String toEmail, String userName, String productName) {
+    public void sendStreakReminderMail(String toEmail, String userName, String productName) {
         if (toEmail == null || toEmail.trim().isEmpty()) {
             System.err.println("Cannot send reminder mail: Email is null or empty");
             return;
@@ -68,7 +68,7 @@ public class MailServiceClient {
             "Beni unuttun mu? Yoksa başka bir rutine mi başladın? Kalbim kırıldı... 💔 Hadi git ve " + productName + "'i kullan!",
             "Serini kaybetmek üzeresin! Eğer hemen " + productName + "'i kullanmazsan, emeklerin çöpe gidebilir. (Tehdit etmiyorum, sadece uyarıyorum 🦉)",
             "Tık tık! Kim o? Cildin! 'Lütfen artık bana " + productName + " sür' diyor. Duyuyor musun? 🤷‍♀️",
-            "Duolingo kuşu sana kızgın! Şaka şaka, ben DerMind. Ama gerçekten " + productName + "'i kullanmanın tam sırası değil mi sence de? ⏰",
+            "Zaman daralıyor! " + productName + "'i kullanmanın tam sırası değil mi sence de? ⏰",
             "Cilt bakım rutininin arkasından el sallamak istemiyorsan hemen " + productName + "'i yüzüne boca et! (Yani, gerektiği kadar sür) 🏃‍♀️",
             "Aynaya bak. O ışıl ışıl cildi kaybetmek ister misin? İstemezsin... O zaman " + productName + " seni bekliyor! ✨"
         };
