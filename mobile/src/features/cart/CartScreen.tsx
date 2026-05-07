@@ -13,50 +13,64 @@ import {
   Platform,
   UIManager,
   ActivityIndicator,
+  Modal,
+  Alert
 } from 'react-native';
 import {
   ShoppingBag, Trash2, Plus, Minus, ChevronUp, ChevronDown,
-  Ticket, X, MapPin, ChevronRight
+  Ticket, X, MapPin, ChevronRight, CheckCircle
 } from 'lucide-react-native';
 import { theme } from '@constants/theme';
 import { PageHeader } from '@components/PageHeader';
-import { CustomButton } from '@components/CustomButton'; // İŞTE BURADA!
-import { cartService } from '@services/api';
+import { CustomButton } from '@components/CustomButton';
+import { cartService, useGetAddresses } from '@services/api';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const dummyAddresses = [
-  { id: '1', title: 'Evim', address: 'Atatürk Mah. Sedef Cad. No:12 D:5 Ataşehir/İstanbul' },
-  { id: '2', title: 'İş Yerim', address: 'Levent Plaza K:10 Beşiktaş/İstanbul' }
-];
+// Dummy addresses removed as we are now using the API
 
 export const CartScreen = ({ navigation }: any) => {
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [isLoadingMain, setIsLoadingMain] = useState(true);
 
-  const [selectedAddress, setSelectedAddress] = useState(dummyAddresses[0]);
+  const { data: userAddresses = [], isLoading: isLoadingAddresses } = useGetAddresses();
+  const [selectedAddress, setSelectedAddress] = useState<any>(null);
+  const [isAddressListExpanded, setIsAddressListExpanded] = useState(false);
+
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false); // Ödeme yükleniyor durumu için
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const loadCart = async () => {
     try {
       setIsLoadingMain(true);
       const res = await cartService.getCart();
       if (res.data && Array.isArray(res.data)) {
-        const mapped = res.data.map((item: any) => ({
-          id: item.product?.id?.toString() || item.id?.toString(),
-          productId: item.product?.id,
-          name: item.product?.name || 'Unknown Product',
-          brand: item.product?.brand || 'Unknown Brand',
-          price: item.product?.price || 0,
-          quantity: item.quantity,
-          image: item.product?.image || null
-        }));
-        setCartItems(mapped);
+        const cartMap = new Map();
+
+        res.data.forEach((item: any) => {
+          const pid = item.product?.id || item.productId || item.id;
+          if (cartMap.has(pid)) {
+            // Ürün zaten varsa sadece miktarını artır
+            const existing = cartMap.get(pid);
+            existing.quantity += (item.quantity || 1);
+          } else {
+            // Ürün yoksa yeni olarak ekle
+            cartMap.set(pid, {
+              id: pid.toString(),
+              productId: pid,
+              name: item.product?.name || 'Unknown Product',
+              brand: item.product?.brand || 'Unknown Brand',
+              price: item.product?.price || 0,
+              quantity: item.quantity || 1,
+              image: item.product?.image || item.product?.imageUrl || item.product?.productImageUrl || item.image || null
+            });
+          }
+        });
+        setCartItems(Array.from(cartMap.values()));
       } else {
         setCartItems([]);
       }
@@ -78,6 +92,14 @@ export const CartScreen = ({ navigation }: any) => {
     loadCart();
   }, []);
 
+  // Set default address when addresses are loaded
+  useEffect(() => {
+    if (userAddresses.length > 0 && !selectedAddress) {
+      const defaultAddr = userAddresses.find(a => a.isDefault) || userAddresses[0];
+      setSelectedAddress(defaultAddr);
+    }
+  }, [userAddresses]);
+
   // --- HESAPLAMALAR ---
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const shipping = subtotal > 500 ? 0 : 29.99;
@@ -87,6 +109,11 @@ export const CartScreen = ({ navigation }: any) => {
   const toggleSummary = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setIsSummaryExpanded(!isSummaryExpanded);
+  };
+
+  const toggleAddressList = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setIsAddressListExpanded(!isAddressListExpanded);
   };
 
   // --- ACTIONS ---
@@ -132,13 +159,18 @@ export const CartScreen = ({ navigation }: any) => {
   };
 
   const handleCheckout = () => {
+    if (!selectedAddress) {
+      Alert.alert("Please select a delivery address.");
+      return;
+    }
     navigation.navigate('Checkout', {
       subtotal: subtotal,
       shipping: shipping,
       total: total,
       items: cartItems,
-      appliedCoupon: appliedCoupon, // "HELLO50" gibi kupon ismi
-      discount: discount            // 50.00 gibi sayısal değer
+      appliedCoupon: appliedCoupon,
+      discount: discount,
+      addressId: selectedAddress.id
     });
   };
 
@@ -147,21 +179,71 @@ export const CartScreen = ({ navigation }: any) => {
     <View style={styles.addressContainer}>
       <View style={styles.addressHeader}>
         <Text style={styles.sectionTitle}>Delivery Address</Text>
-        <TouchableOpacity onPress={() => console.log("Adres Değiştir")}>
-          <Text style={styles.changeText}>Change</Text>
+        <TouchableOpacity onPress={toggleAddressList}>
+          <Text style={styles.changeText}>{isAddressListExpanded ? 'Close' : 'Change'}</Text>
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.addressCard} activeOpacity={0.7}>
-        <View style={styles.addressIconWrapper}>
-          <MapPin size={20} color={theme.colors.primary} />
+      {selectedAddress && !isAddressListExpanded ? (
+        <TouchableOpacity 
+          style={styles.addressCard} 
+          activeOpacity={0.7}
+          onPress={toggleAddressList}
+        >
+          <View style={styles.addressIconWrapper}>
+            <MapPin size={20} color={theme.colors.primary} />
+          </View>
+          <View style={styles.addressInfo}>
+            <Text style={styles.addressTitle}>{selectedAddress.title || selectedAddress.name || 'Address'}</Text>
+            <Text style={styles.addressDetail} numberOfLines={1}>
+              {selectedAddress.city ? `${selectedAddress.city}, ` : ''}
+              {selectedAddress.address || selectedAddress.addressString || selectedAddress.fullAddress}
+            </Text>
+          </View>
+          <ChevronDown size={20} color={theme.colors.gray} />
+        </TouchableOpacity>
+      ) : isAddressListExpanded ? (
+        <View style={styles.expandedAddressList}>
+          {userAddresses.map((item: any) => (
+            <TouchableOpacity 
+              key={item.id}
+              style={[
+                styles.dropdownAddressItem, 
+                selectedAddress?.id === item.id && styles.selectedDropdownItem
+              ]}
+              onPress={() => {
+                setSelectedAddress(item);
+                toggleAddressList();
+              }}
+            >
+              <View style={styles.modalAddressInfo}>
+                <Text style={styles.modalAddressTitle}>{item.title || item.name}</Text>
+                <Text style={styles.modalAddressText} numberOfLines={1}>
+                  {item.city ? `${item.city}, ` : ''}{item.address || item.addressString || item.fullAddress}
+                </Text>
+              </View>
+              {selectedAddress?.id === item.id && (
+                <CheckCircle size={20} color={theme.colors.primary} />
+              )}
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity 
+            style={styles.dropdownAddButton}
+            onPress={() => navigation.navigate('Addresses')}
+          >
+            <Plus size={20} color={theme.colors.primary} />
+            <Text style={styles.dropdownAddText}>Manage Addresses</Text>
+          </TouchableOpacity>
         </View>
-        <View style={styles.addressInfo}>
-          <Text style={styles.addressTitle}>{selectedAddress.title}</Text>
-          <Text style={styles.addressDetail} numberOfLines={1}>{selectedAddress.address}</Text>
-        </View>
-        <ChevronRight size={20} color={theme.colors.gray} />
-      </TouchableOpacity>
+      ) : (
+        <TouchableOpacity 
+          style={[styles.addressCard, { borderStyle: 'dashed', justifyContent: 'center' }]} 
+          onPress={() => navigation.navigate('Addresses')}
+        >
+          <Plus size={20} color={theme.colors.primary} />
+          <Text style={[styles.addressTitle, { marginLeft: 10, color: theme.colors.primary }]}>Add Delivery Address</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 
@@ -270,7 +352,7 @@ export const CartScreen = ({ navigation }: any) => {
 
           {/* CUSTOM BUTTON KULLANIMI 2: BOŞ SEPET BUTONU */}
           <CustomButton
-            title="Alışverişe Başla"
+            title="Start Shopping"
             onPress={() => navigation.navigate('Home')}
           />
         </View>
@@ -339,4 +421,19 @@ const styles = StyleSheet.create({
   summaryExpanded: {},
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   emptyTitle: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text, marginTop: 15, marginBottom: 20 },
+  // Dropdown Styles
+  expandedAddressList: { backgroundColor: 'white', borderRadius: 16, padding: 10, borderWidth: 1, borderColor: '#F1F5F9' },
+  dropdownAddressItem: { 
+    flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, 
+    marginBottom: 8, borderWidth: 1, borderColor: '#F8FAFC' 
+  },
+  selectedDropdownItem: { borderColor: theme.colors.primary, backgroundColor: '#F0F9FF' },
+  modalAddressInfo: { flex: 1 },
+  modalAddressTitle: { fontSize: 14, fontWeight: 'bold', color: theme.colors.text },
+  modalAddressText: { fontSize: 12, color: theme.colors.gray, marginTop: 2 },
+  dropdownAddButton: { 
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', 
+    padding: 12, marginTop: 5 
+  },
+  dropdownAddText: { color: theme.colors.primary, fontWeight: 'bold', fontSize: 13, marginLeft: 8 }
 });
