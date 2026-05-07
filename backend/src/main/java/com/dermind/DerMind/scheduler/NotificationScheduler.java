@@ -250,9 +250,9 @@ public class NotificationScheduler {
             }
 
             for (LocalTime customTime : streak.getCustomTimes()) {
-                // Eğer şimdiki zaman, belirlenen süreyi 10 dakika geçmişse ve 15 dakika aralığındaysa
-                // (örneğin 10:00 ayarlıysa, 10:10 ile 10:15 arasında tetiklensin)
-                LocalTime reminderTimeStart = customTime.plusMinutes(10);
+                // Eğer şimdiki zaman belirlenen saati geçmişse ve en fazla 15 dakika geçmişse tetikle
+                // (Örneğin 20:06 ayarlıysa, 20:06 ile 20:21 arasında ilk yakaladığı anda atar)
+                LocalTime reminderTimeStart = customTime;
                 LocalTime reminderTimeEnd = customTime.plusMinutes(15);
 
                 if (now.isAfter(reminderTimeStart) && now.isBefore(reminderTimeEnd)) {
