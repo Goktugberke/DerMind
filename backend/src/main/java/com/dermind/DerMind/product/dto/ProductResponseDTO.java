@@ -21,4 +21,13 @@ public class ProductResponseDTO {
     private String secondaryCategory;
     private Double sephoraRating;
     private Double personalScore;
+    private boolean hiddenStatus;
+
+    public boolean getHiddenStatus() {
+        return hiddenStatus;
+    }
+
+    public void setHiddenStatus(boolean hiddenStatus) {
+        this.hiddenStatus = hiddenStatus;
+    }
 }

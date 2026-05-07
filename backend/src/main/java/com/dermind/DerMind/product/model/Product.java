@@ -54,6 +54,9 @@ public class Product {
 
     private Double sephoraRating;
 
+    @Column(name = "is_hidden", nullable = false)
+    private boolean hidden = false;
+
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<UserProductRating> ratings = new ArrayList<>();
 

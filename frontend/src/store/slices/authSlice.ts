@@ -14,6 +14,7 @@ export interface User {
   skinType?: string;
   allergies?: string[];
   picture?: string;
+  isAdmin?: boolean;
 }
 
 interface AuthState {
@@ -37,6 +38,7 @@ const convertToUser = (dto: UserResponseDTO): User => ({
   skinType: dto.skinType,
   allergies: Array.isArray(dto.allergens) ? dto.allergens : [],
   picture: dto.picture,
+  isAdmin: dto.isAdmin,
 });
 
 const getFriendlyErrorMessage = (error: any): string => {

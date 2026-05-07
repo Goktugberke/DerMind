@@ -14,6 +14,11 @@ import java.util.Optional;
 public interface UserProductRatingRepository extends JpaRepository<UserProductRating, Long> {
 
     @EntityGraph(attributePaths = {"user", "product"})
+    @Query("SELECT r FROM UserProductRating r")
+    List<UserProductRating> findAllWithUserAndProduct();
+
+
+    @EntityGraph(attributePaths = {"user", "product"})
     List<UserProductRating> findByUserId(String userId);
 
     @EntityGraph(attributePaths = {"user", "product"})

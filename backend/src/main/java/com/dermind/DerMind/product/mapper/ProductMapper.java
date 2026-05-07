@@ -16,6 +16,7 @@ public interface ProductMapper {
 
     @Mapping(target = "personalScore", ignore = true)
     @Mapping(source = "price", target = "price")
+    @Mapping(source = "hidden", target = "hiddenStatus")
     ProductResponseDTO toResponseDTO(Product product);
 
     @Mapping(target = "averageUserRating", ignore = true)

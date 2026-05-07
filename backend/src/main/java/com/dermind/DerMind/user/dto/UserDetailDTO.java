@@ -20,4 +20,6 @@ public class UserDetailDTO {
     private int totalPurchases;
     private int totalRatings;
     private int activeStreaks;
+    @com.fasterxml.jackson.annotation.JsonProperty("isAdmin")
+    private boolean admin;
 }

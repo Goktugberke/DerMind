@@ -36,6 +36,7 @@ export interface UserResponseDTO {
   allergens?: string[];
   skinType?: string;
   picture?: string;
+  isAdmin?: boolean;
 }
 export type UserDetailDTO = UserResponseDTO;
 export interface UserCreateDto {
@@ -57,6 +58,7 @@ export interface ProductResponseDTO {
   brand: string;
   price?: number;
   category?: string;
+  hiddenStatus?: boolean;
   ingredients?: string;
   qualityScore?: number;
   imageUrl?: string;
@@ -379,3 +381,12 @@ export const purchaseApi = {
   createPurchase: async (data: PurchaseCreateDTO) => (await apiClient.post<PurchaseResponseDTO>('/api/purchases', data)).data,
   getPurchasesByUserId: async () => (await apiClient.get<PurchaseResponseDTO[]>('/api/purchases/my-purchases')).data,
 };
+
+export const adminApi = {
+  getAllProductsAdmin: async () => (await apiClient.get<ProductResponseDTO[]>('/api/admin/products')).data,
+  deleteProduct: async (productId: number | string) => await apiClient.delete(`/api/admin/products/${productId}`),
+  toggleHideProduct: async (productId: number | string) => (await apiClient.put<ProductResponseDTO>(`/api/admin/products/${productId}/hide`)).data,
+  getAllReviewsAdmin: async () => (await apiClient.get<RatingResponseDTO[]>('/api/admin/reviews')).data,
+  deleteReview: async (reviewId: number | string) => await apiClient.delete(`/api/admin/reviews/${reviewId}`),
+};
+

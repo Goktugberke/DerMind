@@ -66,6 +66,9 @@ const Navbar = () => {
               <Link to="/profile" className="user-name" onClick={closeMenu}>
                 <span className="user-text">{user?.name}</span>
               </Link>
+              {user?.isAdmin && (
+                <Link to="/admin" className="admin-link" onClick={closeMenu}>Admin</Link>
+              )}
               <Link to="/orders" onClick={closeMenu}>Siparişlerim</Link>
               <button className="btn btn-secondary btn-sm" onClick={handleLogout}>
                 Çıkış

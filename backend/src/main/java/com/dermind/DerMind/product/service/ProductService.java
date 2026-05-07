@@ -33,10 +33,13 @@ public class ProductService {
     private final UserProductRatingRepository ratingRepository;
     private final AiServiceClient aiServiceClient;
     private final ProductMapper productMapper;
+    private final com.dermind.DerMind.security.AuthorizationService authorizationService;
 
     @Transactional(readOnly = true)
     public Page<ProductResponseDTO> getAllProducts(Pageable pageable) {
-        return productRepository.findAll(pageable).map(productMapper::toResponseDTO);
+        // Use filterProducts with no filters to automatically exclude hidden products
+        return productRepository.filterProducts(null, null, null, null, pageable)
+                .map(productMapper::toResponseDTO);
     }
 
     @Transactional(readOnly = true)
@@ -44,6 +47,10 @@ public class ProductService {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
 
+        // Block access to hidden products for non-admin users
+        if (product.isHidden() && !authorizationService.isAdmin()) {
+            throw new ResourceNotFoundException("Product", "id", id);
+        }
         ProductDetailDTO dto = productMapper.toDetailDTO(product);
         dto.setPrice(product.getPrice());
         // Aggregates — tek SQL ile (lazy collection iteration yok, N+1 yok)
@@ -113,7 +120,7 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public Page<ProductResponseDTO> getProductsByBrand(String brand, Pageable pageable) {
-        return productRepository.findByBrand(brand, pageable).map(productMapper::toResponseDTO);
+        return productRepository.findByBrandAndHiddenFalse(brand, pageable).map(productMapper::toResponseDTO);
     }
 
     @Transactional(readOnly = true)
@@ -128,7 +135,7 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public Page<ProductResponseDTO> getProductsByMinQuality(Double minScore, Pageable pageable) {
-        return productRepository.findByQualityScoreGreaterThanEqual(minScore, pageable)
+        return productRepository.findByQualityScoreGreaterThanEqualAndHiddenFalse(minScore, pageable)
                 .map(productMapper::toResponseDTO);
     }
 

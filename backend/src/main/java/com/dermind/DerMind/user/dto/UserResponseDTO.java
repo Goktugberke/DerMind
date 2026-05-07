@@ -17,4 +17,6 @@ public class UserResponseDTO {
     private String skinType;
     private boolean hasAcne;
     private String picture;
+    @com.fasterxml.jackson.annotation.JsonProperty("isAdmin")
+    private boolean admin;
 }
