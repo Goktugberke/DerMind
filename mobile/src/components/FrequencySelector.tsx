@@ -141,13 +141,19 @@ export const FrequencySelector = ({ onChange }: FrequencySelectorProps) => {
                             {isActive && item.id === 'once_week' && (
                                 <View style={styles.timePickerContainer}>
                                     <InputField value={day1} onChange={setDay1} placeholder="Monday" type="day" />
+                                    <InputField value={time1} onChange={setTime1} placeholder="10:00 AM" type="time" />
                                 </View>
                             )}
-
                             {isActive && item.id === 'twice_week' && (
                                 <View style={styles.timePickerContainer}>
                                     <InputField value={day1} onChange={setDay1} placeholder="Monday" type="day" />
                                     <InputField value={day2} onChange={setDay2} placeholder="Thursday" type="day" />
+                                    <InputField value={time1} onChange={setTime1} placeholder="10:00 AM" type="time" />
+                                </View>
+                            )}
+                            {isActive && item.id === 'alternate' && (
+                                <View style={styles.timePickerContainer}>
+                                    <InputField value={time1} onChange={setTime1} placeholder="10:00 AM" type="time" />
                                 </View>
                             )}
                         </View>

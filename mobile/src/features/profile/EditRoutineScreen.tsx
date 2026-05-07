@@ -1,12 +1,12 @@
 import React from 'react';
-import { StyleSheet, ScrollView, View, SafeAreaView, Text, Alert } from 'react-native';
+import { StyleSheet, ScrollView, View, SafeAreaView, Text, Alert, TouchableOpacity } from 'react-native';
 import { PageHeader } from '@components/PageHeader';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { ProductHeroCard } from '@components/ProductHeroCard';
 import { CustomButton } from '@components/CustomButton';
 import { FrequencySelector, FrequencyData } from '@components/FrequencySelector';
 import { theme } from '@constants/theme';
-import { useUpdateStreak } from '../../services/api';
+import { useUpdateStreak, useDeleteStreak } from '../../services/api';
 
 export const EditRoutineScreen = () => {
   const route = useRoute<any>();
@@ -14,11 +14,12 @@ export const EditRoutineScreen = () => {
   const { streak } = route.params || {};
   const [frequencyData, setFrequencyData] = React.useState<FrequencyData>();
 
-  const { mutateAsync: updateStreak, isPending } = useUpdateStreak();
+  const { mutateAsync: updateStreak, isPending: isUpdating } = useUpdateStreak();
+  const { mutateAsync: deleteStreak, isPending: isDeleting } = useDeleteStreak();
 
   const formatTimeForBackend = (val: string) => {
     let raw = val.trim();
-    if (!raw.toLowerCase().includes('m')) return raw;
+    if (!raw.toLowerCase().includes('m')) return raw.includes(':') && raw.split(':').length === 2 ? `${raw}:00` : raw;
 
     let timePart = raw;
     let pm = false;
@@ -32,7 +33,7 @@ export const EditRoutineScreen = () => {
     if (pm && hours < 12) hours += 12;
     if (!pm && hours === 12) hours = 0;
 
-    return `${hours.toString().padStart(2, '0')}:${minutes}`;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`;
   };
 
   const handleEditRoutine = async () => {
@@ -51,20 +52,18 @@ export const EditRoutineScreen = () => {
         usageFrequency: frequencyData.usageFrequency,
       };
 
-      let times: string[] = [];
-      if (frequencyData.frequencyId === 'once_day') times.push(frequencyData.time1);
-      if (frequencyData.frequencyId === 'twice_day') times.push(frequencyData.time1, frequencyData.time2);
-
-      if (times.length > 0) {
-        payload.customTimes = times.map(formatTimeForBackend);
+      // Zamanları belirle
+      if (frequencyData.frequencyId === 'twice_day') {
+        payload.customTimes = [formatTimeForBackend(frequencyData.time1), formatTimeForBackend(frequencyData.time2)];
+      } else {
+        payload.customTimes = [formatTimeForBackend(frequencyData.time1)];
       }
 
-      let days: string[] = [];
-      if (frequencyData.frequencyId === 'once_week') days.push(frequencyData.day1.toUpperCase());
-      if (frequencyData.frequencyId === 'twice_week') days.push(frequencyData.day1.toUpperCase(), frequencyData.day2.toUpperCase());
-
-      if (days.length > 0) {
-        payload.daysOfWeek = days;
+      // Günleri belirle (Sadece haftalık rutinler için)
+      if (frequencyData.frequencyId === 'once_week') {
+        payload.daysOfWeek = [frequencyData.day1.toUpperCase()];
+      } else if (frequencyData.frequencyId === 'twice_week') {
+        payload.daysOfWeek = [frequencyData.day1.toUpperCase(), frequencyData.day2.toUpperCase()];
       }
 
       Alert.alert(
@@ -91,8 +90,30 @@ export const EditRoutineScreen = () => {
         ]
       );
     } catch (error: any) {
-      console.error(error);
+      Alert.alert('Error', 'Failed to update routine.');
     }
+  };
+
+  const handleDeleteRoutine = () => {
+    Alert.alert(
+      'Delete Routine',
+      'Are you sure you want to completely delete this routine? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteStreak(streak.id);
+              navigation.goBack();
+            } catch (error: any) {
+              Alert.alert('Error', 'Failed to delete routine.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const isButtonDisabled = (frequencyData && !frequencyData.isValid);
@@ -132,9 +153,16 @@ export const EditRoutineScreen = () => {
         <CustomButton
           title="Save Changes"
           onPress={handleEditRoutine}
-          isLoading={isPending}
-          disabled={isButtonDisabled}
+          isLoading={isUpdating}
+          disabled={isButtonDisabled || isDeleting}
         />
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={handleDeleteRoutine}
+          disabled={isUpdating || isDeleting}
+        >
+          <Text style={styles.deleteButtonText}>Delete Routine Completely</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -166,12 +194,19 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   footer: {
-    position: 'absolute',
-    bottom: 0,
-    width: '100%',
-    padding: 10,
+    padding: 20,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#EEE',
+  },
+  deleteButton: {
+    marginTop: 15,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  deleteButtonText: {
+    color: '#FF4D4D',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

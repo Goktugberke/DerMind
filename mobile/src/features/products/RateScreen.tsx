@@ -30,7 +30,7 @@ export const RateScreen = () => {
         }
 
         try {
-            await createRating({
+            const result = await createRating({
                 productId: product?.id || 0,
                 rating,
                 review: comment,
@@ -39,7 +39,17 @@ export const RateScreen = () => {
                 usageAmountString: amount
             });
             Alert.alert("Success", "Your review has been submitted!", [
-                { text: "OK", onPress: () => navigation.goBack() }
+                { 
+                    text: "OK", 
+                    onPress: () => navigation.replace('EditReview', { 
+                        product: { 
+                            ...result, 
+                            name: product?.name, 
+                            brand: product?.brand, 
+                            image: product?.image 
+                        } 
+                    }) 
+                }
             ]);
         } catch (error) {
             Alert.alert("Error", "Failed to submit review.");
