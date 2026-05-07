@@ -21,8 +21,11 @@ import { PersonalInfoScreen } from '@features/profile/PersonalInfoScreen';
 import { PaymentMethodsScreen } from '@features/profile/PaymentMethodsScreen';
 import { MyRoutines } from '@features/profile/MyRoutines';
 import { EditRoutineScreen } from '@features/profile/EditRoutineScreen';
+import { RoutineDetailScreen } from '@features/products/RoutineDetailScreen';
 import { MyReviewsScreen } from '@features/profile/MyReviewsScreen';
 import { EditReviewScreen } from '@features/profile/EditReviewScreen';
+import { NotificationsScreen } from '@features/profile/NotificationsScreen';
+import { AddressesScreen } from '@features/profile/AddressesScreen';
 
 // Tabs
 import { TabNavigator } from './TabNavigator';
@@ -73,9 +76,12 @@ export const RootNavigator = () => {
           <Stack.Screen name="MyReviews" component={MyReviewsScreen} />
           <Stack.Screen name="EditReview" component={EditReviewScreen} />
           <Stack.Screen name="EditRoutine" component={EditRoutineScreen} />
+          <Stack.Screen name="RoutineDetail" component={RoutineDetailScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
           <Stack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
           <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
+          <Stack.Screen name="Notifications" component={NotificationsScreen} />
+          <Stack.Screen name="Addresses" component={AddressesScreen} />
         </>
       ) : (
         /* KULLANICI GİRİŞ YAPMAMIŞSA: Sadece Giriş Ekranlarını göster */
