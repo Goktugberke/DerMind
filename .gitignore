@@ -100,6 +100,7 @@ CHOICES.md
 fetch_products_images.py
 fetch_products_images_parallel.py 
 chromedriver.exe
+scratch/clean_bad_image_urls.py
 
 # Python Virtual Environment
 ai-server/.venv/

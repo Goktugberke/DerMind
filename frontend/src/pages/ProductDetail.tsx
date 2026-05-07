@@ -134,6 +134,12 @@ const ProductDetail = () => {
 
   const handleFetchExplanation = async () => {
     if (!id || isExplaining) return;
+
+    if (!isAuthenticated) {
+      setExplanation("AI analizi almak için lütfen giriş yapın.");
+      return;
+    }
+
     try {
       setIsExplaining(true);
       const res = await aiApi.getExplanation(parseInt(id, 10));
