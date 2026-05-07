@@ -56,4 +56,47 @@ public class MailServiceClient {
             System.err.println("Error sending order confirmation mail: " + e.getMessage());
         }
     }
+
+    public void sendDuolingoReminderMail(String toEmail, String userName, String productName) {
+        if (toEmail == null || toEmail.trim().isEmpty()) {
+            System.err.println("Cannot send reminder mail: Email is null or empty");
+            return;
+        }
+
+        String[] funnyMessages = {
+            "Cildin şu an ağlıyor olabilir... 😢 O " + productName + "'i sürmek sadece 2 dakikanı alırdı!",
+            "Beni unuttun mu? Yoksa başka bir rutine mi başladın? Kalbim kırıldı... 💔 Hadi git ve " + productName + "'i kullan!",
+            "Serini kaybetmek üzeresin! Eğer hemen " + productName + "'i kullanmazsan, emeklerin çöpe gidebilir. (Tehdit etmiyorum, sadece uyarıyorum 🦉)",
+            "Tık tık! Kim o? Cildin! 'Lütfen artık bana " + productName + " sür' diyor. Duyuyor musun? 🤷‍♀️",
+            "Duolingo kuşu sana kızgın! Şaka şaka, ben DerMind. Ama gerçekten " + productName + "'i kullanmanın tam sırası değil mi sence de? ⏰",
+            "Cilt bakım rutininin arkasından el sallamak istemiyorsan hemen " + productName + "'i yüzüne boca et! (Yani, gerektiği kadar sür) 🏃‍♀️",
+            "Aynaya bak. O ışıl ışıl cildi kaybetmek ister misin? İstemezsin... O zaman " + productName + " seni bekliyor! ✨"
+        };
+
+        String selectedMessage = funnyMessages[new java.util.Random().nextInt(funnyMessages.length)];
+
+        try {
+            String subject = "Hey " + userName + ", rutinin tehlikede! 🚨";
+            
+            StringBuilder body = new StringBuilder();
+            body.append("Merhaba ").append(userName).append(",\n\n");
+            body.append(selectedMessage).append("\n\n");
+            body.append("Serini korumak ve gününü tamamlamak için hemen uygulamamıza gir ve rutini tamamladığını işaretle!\n");
+            body.append("http://localhost:5173/profile\n\n");
+            body.append("Sevgiyle (ve biraz sitemle),\nDerMind Ekibi 🦉");
+
+            MailRequestDto requestDto = MailRequestDto.builder()
+                    .to(toEmail)
+                    .subject(subject)
+                    .text(body.toString())
+                    .build();
+
+            String endpoint = mailServerUrl + "/api/mail/send";
+            
+            ResponseEntity<String> response = restTemplate.postForEntity(endpoint, requestDto, String.class);
+            System.out.println("Mail server response (Reminder): " + response.getBody());
+        } catch (Exception e) {
+            System.err.println("Error sending reminder mail: " + e.getMessage());
+        }
+    }
 }

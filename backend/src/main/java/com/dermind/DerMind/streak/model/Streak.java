@@ -63,6 +63,9 @@ public class Streak {
     @Column(name = "last_completed_date")
     private LocalDate lastCompletedDate;
 
+    @Column(name = "last_reminder_sent_date")
+    private LocalDate lastReminderSentDate;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "usage_frequency", length = 32)
     private UsageFrequency usageFrequency;
