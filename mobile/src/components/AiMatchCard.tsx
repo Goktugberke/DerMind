@@ -16,9 +16,6 @@ export const AiMatchCard = ({ aiMatchScore, explanation }: AiMatchCardProps) => 
                     <Sparkles size={20} color={theme.colors.secondary} />
                     <Text style={styles.cardTitle}>AI Match Analysis</Text>
                 </View>
-                <View style={styles.scoreBadge}>
-                    <Text style={styles.scoreBadgeText}>{aiMatchScore}% Match</Text>
-                </View>
             </View>
 
             <View style={styles.contentArea}>
