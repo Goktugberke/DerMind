@@ -1,11 +1,13 @@
 package com.dermind.DerMind.product.dto;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 // DTO for Product Response
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class ProductResponseDTO {

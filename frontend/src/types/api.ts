@@ -44,11 +44,13 @@ export interface UserCreateDto {
   email: string;
   name: string;
   picture?: string;
+  birthDate?: string;
 }
 export interface UserUpdateDto {
   name?: string;
   allergens?: string[];
   skinType?: string;
+  birthDate?: string;
 }
 
 // --- PRODUCT TYPES ---
@@ -78,6 +80,9 @@ export interface ProductDetailDTO extends ProductResponseDTO {
   totalRatings?: number;
   totalPurchases?: number;
   personalScore?: number;
+  safeIngredientCount?: number;
+  cautionIngredientCount?: number;
+  riskyIngredientCount?: number;
 }
 export interface ProductCreateDTO { name: string; brand: string; price: number; }
 export type ProductUpdateDTO = Partial<ProductCreateDTO>;
@@ -318,7 +323,7 @@ export const productApi = {
     try {
       // Use the new AI-based similarity endpoint
       const aiResponse = await apiClient.get<AiRecommendResponseDTO>(`/api/ai/similar/${id}`);
-      
+
       if (!aiResponse.data || !aiResponse.data.recommendations) {
         console.warn("[API] AI similar products returned null or empty");
         return [];

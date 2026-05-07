@@ -24,7 +24,7 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode(of = "id")
-@ToString(exclude = {"purchases", "ratings", "streaks", "favorites"})
+@ToString(exclude = { "purchases", "ratings", "streaks", "favorites" })
 public class User {
 
     @Id

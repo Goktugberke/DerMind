@@ -105,7 +105,7 @@ export const registerUser = createAsyncThunk(
       // 3. Backend'e kaydet (Firebase UID ile)
       const token = await firebaseUser.getIdToken();
       console.log("[AuthSlice] Got Firebase token");
-      
+
       localStorage.setItem('authHeader', `Bearer ${token}`);
       localStorage.setItem('isLoggedIn', 'true');
 
@@ -142,7 +142,7 @@ export const loginUser = createAsyncThunk(
           picture: credentials.picture || '',
           uid: credentials.uid
         });
-        
+
         localStorage.setItem('authHeader', `Bearer ${credentials.token}`);
         localStorage.setItem('isLoggedIn', 'true');
       } else if (credentials.email && credentials.password) {

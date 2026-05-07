@@ -14,6 +14,7 @@ export interface Product {
   image?: string;
   description?: string;
   rating?: number;
+  personalScore?: number;
   category?: string;
 }
 

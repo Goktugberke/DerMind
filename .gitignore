@@ -95,3 +95,6 @@ CHOICES.md
 *.docx
 *.pdf
 CHOICES.md
+
+# images
+fetch_products_images.py

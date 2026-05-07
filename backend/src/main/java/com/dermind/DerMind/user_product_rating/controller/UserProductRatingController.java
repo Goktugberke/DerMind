@@ -4,10 +4,6 @@ import com.dermind.DerMind.security.CurrentUser;
 import com.dermind.DerMind.user.model.User;
 import com.dermind.DerMind.user_product_rating.dto.*;
 import com.dermind.DerMind.user_product_rating.service.UserProductRatingService;
-import com.dermind.DerMind.user.service.UserService;
-import com.dermind.DerMind.error.UserNotAuthenticatedException;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
@@ -25,7 +21,6 @@ import java.util.List;
 public class UserProductRatingController {
 
     private final UserProductRatingService ratingService;
-    private final UserService userService;
 
     @PostMapping
     public ResponseEntity<RatingResponseDTO> createRating(
@@ -57,9 +52,8 @@ public class UserProductRatingController {
      * GET /api/ratings/my-ratings
      */
     @GetMapping("/my-ratings")
-    public ResponseEntity<List<RatingResponseDTO>> getMyRatings(@AuthenticationPrincipal Object principal) {
-        String userId = getUserIdFromPrincipal(principal);
-        List<RatingResponseDTO> ratings = ratingService.getRatingsByUserId(userId);
+    public ResponseEntity<List<RatingResponseDTO>> getMyRatings(@CurrentUser User user) {
+        List<RatingResponseDTO> ratings = ratingService.getRatingsByUserId(user.getId());
         return ResponseEntity.ok(ratings);
     }
 
@@ -102,22 +96,5 @@ public class UserProductRatingController {
         return ResponseEntity.noContent().build();
     }
 
-    private String getUserIdFromPrincipal(Object principal) {
-        if (principal == null) {
-            throw new UserNotAuthenticatedException("Bu işlemi gerçekleştirmek için giriş yapmalısınız.");
-        }
 
-        if (principal instanceof org.springframework.security.core.userdetails.UserDetails) {
-            String email = ((org.springframework.security.core.userdetails.UserDetails) principal).getUsername();
-            return userService.getUserByEmail(email).getId();
-        }
-
-        if (principal instanceof OidcUser) {
-            String providerId = ((OidcUser) principal).getSubject();
-            return "google_" + providerId;
-        }
-
-        throw new UserNotAuthenticatedException(
-                "Desteklenmeyen kimlik doğrulama türü: " + principal.getClass().getName());
-    }
 }

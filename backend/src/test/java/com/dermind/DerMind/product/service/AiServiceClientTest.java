@@ -21,12 +21,13 @@ import static org.mockito.Mockito.when;
 class AiServiceClientTest {
 
     @Mock RestTemplate restTemplate;
+    @Mock com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     AiServiceClient aiServiceClient;
 
     @BeforeEach
     void setUp() {
-        aiServiceClient = new AiServiceClient(restTemplate);
+        aiServiceClient = new AiServiceClient(restTemplate, objectMapper);
         ReflectionTestUtils.setField(aiServiceClient, "aiServerUrl", "http://localhost:8000");
         ReflectionTestUtils.setField(aiServiceClient, "internalKey", "");
     }
@@ -44,15 +45,18 @@ class AiServiceClientTest {
 
     @Test
     @DisplayName("getPersonalScore: başarılı yanıt → personalScore döner")
-    void getPersonalScore_success_returnsScore() {
+    void getPersonalScore_success_returnsScore() throws Exception {
         AiScoreResponseDTO response = new AiScoreResponseDTO();
         response.setPersonalScore(8.7);
 
-        when(restTemplate.postForEntity(
+        when(restTemplate.exchange(
                 eq("http://localhost:8000/score"),
+                eq(org.springframework.http.HttpMethod.POST),
                 any(),
-                eq(AiScoreResponseDTO.class)
-        )).thenReturn(ResponseEntity.ok(response));
+                eq(String.class)
+        )).thenReturn(ResponseEntity.ok("{\"personalScore\": 8.7}"));
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+        when(objectMapper.readValue(anyString(), eq(AiScoreResponseDTO.class))).thenReturn(response);
 
         User user = makeUser("dry", false, null);
         Double result = aiServiceClient.getPersonalScore("P001", user, 0.75);
@@ -76,8 +80,8 @@ class AiServiceClientTest {
     @Test
     @DisplayName("getPersonalScore: AI server ulaşılamaz → null döner (exception swallow)")
     void getPersonalScore_networkError_returnsNull() {
-        when(restTemplate.postForEntity(anyString(), any(), eq(AiScoreResponseDTO.class)))
-                .thenThrow(new ResourceAccessException("Connection refused"));
+        when(restTemplate.exchange(anyString(), any(), any(), eq(String.class)))
+                .thenThrow(new org.springframework.web.client.ResourceAccessException("Connection refused"));
 
         User user = makeUser("normal", false, null);
         Double result = aiServiceClient.getPersonalScore("P001", user, null);
@@ -88,7 +92,7 @@ class AiServiceClientTest {
     @Test
     @DisplayName("getPersonalScore: AI null body döner → null döner")
     void getPersonalScore_nullBody_returnsNull() {
-        when(restTemplate.postForEntity(anyString(), any(), eq(AiScoreResponseDTO.class)))
+        when(restTemplate.exchange(anyString(), any(), any(), eq(String.class)))
                 .thenReturn(ResponseEntity.ok(null));
 
         User user = makeUser("normal", true, null);
@@ -97,12 +101,13 @@ class AiServiceClientTest {
 
     @Test
     @DisplayName("getPersonalScore: allerjen listesi — virgüllü string parse edilir")
-    void getPersonalScore_withAllergens_parsesAndSends() {
+    void getPersonalScore_withAllergens_parsesAndSends() throws Exception {
         AiScoreResponseDTO response = new AiScoreResponseDTO();
         response.setPersonalScore(6.2);
 
-        when(restTemplate.postForEntity(anyString(), any(), eq(AiScoreResponseDTO.class)))
-                .thenReturn(ResponseEntity.ok(response));
+        when(restTemplate.exchange(anyString(), any(), any(), eq(String.class)))
+                .thenReturn(ResponseEntity.ok("{}"));
+        when(objectMapper.readValue(anyString(), eq(AiScoreResponseDTO.class))).thenReturn(response);
 
         User user = makeUser("sensitive", false, new java.util.LinkedHashSet<>(java.util.Set.of("paraben", "fragrance", "sulfate")));
         Double result = aiServiceClient.getPersonalScore("P003", user, 0.4);
@@ -112,12 +117,13 @@ class AiServiceClientTest {
 
     @Test
     @DisplayName("getPersonalScore: null skinType → 'normal' default olarak gönderilir")
-    void getPersonalScore_nullSkinType_defaultsToNormal() {
+    void getPersonalScore_nullSkinType_defaultsToNormal() throws Exception {
         AiScoreResponseDTO response = new AiScoreResponseDTO();
         response.setPersonalScore(7.0);
 
-        when(restTemplate.postForEntity(anyString(), any(), eq(AiScoreResponseDTO.class)))
-                .thenReturn(ResponseEntity.ok(response));
+        when(restTemplate.exchange(anyString(), any(), any(), eq(String.class)))
+                .thenReturn(ResponseEntity.ok("{}"));
+        when(objectMapper.readValue(anyString(), eq(AiScoreResponseDTO.class))).thenReturn(response);
 
         User user = makeUser(null, false, null);
         Double result = aiServiceClient.getPersonalScore("P004", user, null);
@@ -127,13 +133,14 @@ class AiServiceClientTest {
 
     @Test
     @DisplayName("getPersonalScore: internalKey varsa X-Internal-Key header eklenir")
-    void getPersonalScore_withInternalKey_addsHeader() {
+    void getPersonalScore_withInternalKey_addsHeader() throws Exception {
         ReflectionTestUtils.setField(aiServiceClient, "internalKey", "secret-key-123");
         AiScoreResponseDTO response = new AiScoreResponseDTO();
         response.setPersonalScore(9.0);
 
-        when(restTemplate.postForEntity(anyString(), any(), eq(AiScoreResponseDTO.class)))
-                .thenReturn(ResponseEntity.ok(response));
+        when(restTemplate.exchange(anyString(), any(), any(), eq(String.class)))
+                .thenReturn(ResponseEntity.ok("{}"));
+        when(objectMapper.readValue(anyString(), eq(AiScoreResponseDTO.class))).thenReturn(response);
 
         User user = makeUser("normal", false, null);
         Double result = aiServiceClient.getPersonalScore("P005", user, 1.0);
@@ -143,16 +150,18 @@ class AiServiceClientTest {
 
     @Test
     @DisplayName("getPersonalScore: trailing slash URL'den temizlenir")
-    void getPersonalScore_trailingSlashUrl_stripsSlash() {
+    void getPersonalScore_trailingSlashUrl_stripsSlash() throws Exception {
         ReflectionTestUtils.setField(aiServiceClient, "aiServerUrl", "http://localhost:8000/");
         AiScoreResponseDTO response = new AiScoreResponseDTO();
         response.setPersonalScore(8.0);
 
-        when(restTemplate.postForEntity(
+        when(restTemplate.exchange(
                 eq("http://localhost:8000/score"),
                 any(),
-                eq(AiScoreResponseDTO.class)
-        )).thenReturn(ResponseEntity.ok(response));
+                any(),
+                eq(String.class)
+        )).thenReturn(ResponseEntity.ok("{}"));
+        when(objectMapper.readValue(anyString(), eq(AiScoreResponseDTO.class))).thenReturn(response);
 
         User user = makeUser("oily", true, null);
         assertThat(aiServiceClient.getPersonalScore("P006", user, 0.6)).isEqualTo(8.0);

@@ -17,6 +17,7 @@ const convertToProduct = (dto: ProductResponseDTO): Product => {
     price: dto.price || (dto as any).price_usd || 0,
     description: dto.ingredients || '',
     rating: dto.qualityScore || 0,
+    personalScore: dto.personalScore || dto.qualityScore || 0,
     category: dto.category,
     image: dto.imageUrl,
   };
@@ -320,11 +321,21 @@ const Products = () => {
                     {product.description && (
                       <p className="product-description" style={{ maxHeight: '40px', overflow: 'hidden' }}>{product.description}</p>
                     )}
-                    {product.rating !== undefined && (
-                      <div className="product-rating">
-                        ⭐ {product.rating.toFixed(1)}/10
-                      </div>
-                    )}
+                    <div className="product-rating" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>⭐ {product.rating.toFixed(1)}</span>
+                      {isAuthenticated && product.personalScore !== undefined && (
+                        <span style={{ 
+                          fontSize: '0.8em', 
+                          backgroundColor: product.personalScore > 7 ? '#ecfdf5' : product.personalScore > 4 ? '#fffbeb' : '#fef2f2',
+                          color: product.personalScore > 7 ? '#059669' : product.personalScore > 4 ? '#d97706' : '#dc2626',
+                          padding: '2px 8px',
+                          borderRadius: '12px',
+                          fontWeight: 'bold'
+                        }}>
+                          Sana Özel: {product.personalScore.toFixed(1)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </Link>
                 <div className="product-footer">

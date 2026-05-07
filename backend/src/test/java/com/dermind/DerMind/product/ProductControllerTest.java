@@ -83,7 +83,9 @@ class ProductControllerTest {
     }
 
     private ProductResponseDTO makeResponse(Long id, String name, String brand) {
-        return new ProductResponseDTO(id, name, brand, null, null, null, null, null, null, null, null, null);
+        return ProductResponseDTO.builder()
+                .id(id).name(name).brand(brand)
+                .build();
     }
 
     @Test
@@ -111,7 +113,10 @@ class ProductControllerTest {
 
     @Test
     void getProductById_anonymous_returnsOk() throws Exception {
-        ProductDetailDTO detail = new ProductDetailDTO(1L, "Toner", "COSRX", "Niacinamide", 9.0, 4.5, 10, 3, null);
+        ProductDetailDTO detail = ProductDetailDTO.builder()
+                .id(1L).name("Toner").brand("COSRX").ingredients("Niacinamide")
+                .qualityScore(9.0).averageUserRating(4.5).totalRatings(10).totalPurchases(3)
+                .build();
         when(productService.getProductById(1L)).thenReturn(detail);
 
         mockMvc.perform(get("/api/products/1"))
@@ -139,8 +144,10 @@ class ProductControllerTest {
                 .build();
 
         when(productService.createProduct(any())).thenReturn(
-                new ProductResponseDTO(10L, "Serum", "The Ordinary", "Niacinamide 10%, Zinc 1%", 8.0,
-                        null, null, "P123456", null, null, null, null)
+                ProductResponseDTO.builder()
+                        .id(10L).name("Serum").brand("The Ordinary").ingredients("Niacinamide 10%, Zinc 1%")
+                        .qualityScore(8.0).sephoraProductId("P123456")
+                        .build()
         );
 
         mockMvc.perform(post("/api/products").with(csrf())

@@ -368,7 +368,47 @@ const ProductDetail = () => {
             )}
 
             <div className="product-ingredients-section" style={{ marginTop: '20px', marginBottom: '25px' }}>
-              <h3 style={{ fontSize: '1.1em', marginBottom: '10px', color: '#1f2937' }}>Ürün İçeriği</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h3 style={{ fontSize: '1.1em', margin: 0, color: '#1f2937' }}>İçerik Analizi</h3>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {productDetail?.safeIngredientCount !== undefined && (
+                    <div style={{ backgroundColor: '#ecfdf5', color: '#065f46', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75em', fontWeight: 'bold', border: '1px solid #a7f3d0' }}>
+                      {productDetail.safeIngredientCount} Güvenli
+                    </div>
+                  )}
+                  {productDetail?.cautionIngredientCount !== undefined && productDetail.cautionIngredientCount > 0 && (
+                    <div style={{ backgroundColor: '#fffbeb', color: '#92400e', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75em', fontWeight: 'bold', border: '1px solid #fde68a' }}>
+                      {productDetail.cautionIngredientCount} Dikkat
+                    </div>
+                  )}
+                  {productDetail?.riskyIngredientCount !== undefined && productDetail.riskyIngredientCount > 0 && (
+                    <div style={{ backgroundColor: '#fef2f2', color: '#991b1b', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75em', fontWeight: 'bold', border: '1px solid #fecaca' }}>
+                      {productDetail.riskyIngredientCount} Riskli
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Visual Progress Bar Breakdown */}
+              {(productDetail?.safeIngredientCount !== undefined || productDetail?.cautionIngredientCount !== undefined || productDetail?.riskyIngredientCount !== undefined) && (
+                <div style={{ height: '8px', width: '100%', display: 'flex', borderRadius: '4px', overflow: 'hidden', marginBottom: '15px', backgroundColor: '#f3f4f6' }}>
+                  {(() => {
+                    const safe = productDetail?.safeIngredientCount || 0;
+                    const caution = productDetail?.cautionIngredientCount || 0;
+                    const risky = productDetail?.riskyIngredientCount || 0;
+                    const total = safe + caution + risky;
+                    if (total === 0) return null;
+                    return (
+                      <>
+                        <div style={{ width: `${(safe / total) * 100}%`, backgroundColor: '#10b981' }} title="Safe" />
+                        <div style={{ width: `${(caution / total) * 100}%`, backgroundColor: '#f59e0b' }} title="Caution" />
+                        <div style={{ width: `${(risky / total) * 100}%`, backgroundColor: '#ef4444' }} title="Risky" />
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+
               <div style={{
                 padding: '12px',
                 backgroundColor: '#ffffff',

@@ -13,9 +13,9 @@ public class ProductRecommendationDTO {
     private String name;
     private String brand;
     private Double qualityScore;
-    private Double matchScore;
-    private String recommendation;
-    private String reason;
+    private Double matchScore; // Kullanıcıya uygunluk puanı
+    private String recommendation; // "Highly Recommended", "Suitable", "Not Recommended"
+    private String reason; // Öneri nedeni açıklaması
     private Double price;
     private String imageUrl;
 }

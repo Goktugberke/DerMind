@@ -49,6 +49,7 @@ class ProductServiceTest {
     @Mock UserProductRatingRepository ratingRepository;
     @Mock AiServiceClient aiServiceClient;
     @Mock ProductMapper productMapper;
+    @Mock IngredientSafetyChecker ingredientSafetyChecker;
 
     @InjectMocks ProductService productService;
 
@@ -68,7 +69,10 @@ class ProductServiceTest {
     }
 
     private ProductDetailDTO emptyDetail(Long id, String name) {
-        return new ProductDetailDTO(id, name, "TestBrand", "ing", 7.5, 0.0, 0, 0, null);
+        return ProductDetailDTO.builder()
+                .id(id).name(name).brand("TestBrand").ingredients("ing").qualityScore(7.5)
+                .averageUserRating(0.0).totalRatings(0).totalPurchases(0)
+                .build();
     }
 
     @Test
@@ -78,7 +82,7 @@ class ProductServiceTest {
         Page<Product> page = new PageImpl<>(List.of(p));
         when(productRepository.findAll(any(Pageable.class))).thenReturn(page);
         when(productMapper.toResponseDTO(p))
-                .thenReturn(new ProductResponseDTO(1L, "Toner", "TestBrand", null, 7.5, null, null, "P001", null, null, null, null));
+                .thenReturn(ProductResponseDTO.builder().id(1L).name("Toner").brand("TestBrand").qualityScore(7.5).sephoraProductId("P001").build());
 
         Page<ProductResponseDTO> result = productService.getAllProducts(PageRequest.of(0, 10));
 
@@ -114,7 +118,7 @@ class ProductServiceTest {
     }
 
     @Test
-    @DisplayName("getProductById authenticated: AI çağrısı yapılır, recommendRate aggregate'ten gelir")
+    @DisplayName("getProductById authenticated: AI çağrısı yapılır")
     void getProductById_authenticated_callsAi() {
         Product product = makeProduct(1L, "Toner", "P001");
         User user = new User();
@@ -127,6 +131,7 @@ class ProductServiceTest {
         when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
         when(ratingRepository.getRecommendRateByProductId(1L)).thenReturn(0.83);
         when(aiServiceClient.getPersonalScore("P001", user, 0.83)).thenReturn(8.7);
+        when(ingredientSafetyChecker.analyze(any())).thenReturn(new IngredientSafetyChecker.IngredientCounts(0,0,0));
 
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken("user@example.com", null,
@@ -172,7 +177,7 @@ class ProductServiceTest {
         when(productMapper.toEntity(dto)).thenReturn(entity);
         when(productRepository.save(entity)).thenReturn(saved);
         when(productMapper.toResponseDTO(saved))
-                .thenReturn(new ProductResponseDTO(10L, "New", "X", "Y", 8.0, null, null, null, null, null, null, null));
+                .thenReturn(ProductResponseDTO.builder().id(10L).name("New").brand("X").ingredients("Y").qualityScore(8.0).build());
 
         ProductResponseDTO result = productService.createProduct(dto);
 
@@ -199,7 +204,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(productRepository.save(existing)).thenReturn(existing);
         when(productMapper.toResponseDTO(existing))
-                .thenReturn(new ProductResponseDTO(1L, "Old", "TestBrand", null, 7.5, null, null, "P001", null, null, null, null));
+                .thenReturn(ProductResponseDTO.builder().id(1L).name("Old").brand("TestBrand").qualityScore(7.5).sephoraProductId("P001").build());
 
         productService.updateProduct(1L, dto);
 

@@ -8,7 +8,6 @@ import com.dermind.DerMind.product.repository.ProductRepository;
 import com.dermind.DerMind.user.model.User;
 import com.dermind.DerMind.user.repository.UserRepository;
 import com.dermind.DerMind.user_product_rating.repository.UserProductRatingRepository;
-import com.dermind.DerMind.ai.dto.AiScoreResponseDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -33,13 +32,43 @@ public class ProductService {
     private final UserProductRatingRepository ratingRepository;
     private final AiServiceClient aiServiceClient;
     private final ProductMapper productMapper;
-    private final com.dermind.DerMind.security.AuthorizationService authorizationService;
+    private final IngredientSafetyChecker ingredientSafetyChecker;
 
     @Transactional(readOnly = true)
     public Page<ProductResponseDTO> getAllProducts(Pageable pageable) {
-        // Use filterProducts with no filters to automatically exclude hidden products
-        return productRepository.filterProducts(null, null, null, null, pageable)
+        Page<ProductResponseDTO> page = productRepository.filterProducts(null, null, null, null, pageable)
                 .map(productMapper::toResponseDTO);
+        return populatePersonalScores(page);
+    }
+
+    private Page<ProductResponseDTO> populatePersonalScores(Page<ProductResponseDTO> page) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName())) {
+            String email = auth.getName();
+            userRepository.findByEmail(email).ifPresent(user -> {
+                List<String> sephoraIds = page.getContent().stream()
+                        .map(ProductResponseDTO::getSephoraProductId)
+                        .filter(id -> id != null && !id.isBlank())
+                        .collect(Collectors.toList());
+
+                if (!sephoraIds.isEmpty()) {
+                    java.util.Map<String, Double> scores = aiServiceClient.getBatchScores(sephoraIds, user);
+                    for (ProductResponseDTO dto : page.getContent()) {
+                        if (dto.getSephoraProductId() != null && scores.containsKey(dto.getSephoraProductId())) {
+                            dto.setPersonalScore(scores.get(dto.getSephoraProductId()));
+                        } else {
+                            dto.setPersonalScore(dto.getQualityScore());
+                        }
+                    }
+                }
+            });
+        } else {
+            // Unauthenticated: personal score = quality score
+            for (ProductResponseDTO dto : page.getContent()) {
+                dto.setPersonalScore(dto.getQualityScore());
+            }
+        }
+        return page;
     }
 
     @Transactional(readOnly = true)
@@ -47,12 +76,7 @@ public class ProductService {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
 
-        // Block access to hidden products for non-admin users
-        if (product.isHidden() && !authorizationService.isAdmin()) {
-            throw new ResourceNotFoundException("Product", "id", id);
-        }
         ProductDetailDTO dto = productMapper.toDetailDTO(product);
-        dto.setPrice(product.getPrice());
         // Aggregates — tek SQL ile (lazy collection iteration yok, N+1 yok)
         productRepository.findProductStats(id).ifPresentOrElse(stats -> {
             dto.setAverageUserRating(stats.getAvgRating() != null ? stats.getAvgRating() : 0.0);
@@ -70,26 +94,22 @@ public class ProductService {
             String email = auth.getName();
             userRepository.findByEmail(email).ifPresent(user -> {
                 Double recommendRate = computeRecommendRate(product);
-                AiScoreResponseDTO aiResponse = aiServiceClient.getAiScoreResponse(
+                Double personalScore = aiServiceClient.getPersonalScore(
                         product.getSephoraProductId(), user, recommendRate);
-                if (aiResponse != null) {
-                    Double personalScore = aiResponse.getPersonalScore();
-                    log.info("[ProductService] Fetched personalScore {} for product {} and user {}", personalScore, product.getSephoraProductId(), email);
+                if (personalScore != null) {
                     dto.setPersonalScore(personalScore);
-                    
-                    // REAL PRICE ENRICHMENT: If DB price is missing, use AI server price
-                    if (dto.getPrice() == null || dto.getPrice() == 0.0) {
-                        dto.setPrice(aiResponse.getPriceUsd());
-                    }
-                } else {
-                    log.warn("[ProductService] AI response returned null for product {} and user {}", product.getSephoraProductId(), email);
                 }
             });
         }
         if (dto.getPersonalScore() == null) {
-            log.info("[ProductService] Using qualityScore fallback for product {}", product.getId());
             dto.setPersonalScore(product.getQualityScore());
         }
+
+        IngredientSafetyChecker.IngredientCounts counts = ingredientSafetyChecker.analyze(product.getIngredients());
+        dto.setSafeIngredientCount(counts.safeCount());
+        dto.setCautionIngredientCount(counts.cautionCount());
+        dto.setRiskyIngredientCount(counts.riskyCount());
+
         return dto;
     }
 
@@ -120,52 +140,48 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public Page<ProductResponseDTO> getProductsByBrand(String brand, Pageable pageable) {
-        return productRepository.findByBrandAndHiddenFalse(brand, pageable).map(productMapper::toResponseDTO);
+        Page<ProductResponseDTO> page = productRepository.findByBrandAndHiddenFalse(brand, pageable).map(productMapper::toResponseDTO);
+        return populatePersonalScores(page);
     }
 
     @Transactional(readOnly = true)
     public Page<ProductResponseDTO> searchProductsByName(String name, Pageable pageable) {
-        return productRepository.searchByName(name, pageable).map(productMapper::toResponseDTO);
+        Page<ProductResponseDTO> page = productRepository.searchByName(name, pageable).map(productMapper::toResponseDTO);
+        return populatePersonalScores(page);
     }
 
     @Transactional(readOnly = true)
     public Page<ProductResponseDTO> searchProducts(String searchTerm, Pageable pageable) {
-        return productRepository.searchProducts(searchTerm, pageable).map(productMapper::toResponseDTO);
+        Page<ProductResponseDTO> page = productRepository.searchProducts(searchTerm, pageable).map(productMapper::toResponseDTO);
+        return populatePersonalScores(page);
     }
 
     @Transactional(readOnly = true)
     public Page<ProductResponseDTO> getProductsByMinQuality(Double minScore, Pageable pageable) {
-        return productRepository.findByQualityScoreGreaterThanEqualAndHiddenFalse(minScore, pageable)
+        Page<ProductResponseDTO> page = productRepository.findByQualityScoreGreaterThanEqualAndHiddenFalse(minScore, pageable)
                 .map(productMapper::toResponseDTO);
+        return populatePersonalScores(page);
     }
 
     @Transactional(readOnly = true)
     public Page<ProductResponseDTO> filterProducts(String searchTerm, Double minPrice, Double maxPrice,
             Double minQuality, Pageable pageable) {
-        Page<Product> products = productRepository.filterProducts(searchTerm, minPrice, maxPrice, minQuality, pageable);
-        log.info("[ProductService] Filter results: {} products found for term='{}', minPrice={}, maxPrice={}, minQuality={}", 
-                 products.getTotalElements(), searchTerm, minPrice, maxPrice, minQuality);
-        return products.map(productMapper::toResponseDTO);
+        Page<ProductResponseDTO> page = productRepository.filterProducts(searchTerm, minPrice, maxPrice, minQuality, pageable)
+                .map(productMapper::toResponseDTO);
+        return populatePersonalScores(page);
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "top-quality", key = "#limit")
     public List<ProductDetailDTO> getTopQualityProducts(int limit) {
-        List<ProductDetailDTO> results = productRepository.findTopQualityProducts(Pageable.ofSize(Math.min(limit, 100)))
+        return productRepository.findTopQualityProducts(Pageable.ofSize(Math.min(limit, 100)))
                 .getContent().stream()
-                .map(p -> {
-                    ProductDetailDTO dto = productMapper.toDetailDTO(p);
-                    dto.setPrice(p.getPrice());
-                    return dto;
-                })
+                .map(productMapper::toDetailDTO)
                 .collect(Collectors.toList());
-        
-        if (!results.isEmpty()) {
-            log.info("[ProductService] Top product: {}, Price: {}", results.get(0).getName(), results.get(0).getPrice());
-        }
-        return results;
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "most-purchased", key = "#limit")
     public List<ProductDetailDTO> getMostPurchasedProducts(int limit) {
         return productRepository.findMostPurchasedProducts(Pageable.ofSize(Math.min(limit, 100)))
                 .getContent().stream()
@@ -216,16 +232,11 @@ public class ProductService {
         matchScore = Math.max(0.0, Math.min(100.0, matchScore));
 
         return new ProductRecommendationDTO(
-            product.getId(),
-            product.getName(),
-            product.getBrand(),
-            product.getQualityScore(),
-            matchScore,
-            recommendation,
-            reason.toString().trim().isEmpty() ? "Highly Recommended for your skin profile." : reason.toString().trim(),
-            product.getPrice(),
-            null
-        );
+                product.getId(), product.getName(), product.getBrand(),
+                product.getQualityScore(), matchScore, recommendation,
+                reason.toString().trim().isEmpty() ? "Highly Recommended for your skin profile."
+                        : reason.toString().trim(),
+                product.getPrice(), null);
     }
 
     /**
@@ -240,7 +251,6 @@ public class ProductService {
 
     @Transactional
     public void syncPricesFromCsv() {
-        // Path should be relative to project root or use absolute
         String infoPath = "ai-server/datasets/sephora_dataset/product_info.csv";
         java.io.File file = new java.io.File(infoPath);
         if (!file.exists()) {
@@ -269,7 +279,6 @@ public class ProductService {
 
             int count = 0;
             while ((line = br.readLine()) != null) {
-                // Robust CSV split: ignore commas inside quotes
                 String[] values = line.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
                 if (values.length > Math.max(pidIdx, priceIdx)) {
                     String pid = values[pidIdx].replace("\"", "");
@@ -290,7 +299,6 @@ public class ProductService {
                         count++;
                         if (count % 100 == 0) {
                             productRepository.flush();
-                            log.info("Synced {} products...", count);
                         }
                     } catch (NumberFormatException e) {
                         // Skip

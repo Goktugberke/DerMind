@@ -49,7 +49,9 @@ class FavoriteServiceTest {
     }
 
     private ProductResponseDTO makeProductDTO(Long id) {
-        return new ProductResponseDTO(id, "Product " + id, null, null, null, null, null, null, null, null, null, null);
+        return ProductResponseDTO.builder()
+                .id(id).name("Product " + id)
+                .build();
     }
 
     private Favorite makeFavorite(Long id, User user, Product product) {

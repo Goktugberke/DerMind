@@ -73,6 +73,7 @@ body {
 @tailwind components;
 
 @layer components {
+
   /* Layout */
   .app-layout {
     @apply min-h-screen flex flex-col;
@@ -346,6 +347,9 @@ body {
   overflow: hidden;
   box-shadow: var(--shadow);
   transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .product-card:hover {
@@ -374,12 +378,15 @@ body {
 
 .product-info {
   padding: 1.5rem;
+  flex-grow: 1;
 }
 
 .product-name {
   font-size: 1.25rem;
   margin-bottom: 0.5rem;
   color: var(--text-color);
+  padding: 1.5rem;
+  margin-top: auto;
 }
 
 .product-description {
@@ -398,6 +405,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 0 1.5rem 1.5rem 1.5rem;
 }
 
 .product-price {
@@ -860,11 +868,30 @@ body {
   text-transform: uppercase;
 }
 
-.status-pending { background: #fef3c7; color: #92400e; }
-.status-processing { background: #e0e7ff; color: #3730a3; }
-.status-shipped { background: #dcfce7; color: #166534; }
-.status-delivered { background: #dcfce7; color: #166534; }
-.status-cancelled { background: #fee2e2; color: #991b1b; }
+.status-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-processing {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.status-shipped {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-delivered {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-cancelled {
+  background: #fee2e2;
+  color: #991b1b;
+}
 
 .order-card-body {
   padding: 1.5rem;
@@ -1317,9 +1344,11 @@ body {
 }
 
 .product-link {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
   text-decoration: none;
   color: inherit;
-  display: block;
 }
 
 .product-link:hover {
@@ -1642,6 +1671,7 @@ body {
     flex-direction: column;
   }
 }
+
 /* Favorites Page */
 .favorites-page {
   padding: 2rem 1.5rem;
@@ -1756,7 +1786,7 @@ body {
     align-items: flex-start;
     padding: 5rem 2rem 2rem;
     gap: 2rem;
-    box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+    box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1);
     transition: right 0.3s ease-in-out;
     z-index: 1000;
   }
@@ -1834,5 +1864,3 @@ body {
     font-size: 1.75rem;
   }
 }
-
-
