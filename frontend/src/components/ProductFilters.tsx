@@ -78,7 +78,7 @@ const ProductFilters = ({
           marginTop: '10px',
           boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
           gap: '20px'
         }}>
           <div className="filter-section">
@@ -93,13 +93,14 @@ const ProductFilters = ({
                 min="0"
                 style={{
                   width: '100%',
+                  minWidth: 0,
                   padding: '8px 12px',
                   borderRadius: '6px',
                   border: '1px solid #d1d5db',
                   fontSize: '0.9rem'
                 }}
               />
-              <span style={{ color: '#9ca3af' }}>-</span>
+              <span style={{ color: '#9ca3af', flexShrink: 0 }}>-</span>
               <input
                 type="number"
                 placeholder="Max"
@@ -109,6 +110,7 @@ const ProductFilters = ({
                 min="0"
                 style={{
                   width: '100%',
+                  minWidth: 0,
                   padding: '8px 12px',
                   borderRadius: '6px',
                   border: '1px solid #d1d5db',
@@ -120,12 +122,14 @@ const ProductFilters = ({
 
           <div className="filter-section">
             <h3 style={{ fontSize: '0.9rem', marginBottom: '12px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Minimum Puan</h3>
-            <div className="rating-filter" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
+            <div className="rating-filter" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {[2, 4, 6, 8, 10].map((rating) => (
                 <button
                   key={rating}
                   className={`rating-btn ${localRating === rating ? 'active' : ''}`}
                   style={{
+                    flex: '1 1 calc(20% - 6px)',
+                    minWidth: '40px',
                     padding: '6px 4px',
                     fontSize: '0.8rem',
                     border: '1px solid',

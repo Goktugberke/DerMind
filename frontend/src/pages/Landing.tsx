@@ -5,6 +5,7 @@ import { addToCartAsync } from '../store/slices/cartSlice';
 import type { Product } from '../store/slices/cartSlice';
 import SearchBar from '../components/SearchBar';
 import { productApi } from '../types/api';
+import { convertToProduct } from '../utils/productUtils';
 
 const Landing = () => {
   const dispatch = useAppDispatch();
@@ -18,16 +19,7 @@ const Landing = () => {
         const data = await productApi.getTopQualityProducts(6);
         
         // Convert DTO to UI Product type
-        const converted = data.map(dto => ({
-          id: dto.id.toString(),
-          name: dto.name,
-          price: dto.price || 0,
-          description: dto.ingredients 
-            ? (dto.ingredients.length > 60 ? dto.ingredients.substring(0, 57) + '...' : dto.ingredients)
-            : '',
-          rating: dto.qualityScore || 0,
-          image: dto.imageUrl
-        }));
+        const converted = data.map(convertToProduct);
         
         setTopProducts(converted);
       } catch (error) {
@@ -110,10 +102,18 @@ const Landing = () => {
                   <Link to={`/products/${product.id}`} className="product-link">
                     <div className="product-image">
                       {product.image ? (
-                        <img src={product.image} alt={product.name} />
+                        <img 
+                          src={product.image} 
+                          alt={product.name} 
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            (e.target as HTMLImageElement).parentElement?.classList.add('show-placeholder');
+                          }}
+                        />
                       ) : (
                         <div className="product-placeholder">📦</div>
                       )}
+                      <div className="product-placeholder hidden-placeholder">📦</div>
                       {product.rating && product.rating >= 8.0 && (
                         <div className="product-badge">Top Rated</div>
                       )}

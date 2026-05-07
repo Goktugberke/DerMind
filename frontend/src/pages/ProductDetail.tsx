@@ -5,25 +5,8 @@ import { addToCartAsync } from '../store/slices/cartSlice';
 import type { Product } from '../store/slices/cartSlice';
 import { productApi, ratingApi, streakApi, favoriteApi, aiApi, UsageFrequency } from '../types/api';
 import type { ProductDetailDTO, RatingResponseDTO, AiExplainResponseDTO } from '../types/api';
+import { convertToProduct } from '../utils/productUtils';
 
-const convertToProduct = (dto: any): Product => {
-  const id = dto.id || dto.product_id;
-  const name = dto.name || dto.product_name;
-
-  // REAL DATA ONLY: Use database price or AI-provided price_usd
-  const realPrice = dto.price || dto.price_usd || dto.priceUsd || 0;
-
-  return {
-    id: id.toString(),
-    name: name,
-    brand: dto.brand,
-    price: realPrice,
-    description: dto.ingredients || '',
-    rating: dto.averageUserRating || dto.qualityScore || dto.base_score || dto.rating || 0,
-    category: dto.category,
-    image: dto.imageUrl || dto.image_url
-  };
-};
 
 interface ProductScore {
   overallScore: number;
@@ -289,33 +272,48 @@ const ProductDetail = () => {
 
   return (
     <div className="product-detail-page">
-      <div className="container">
-        <Link to="/products" className="back-link">← Ürünlere Dön</Link>
-        <div className="product-detail-content">
-          <div className="product-detail-image">
-            {product.image ? <img src={product.image} alt={product.name} /> : <div className="product-placeholder-large">📦</div>}
+      <div className="container product-detail-container">
+        {/* LEFT COLUMN: Sticky Image */}
+        <div className="product-detail-left">
+          <Link to="/products" className="back-link" style={{ marginBottom: '1.5rem' }}>← Ürünlere Dön</Link>
+          <div className="product-image-container">
+            {product.image ? (
+              <img 
+                src={product.image} 
+                alt={product.name}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                  (e.target as HTMLImageElement).parentElement?.classList.add('show-placeholder');
+                }}
+              />
+            ) : (
+              <div className="product-placeholder-large">📦</div>
+            )}
+            <div className="product-placeholder-large hidden-placeholder">📦</div>
           </div>
+        </div>
+
+        {/* RIGHT COLUMN: Details */}
+        <div className="product-detail-right">
           <div className="product-detail-info">
             <h1>{product.name}</h1>
-            {productDetail?.brand && <div className="product-brand">Marka: {productDetail.brand}</div>}
-            {productDetail?.qualityScore && <div>Kalite Puanı: {productDetail.qualityScore.toFixed(1)}/10</div>}
+            {productDetail?.brand && <div className="product-brand">{productDetail.brand}</div>}
             <div className="product-price-large">${product.price.toFixed(2)}</div>
 
             {score && (
-              <div className="product-scoring" style={{ marginTop: '15px', padding: '15px', backgroundColor: '#f3f4f6', borderRadius: '12px' }}>
-                <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  ML Analizi
-                </h3>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                  <div className="score-main" style={{
-                    fontSize: '2.5em',
-                    fontWeight: 'bold',
-                    color: score.overallScore > 70 ? '#10b981' : score.overallScore > 30 ? '#f59e0b' : '#ef4444'
+              <div className="product-detail-card" style={{ marginTop: '1rem', padding: '1.25rem', backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px' }}>
+                <h3 style={{ fontSize: '1rem', marginBottom: '0.75rem', color: '#1f2937' }}>✨ DerMind ML Analizi</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <div style={{
+                    fontSize: '1.75rem',
+                    fontWeight: '800',
+                    color: score.overallScore > 70 ? 'var(--success-color)' : score.overallScore > 30 ? '#f59e0b' : 'var(--danger-color)',
+                    lineHeight: 1
                   }}>
-                    {(score.overallScore / 10).toFixed(1)}<span style={{ fontSize: '0.5em', color: '#9ca3af' }}>/10</span>
+                    {(score.overallScore / 10).toFixed(1)}<span style={{ fontSize: '0.8rem', color: '#9ca3af', fontWeight: '500' }}>/10</span>
                   </div>
-                  <div className="score-desc" style={{ fontSize: '0.95em', color: '#4b5563' }}>
-                    Bu ürün cilt tipin ve tercihlerine göre <strong>{score.overallScore > 70 ? 'yüksek' : score.overallScore > 30 ? 'orta' : 'düşük'}</strong> uyumluluk gösteriyor.
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-light)', lineHeight: '1.3' }}>
+                    Cilt profilinize göre <strong>{score.overallScore > 70 ? 'mükemmel' : score.overallScore > 30 ? 'orta' : 'düşük'}</strong> uyumluluk.
                   </div>
                 </div>
 
@@ -330,13 +328,13 @@ const ProductDetail = () => {
                         width: '100%',
                         backgroundColor: '#6366f1',
                         color: 'white',
-                        padding: '10px',
-                        borderRadius: '8px',
-                        fontSize: '0.9em',
+                        padding: '8px',
+                        borderRadius: '6px',
+                        fontSize: '0.85rem',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '8px'
+                        gap: '6px'
                       }}
                     >
                       {isExplaining ? (
@@ -350,12 +348,12 @@ const ProductDetail = () => {
                   ) : (
                     <div style={{
                       backgroundColor: '#ffffff',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      fontSize: '0.9em',
-                      lineHeight: '1.6',
+                      padding: '10px',
+                      borderRadius: '6px',
+                      fontSize: '0.85rem',
+                      lineHeight: '1.5',
                       color: '#374151',
-                      borderLeft: '4px solid #6366f1'
+                      borderLeft: '3px solid #6366f1'
                     }}>
                       <div style={{ fontWeight: 'bold', marginBottom: '8px', color: '#4f46e5', display: 'flex', alignItems: 'center', gap: '5px' }}>
                         <span>✨ AI Analizi:</span>
@@ -367,81 +365,73 @@ const ProductDetail = () => {
               </div>
             )}
 
-            <div className="product-ingredients-section" style={{ marginTop: '20px', marginBottom: '25px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <h3 style={{ fontSize: '1.1em', margin: 0, color: '#1f2937' }}>İçerik Analizi</h3>
-                <div style={{ display: 'flex', gap: '8px' }}>
+            <div className="product-detail-card" style={{ marginTop: '1rem', padding: '1.25rem', backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <h3 style={{ fontSize: '1rem', color: '#1f2937' }}>İçerik Analizi</h3>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
                   {productDetail?.safeIngredientCount !== undefined && (
-                    <div style={{ backgroundColor: '#ecfdf5', color: '#065f46', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75em', fontWeight: 'bold', border: '1px solid #a7f3d0' }}>
+                    <span style={{ background: '#ecfdf5', color: '#065f46', padding: '0.15rem 0.5rem', borderRadius: '1rem', fontSize: '0.65rem', fontWeight: '700' }}>
                       {productDetail.safeIngredientCount} Güvenli
-                    </div>
-                  )}
-                  {productDetail?.cautionIngredientCount !== undefined && productDetail.cautionIngredientCount > 0 && (
-                    <div style={{ backgroundColor: '#fffbeb', color: '#92400e', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75em', fontWeight: 'bold', border: '1px solid #fde68a' }}>
-                      {productDetail.cautionIngredientCount} Dikkat
-                    </div>
+                    </span>
                   )}
                   {productDetail?.riskyIngredientCount !== undefined && productDetail.riskyIngredientCount > 0 && (
-                    <div style={{ backgroundColor: '#fef2f2', color: '#991b1b', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75em', fontWeight: 'bold', border: '1px solid #fecaca' }}>
+                    <span style={{ background: '#fef2f2', color: '#991b1b', padding: '0.15rem 0.5rem', borderRadius: '1rem', fontSize: '0.65rem', fontWeight: '700' }}>
                       {productDetail.riskyIngredientCount} Riskli
-                    </div>
+                    </span>
                   )}
                 </div>
               </div>
 
-              {/* Visual Progress Bar Breakdown */}
-              {(productDetail?.safeIngredientCount !== undefined || productDetail?.cautionIngredientCount !== undefined || productDetail?.riskyIngredientCount !== undefined) && (
-                <div style={{ height: '8px', width: '100%', display: 'flex', borderRadius: '4px', overflow: 'hidden', marginBottom: '15px', backgroundColor: '#f3f4f6' }}>
-                  {(() => {
-                    const safe = productDetail?.safeIngredientCount || 0;
-                    const caution = productDetail?.cautionIngredientCount || 0;
-                    const risky = productDetail?.riskyIngredientCount || 0;
-                    const total = safe + caution + risky;
-                    if (total === 0) return null;
-                    return (
-                      <>
-                        <div style={{ width: `${(safe / total) * 100}%`, backgroundColor: '#10b981' }} title="Safe" />
-                        <div style={{ width: `${(caution / total) * 100}%`, backgroundColor: '#f59e0b' }} title="Caution" />
-                        <div style={{ width: `${(risky / total) * 100}%`, backgroundColor: '#ef4444' }} title="Risky" />
-                      </>
-                    );
-                  })()}
-                </div>
-              )}
+              {/* Progress Bar */}
+              <div style={{ height: '6px', width: '100%', display: 'flex', borderRadius: '3px', overflow: 'hidden', marginBottom: '0.75rem', background: '#f1f5f9' }}>
+                {(() => {
+                  const safe = productDetail?.safeIngredientCount || 0;
+                  const caution = productDetail?.cautionIngredientCount || 0;
+                  const risky = productDetail?.riskyIngredientCount || 0;
+                  const total = safe + caution + risky;
+                  if (total === 0) return null;
+                  return (
+                    <>
+                      <div style={{ width: `${(safe / total) * 100}%`, backgroundColor: 'var(--success-color)' }} />
+                      <div style={{ width: `${(caution / total) * 100}%`, backgroundColor: '#f59e0b' }} />
+                      <div style={{ width: `${(risky / total) * 100}%`, backgroundColor: 'var(--danger-color)' }} />
+                    </>
+                  );
+                })()}
+              </div>
 
               <div style={{
-                padding: '12px',
-                backgroundColor: '#ffffff',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                fontSize: '0.9em',
-                lineHeight: '1.6',
-                color: productDetail?.ingredients ? '#4b5563' : '#9ca3af',
-                maxHeight: '150px',
+                padding: '0.75rem',
+                backgroundColor: '#f8fafc',
+                borderRadius: '0.5rem',
+                fontSize: '0.8rem',
+                lineHeight: '1.4',
+                color: '#475569',
+                maxHeight: '100px',
                 overflowY: 'auto',
-                fontStyle: productDetail?.ingredients ? 'normal' : 'italic'
+                border: '1px solid #e2e8f0'
               }}>
-                {productDetail?.ingredients || 'Bu ürün için içerik bilgisi henüz eklenmemiştir.'}
+                {productDetail?.ingredients || 'İçerik bilgisi yok.'}
               </div>
             </div>
 
-            <div className="product-actions" style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-              <button className="btn btn-primary" onClick={() => dispatch(addToCartAsync(product))}>Sepete Ekle</button>
+            <div className="product-actions" style={{ display: 'flex', gap: '8px', marginBottom: '1rem', flexWrap: 'wrap' }}>
+              <button className="btn btn-primary btn-sm" onClick={() => dispatch(addToCartAsync(product))}>Sepete Ekle</button>
               <button
                 onClick={() => setShowRoutineModal(true)}
-                className="btn btn-secondary"
+                className="btn btn-secondary btn-sm"
                 style={{ backgroundColor: '#6c757d', color: 'white' }}
               >
                 Rutine Ekle
               </button>
               <button
-                className={`btn ${isFavorite ? 'btn-danger' : 'btn-outline'}`}
+                className={`btn btn-sm ${isFavorite ? 'btn-danger' : 'btn-outline'}`}
                 onClick={toggleFavorite}
                 disabled={favLoading}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
+                  gap: '6px',
                   backgroundColor: isFavorite ? '#ef4444' : 'transparent',
                   color: isFavorite ? 'white' : '#1f2937',
                   border: '1px solid #d1d5db'
@@ -452,9 +442,9 @@ const ProductDetail = () => {
             </div>
 
             {similarProducts.length > 0 && (
-              <div className="similar-products-section" style={{ marginTop: '30px', marginBottom: '30px' }}>
-                <h3 style={{ fontSize: '1.2em', marginBottom: '15px', color: '#1f2937' }}>Benzer Ürün Önerileri</h3>
-                <div style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '10px' }}>
+              <div className="similar-products-section" style={{ marginTop: '1.5rem', marginBottom: '1.5rem' }}>
+                <h3 style={{ fontSize: '1rem', marginBottom: '10px', color: '#1f2937' }}>Benzer Ürün Önerileri</h3>
+                <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '8px' }}>
                   {similarProducts.map((simDto) => {
                     const simProd = convertToProduct(simDto);
                     return (
@@ -462,11 +452,11 @@ const ProductDetail = () => {
                         key={simProd.id}
                         to={`/products/${simProd.id}`}
                         style={{
-                          minWidth: '200px',
-                          maxWidth: '200px',
+                          minWidth: '140px',
+                          maxWidth: '140px',
                           border: '1px solid #e5e7eb',
                           borderRadius: '8px',
-                          padding: '10px',
+                          padding: '8px',
                           textDecoration: 'none',
                           color: 'inherit',
                           backgroundColor: '#fff',
@@ -477,8 +467,21 @@ const ProductDetail = () => {
                         onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.02)')}
                         onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
                       >
-                        <div style={{ height: '150px', backgroundColor: '#f3f4f6', borderRadius: '4px', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                          {simProd.image ? <img src={simProd.image} alt={simProd.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> : <span style={{ fontSize: '2em' }}>📦</span>}
+                        <div style={{ height: '100px', backgroundColor: '#f3f4f6', borderRadius: '4px', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
+                          {simProd.image ? (
+                            <img 
+                              src={simProd.image} 
+                              alt={simProd.name} 
+                              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} 
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                                (e.target as HTMLImageElement).parentElement?.classList.add('show-placeholder');
+                              }}
+                            />
+                          ) : (
+                            <span style={{ fontSize: '2em' }}>📦</span>
+                          )}
+                          <span className="hidden-placeholder" style={{ fontSize: '2em' }}>📦</span>
                         </div>
                         <strong style={{ fontSize: '0.95em', marginBottom: '5px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', height: '40px' }}>{simProd.name}</strong>
                         <span style={{ fontSize: '0.85em', color: '#6b7280', marginBottom: '5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{simProd.brand}</span>
@@ -574,13 +577,13 @@ const ProductDetail = () => {
               </div>
             )}
 
-            <div className="product-ratings" style={{ marginTop: '30px', color: 'black' }}>
-              <h3>Yorumlar</h3>
+            <div className="product-ratings" style={{ marginTop: '1.5rem', color: 'black' }}>
+              <h3 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>Yorumlar</h3>
 
               {/* Add/Edit Review Form */}
               {isAuthenticated ? (
-                <form onSubmit={handleReviewSubmit} style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
-                  <h4 style={{ margin: '0 0 10px 0', color: '#333' }}>{editingRatingId ? 'Yorumu Düzenle' : 'Yorum Yap'}</h4>
+                <form onSubmit={handleReviewSubmit} style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
+                  <h4 style={{ margin: '0 0 0.5rem 0', color: '#334155', fontSize: '0.9rem' }}>{editingRatingId ? 'Yorumu Düzenle' : 'Yorum Yap'}</h4>
                   <div style={{ marginBottom: '20px' }}>
                     <label style={{ display: 'block', marginBottom: '10px', color: '#374151', fontWeight: '600', fontSize: '0.95em' }}>Ürün Puanı:</label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexWrap: 'wrap' }}>
@@ -596,7 +599,7 @@ const ProductDetail = () => {
                               border: 'none',
                               cursor: 'pointer',
                               padding: '2px',
-                              fontSize: '1.5rem',
+                              fontSize: '1.2rem',
                               color: isSelected ? '#fbbf24' : '#d1d5db',
                               transition: 'transform 0.1s ease',
                             }}
@@ -607,7 +610,7 @@ const ProductDetail = () => {
                           </button>
                         );
                       })}
-                      <span style={{ marginLeft: '10px', fontSize: '1.1em', fontWeight: 'bold', color: '#f59e0b', backgroundColor: '#fef3c7', padding: '2px 8px', borderRadius: '6px' }}>
+                      <span style={{ marginLeft: '10px', fontSize: '1rem', fontWeight: 'bold', color: '#f59e0b', backgroundColor: '#fef3c7', padding: '2px 8px', borderRadius: '6px' }}>
                         {reviewRating}/10
                       </span>
                     </div>
@@ -619,13 +622,13 @@ const ProductDetail = () => {
                       onChange={(e) => setReviewText(e.target.value)}
                       style={{
                         width: '100%',
-                        minHeight: '100px',
-                        padding: '12px',
-                        borderRadius: '8px',
+                        minHeight: '60px',
+                        padding: '10px',
+                        borderRadius: '6px',
                         border: '1px solid #e5e7eb',
                         backgroundColor: '#f9fafb',
                         color: '#1f2937',
-                        fontSize: '0.95em',
+                        fontSize: '0.85rem',
                         outline: 'none',
                         transition: 'border-color 0.2s'
                       }}
@@ -654,11 +657,11 @@ const ProductDetail = () => {
               {ratings.length === 0 ? <p style={{ color: 'black' }}>Henüz yorum yapılmamış.</p> : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                   {ratings.map((rating) => (
-                    <div key={rating.id} className="rating-item" style={{ border: '1px solid #eee', padding: '15px', borderRadius: '8px', backgroundColor: '#fff', color: 'black' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <div key={rating.id} className="rating-item" style={{ border: '1px solid #e2e8f0', padding: '10px', borderRadius: '6px', backgroundColor: '#fff', color: 'black' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                         <div>
-                          <strong style={{ fontSize: '1.1em', color: '#333' }}>{rating.userName || 'Kullanıcı'}</strong>
-                          <span style={{ marginLeft: '10px', color: '#ffb400', fontWeight: 'bold' }}>⭐ {rating.rating}/10</span>
+                          <strong style={{ fontSize: '0.95rem', color: '#334155' }}>{rating.userName || 'Kullanıcı'}</strong>
+                          <span style={{ marginLeft: '8px', color: '#f59e0b', fontWeight: 'bold', fontSize: '0.85rem' }}>⭐ {rating.rating}/10</span>
                         </div>
                         {user && rating.userId === user.id && (
                           <div style={{ display: 'flex', gap: '10px' }}>
@@ -679,7 +682,7 @@ const ProductDetail = () => {
                           </div>
                         )}
                       </div>
-                      <p style={{ margin: 0, color: '#444', lineHeight: '1.5' }}>{rating.comment || rating.review}</p>
+                      <p style={{ margin: 0, color: '#475569', lineHeight: '1.4', fontSize: '0.85rem' }}>{rating.comment || rating.review}</p>
                     </div>
                   ))}
                 </div>

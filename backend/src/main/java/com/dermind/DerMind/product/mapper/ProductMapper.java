@@ -26,7 +26,6 @@ public interface ProductMapper {
     @Mapping(target = "safeIngredientCount", ignore = true)
     @Mapping(target = "cautionIngredientCount", ignore = true)
     @Mapping(target = "riskyIngredientCount", ignore = true)
-    @Mapping(target = "imageUrl", ignore = true)
     @Mapping(source = "price", target = "price")
     ProductDetailDTO toDetailDTO(Product product);
 

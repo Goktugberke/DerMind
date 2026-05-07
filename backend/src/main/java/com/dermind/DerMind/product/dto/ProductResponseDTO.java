@@ -23,6 +23,7 @@ public class ProductResponseDTO {
     private String secondaryCategory;
     private Double sephoraRating;
     private Double personalScore;
+    private String imageUrl;
     private boolean hiddenStatus;
 
     public boolean getHiddenStatus() {

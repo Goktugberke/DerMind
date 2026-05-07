@@ -54,6 +54,9 @@ public class Product {
 
     private Double sephoraRating;
 
+    @Column(name = "image_url", length = 1024)
+    private String imageUrl;
+
     @Column(name = "is_hidden", nullable = false)
     private boolean hidden = false;
 

@@ -7,21 +7,8 @@ import SearchBar from '../components/SearchBar';
 import ProductFilters from '../components/ProductFilters';
 import { productApi, favoriteApi } from '../types/api';
 import type { ProductResponseDTO, PageResponse } from '../types/api';
+import { convertToProduct } from '../utils/productUtils';
 
-// Convert ProductResponseDTO to Product (for cart)
-const convertToProduct = (dto: ProductResponseDTO): Product => {
-  return {
-    id: dto.id.toString(),
-    name: dto.name,
-    brand: dto.brand,
-    price: dto.price || (dto as any).price_usd || 0,
-    description: dto.ingredients || '',
-    rating: dto.qualityScore || 0,
-    personalScore: dto.personalScore || dto.qualityScore || 0,
-    category: dto.category,
-    image: dto.imageUrl,
-  };
-};
 
 interface FilterOptions {
   minPrice: number;
@@ -254,14 +241,13 @@ const Products = () => {
       <div className="container">
         <div className="products-header">
           <h1>Ürünler</h1>
-          <div className="products-controls" style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div className="products-search" style={{ flex: 1, minWidth: '250px' }}>
+          <div className="products-controls">
+            <div className="products-search">
               <SearchBar onSearch={handleSearch} initialValue={searchQuery} />
             </div>
             <div className="products-sort">
               <select 
                 className="filter-select"
-                style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
                 value={filters.sortBy}
                 onChange={(e) => handleFilterChange({...filters, sortBy: e.target.value as FilterOptions['sortBy']})}
               >
@@ -298,10 +284,16 @@ const Products = () => {
                         src={product.image} 
                         alt={product.name} 
                         loading="lazy"
+                        onError={(e) => {
+                          // If image fails to load, show placeholder
+                          (e.target as HTMLImageElement).style.display = 'none';
+                          (e.target as HTMLImageElement).parentElement?.classList.add('show-placeholder');
+                        }}
                       />
                     ) : (
                       <div className="product-placeholder">📦</div>
                     )}
+                    <div className="product-placeholder hidden-placeholder">📦</div>
                     {isAuthenticated && (
                       <button 
                         className={`add-favorite-btn ${favoriteIds.has(String(product.id)) ? 'active' : ''}`}

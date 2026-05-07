@@ -45,10 +45,18 @@ const Cart = () => {
               <div key={item.id} className="cart-item">
                 <div className="cart-item-image">
                   {item.image ? (
-                    <img src={item.image} alt={item.name} />
+                    <img 
+                      src={item.image} 
+                      alt={item.name} 
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                        (e.target as HTMLImageElement).parentElement?.classList.add('show-placeholder');
+                      }}
+                    />
                   ) : (
                     <div className="product-placeholder">📦</div>
                   )}
+                  <div className="product-placeholder hidden-placeholder">📦</div>
                 </div>
                 <div className="cart-item-info">
                   <h3>{item.name}</h3>

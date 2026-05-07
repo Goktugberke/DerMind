@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { cartApi } from '../../types/api';
 import type { CartItemAddDTO } from '../../types/api';
+import { convertToProduct } from '../../utils/productUtils';
 
 import type { RootState } from '../store';
 
@@ -42,12 +43,7 @@ export const fetchCart = createAsyncThunk(
     try {
       const response = await cartApi.getCart();
       return response.map(item => ({
-        id: item.product.id,
-        name: item.product.name,
-        brand: item.product.brand,
-        price: item.product.price || 0,
-        image: item.product.imageUrl,
-        description: item.product.ingredients,
+        ...convertToProduct(item.product),
         quantity: item.quantity
       })) as CartItem[];
     } catch (error: unknown) {
@@ -144,12 +140,7 @@ export const mergeCartAsync = createAsyncThunk(
     try {
       const response = await cartApi.mergeCart(localItems);
       return response.map(item => ({
-        id: item.product.id,
-        name: item.product.name,
-        brand: item.product.brand,
-        price: item.product.price || 0,
-        image: item.product.imageUrl,
-        description: item.product.ingredients,
+        ...convertToProduct(item.product),
         quantity: item.quantity
       })) as CartItem[];
     } catch (error: unknown) {

@@ -98,3 +98,5 @@ CHOICES.md
 
 # images
 fetch_products_images.py
+fetch_products_images_parallel.py 
+chromedriver.exe

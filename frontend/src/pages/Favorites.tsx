@@ -5,19 +5,8 @@ import { addToCartAsync } from '../store/slices/cartSlice';
 import type { Product } from '../store/slices/cartSlice';
 import { favoriteApi } from '../types/api';
 import type { FavoriteResponseDTO, ProductResponseDTO } from '../types/api';
+import { convertToProduct } from '../utils/productUtils';
 
-const convertToProduct = (dto: ProductResponseDTO): Product => {
-  const mockPrice = dto.price || (100 + (parseInt(dto.id.toString(), 10) * 12345 % 400));
-  return {
-    id: dto.id.toString(),
-    name: dto.name,
-    brand: dto.brand,
-    price: mockPrice,
-    description: dto.ingredients || 'Cilt dostu içerik',
-    rating: dto.qualityScore || 0,
-    image: dto.imageUrl,
-  };
-};
 
 const Favorites = () => {
   const [favorites, setFavorites] = useState<FavoriteResponseDTO[]>([]);
@@ -108,10 +97,18 @@ const Favorites = () => {
                   <Link to={`/products/${product.id}`} className="product-link">
                     <div className="product-image">
                       {product.image ? (
-                        <img src={product.image} alt={product.name} />
+                        <img 
+                          src={product.image} 
+                          alt={product.name} 
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            (e.target as HTMLImageElement).parentElement?.classList.add('show-placeholder');
+                          }}
+                        />
                       ) : (
                         <div className="product-placeholder">📦</div>
                       )}
+                      <div className="product-placeholder hidden-placeholder">📦</div>
                     </div>
                     <div className="product-info">
                       <h3 className="product-name">{product.name}</h3>
