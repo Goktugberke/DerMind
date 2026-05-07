@@ -22,6 +22,10 @@ const Routine = () => {
   const [dailyFrequency, setDailyFrequency] = useState<1 | 2>(1); // 1 or 2 times daily
   const [customTimes, setCustomTimes] = useState<string[]>(['08:00']); // Default 1 time
   const [editingStreakId, setEditingStreakId] = useState<number | null>(null);
+  
+  // Action State
+  const [deletingStreakId, setDeletingStreakId] = useState<number | null>(null);
+  const [recordingUsageId, setRecordingUsageId] = useState<number | null>(null);
 
   // Fetch streaks function - simplified to separate loading state
   const fetchStreaks = async (silent = false) => {
@@ -98,18 +102,20 @@ const Routine = () => {
     if (dailyFrequency === 2) finalFrequency = UsageFrequency.TWICE_DAILY;
 
     try {
+      const sortedTimes = [...customTimes].sort();
+      
       if (editingStreakId) {
         // Update existing
         await streakApi.updateStreak(editingStreakId, {
           usageFrequency: finalFrequency,
-          customTimes: customTimes,
+          customTimes: sortedTimes,
         });
       } else {
         // Create new
         await streakApi.createStreak({
           productId: parseInt(selectedProduct),
           usageFrequency: finalFrequency,
-          customTimes: customTimes,
+          customTimes: sortedTimes,
         });
       }
 
@@ -129,22 +135,28 @@ const Routine = () => {
   };
 
   const handleRecordUsage = async (streakId: number) => {
+    if (recordingUsageId) return;
+    setRecordingUsageId(streakId);
     try {
       await streakApi.recordUsage(streakId);
       // Silent refresh to avoid page flicker or scroll jump
-      fetchStreaks(true);
+      await fetchStreaks(true);
     } catch (err) {
       console.error('Error recording usage:', err);
+    } finally {
+      setRecordingUsageId(null);
     }
   };
 
-  const handleDeleteStreak = async (streakId: number) => {
-    if (!confirm("Bu rutini silmek istediğinize emin misiniz?")) return;
+  const confirmDelete = async () => {
+    if (!deletingStreakId) return;
     try {
-      await streakApi.deleteStreak(streakId);
+      await streakApi.deleteStreak(deletingStreakId);
       fetchStreaks();
     } catch (err) {
       console.error('Error deleting streak:', err);
+    } finally {
+      setDeletingStreakId(null);
     }
   };
 
@@ -313,13 +325,13 @@ const Routine = () => {
                     <button
                       className={`usage-action-btn ${usedOnce ? 'completed' : 'pending'}`}
                       onClick={() => !usedOnce && handleRecordUsage(streak.id)}
-                      disabled={usedOnce}
+                      disabled={usedOnce || recordingUsageId === streak.id}
                     >
                       <span className="btn-time-label">
                         {streak.customTimes?.[0] || '1. Kullanım'}
                       </span>
                       <span className="btn-status-label">
-                        {usedOnce ? '✓ Kullanıldı' : 'Kullan'}
+                        {recordingUsageId === streak.id && !usedOnce ? '...' : (usedOnce ? '✓ Kullanıldı' : 'Kullan')}
                       </span>
                     </button>
 
@@ -327,25 +339,38 @@ const Routine = () => {
                       <button
                         className={`usage-action-btn ${usedTwice ? 'completed' : 'pending'}`}
                         onClick={() => !usedTwice && handleRecordUsage(streak.id)}
-                        disabled={usedTwice}
+                        disabled={usedTwice || !usedOnce || recordingUsageId === streak.id}
+                        style={{ opacity: !usedOnce ? 0.6 : 1, cursor: !usedOnce ? 'not-allowed' : 'pointer' }}
                       >
                         <span className="btn-time-label">
                           {streak.customTimes?.[1] || '2. Kullanım'}
                         </span>
                         <span className="btn-status-label">
-                          {usedTwice ? '✓ Kullanıldı' : 'Kullan'}
+                          {usedTwice ? '✓ Kullanıldı' : (usedOnce ? 'Kullan' : 'Bekleniyor')}
                         </span>
                       </button>
                     )}
                   </div>
 
                   <div className="task-card-footer">
-                    <button className="edit-link" onClick={() => handleEditClick(streak)}>
-                      📝 Düzenle
-                    </button>
-                    <button className="delete-link" onClick={() => handleDeleteStreak(streak.id)}>
-                      🗑️ Sil
-                    </button>
+                    {deletingStreakId === streak.id ? (
+                      <div className="delete-confirm-prompt" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                        <span style={{ fontSize: '0.85rem', color: '#ef4444', fontWeight: 'bold' }}>Emin misiniz?</span>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button className="confirm-btn" onClick={confirmDelete} style={{ background: '#ef4444', color: 'white', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>Evet, Sil</button>
+                          <button className="cancel-btn" onClick={() => setDeletingStreakId(null)} style={{ background: '#e5e7eb', color: '#374151', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>İptal</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <button className="edit-link" onClick={() => handleEditClick(streak)}>
+                          📝 Düzenle
+                        </button>
+                        <button className="delete-link" onClick={() => setDeletingStreakId(streak.id)}>
+                          🗑️ Sil
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               );
