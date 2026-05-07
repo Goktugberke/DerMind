@@ -1,13 +1,13 @@
 // src/screens/CheckoutScreen.tsx
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, SafeAreaView, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, SafeAreaView, TextInput, Alert, ActivityIndicator, LayoutAnimation, TouchableOpacity } from 'react-native';
 import { PageHeader } from '@components/PageHeader';
 import { CustomButton } from '@components/CustomButton';
 import { PaymentCard } from '@components/PaymentCard';
-import { Lock, Info, ShieldCheck } from 'lucide-react-native';
+import { Lock, Info, ShieldCheck, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { theme } from '@constants/theme';
 
-import { useCreatePurchase, useStartStreak, useClearCart } from '../../services/api';
+import { useCreatePurchase, useClearCart } from '../../services/api';
 
 export const CheckoutScreen = ({ route, navigation }: any) => {
     // CartScreen'den gelen veriler
@@ -15,9 +15,9 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
     const [selectedCard, setSelectedCard] = useState('1');
     const [cardName, setCardName] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isNewCardExpanded, setIsNewCardExpanded] = useState(false);
 
     const { mutateAsync: createPurchase } = useCreatePurchase();
-    const { mutateAsync: startStreak } = useStartStreak();
     const { mutateAsync: clearCart } = useClearCart();
 
     const handlePayment = async () => {
@@ -39,12 +39,6 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
                     paymentMethod: "CREDIT_CARD",
                     shippingAddress: "Default Shipping Address",
                     notes: "Mobile App Purchase"
-                });
-
-                // 2. Otomatik Streak başlat
-                await startStreak({
-                    productId: productId,
-                    usageFrequency: "DAILY"
                 });
             }
 
@@ -88,39 +82,70 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
                         key={card.id}
                         item={card}
                         isSelected={selectedCard === card.id}
-                        onSelect={() => setSelectedCard(card.id)}
+                        onSelect={() => {
+                            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                            setSelectedCard(card.id);
+                            setIsNewCardExpanded(false);
+                        }}
                     />
                 ))}
 
-                {/* YENİ KART EKLEME */}
-                <Text style={[styles.sectionTitle, { marginTop: 10 }]}>ADD NEW CARD</Text>
-
-                <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Name on Card</Text>
-                    <TextInput style={styles.input} placeholder="e.g. Ayşe Yılmaz" />
-                </View>
-
-                <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Card Number</Text>
-                    <View style={styles.iconInputWrapper}>
-                        <Lock size={18} color="#94A3B8" style={{ marginRight: 10 }} />
-                        <TextInput style={styles.flexInput} placeholder="0000 0000 0000 0000" keyboardType="numeric" />
-                    </View>
-                </View>
-
-                <View style={styles.row}>
-                    <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
-                        <Text style={styles.inputLabel}>Expiry Date</Text>
-                        <TextInput style={styles.input} placeholder="MM/YY" />
-                    </View>
-                    <View style={[styles.inputGroup, { flex: 1 }]}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                            <Text style={[styles.inputLabel, { marginBottom: 0 }]}>CVC</Text>
-                            <Info size={14} color="#94A3B8" style={{ marginLeft: 4 }} />
+                {/* YENİ KART EKLEME (PAY WITH UNSAVED CARD) */}
+                <TouchableOpacity
+                    style={[styles.newCardContainer, isNewCardExpanded && styles.newCardExpanded]}
+                    onPress={() => {
+                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                        const nextState = !isNewCardExpanded;
+                        setIsNewCardExpanded(nextState);
+                        if (nextState) {
+                            setSelectedCard(''); // Kayıtlı kart seçimini temizle
+                        } else {
+                            setSelectedCard('1'); // Kapatıldığında ilk karta dön
+                        }
+                    }}
+                    activeOpacity={0.9}
+                >
+                    <View style={styles.newCardHeader}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <View style={[styles.radio, isNewCardExpanded && styles.radioSelected, { marginRight: 12 }]}>
+                                {isNewCardExpanded && <View style={styles.radioInner} />}
+                            </View>
+                            <Text style={styles.newCardTitle}>Pay with Another Card</Text>
                         </View>
-                        <TextInput style={styles.input} placeholder="123" keyboardType="numeric" />
+                        {isNewCardExpanded ? <ChevronDown size={20} color={theme.colors.text} /> : <ChevronUp size={20} color={theme.colors.text} />}
                     </View>
-                </View>
+
+                    {isNewCardExpanded && (
+                        <View style={styles.dropdownContent}>
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>Name on Card</Text>
+                                <TextInput style={styles.input} placeholder="e.g. Ayşe Yılmaz" />
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>Card Number</Text>
+                                <View style={styles.iconInputWrapper}>
+                                    <Lock size={18} color="#94A3B8" style={{ marginRight: 10 }} />
+                                    <TextInput style={styles.flexInput} placeholder="0000 0000 0000 0000" keyboardType="numeric" />
+                                </View>
+                            </View>
+
+                            <View style={styles.row}>
+                                <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
+                                    <Text style={styles.inputLabel}>Expiry Date</Text>
+                                    <TextInput style={styles.input} placeholder="MM/YY" />
+                                </View>
+                                <View style={[styles.inputGroup, { flex: 1 }]}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                                        <Text style={[styles.inputLabel, { marginBottom: 0 }]}>CVC</Text>
+                                        <Info size={14} color="#94A3B8" style={{ marginLeft: 4 }} />
+                                    </View>
+                                    <TextInput style={styles.input} placeholder="123" keyboardType="numeric" />
+                                </View>
+                            </View>
+                        </View>
+                    )}
+                </TouchableOpacity>
 
                 {/* ORDER SUMMARY (Cart'tan gelen veriler) */}
                 <Text style={[styles.sectionTitle, { marginTop: 20 }]}>ORDER SUMMARY</Text>
@@ -183,6 +208,42 @@ const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
     container: { padding: 20, backgroundColor: theme.colors.deepbackground },
     sectionTitle: { fontSize: 13, fontWeight: '800', color: '#8B2E6E', marginBottom: 15, letterSpacing: 0.5 },
+    newCardContainer: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 20,
+        padding: 16,
+        marginTop: 10,
+        marginBottom: 15,
+        borderWidth: 1.5,
+        borderColor: '#E2E8F0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+    },
+    newCardExpanded: {
+        borderColor: '#8B2E6E',
+        backgroundColor: theme.colors.secondary + '50'
+    },
+    newCardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    newCardTitle: {
+        fontSize: 15,
+        fontWeight: 'bold',
+        color: '#1E293B',
+    },
+    dropdownContent: {
+        marginTop: 20,
+        paddingTop: 20,
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+    },
+    radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#E2E8F0', justifyContent: 'center', alignItems: 'center' },
+    radioSelected: { borderColor: '#8B2E6E' },
+    radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#8B2E6E' },
     inputGroup: { marginBottom: 15 },
     inputLabel: { fontSize: 14, fontWeight: '600', color: '#1E293B', marginBottom: 8 },
     input: { backgroundColor: '#F8F9FA', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E2E8F0' },

@@ -52,6 +52,8 @@ export const StartRoutineScreen = () => {
       return;
     }
 
+    if (isPending) return;
+
     if (!frequencyData || !frequencyData.isValid) {
       Alert.alert('Error', 'Please enter valid time and day values.');
       return;
@@ -59,24 +61,24 @@ export const StartRoutineScreen = () => {
 
     try {
       const payload: any = {
-        productId: product.id,
+        productId: Number(product.id),
         usageFrequency: frequencyData.usageFrequency,
       };
 
-      let times: string[] = [];
-      if (frequencyData.frequencyId === 'once_day') times.push(frequencyData.time1);
-      if (frequencyData.frequencyId === 'twice_day') times.push(frequencyData.time1, frequencyData.time2);
-
-      if (times.length > 0) {
-        payload.customTimes = times.map(formatTimeForBackend);
+      // Zamanları belirle
+      if (frequencyData.frequencyId === 'twice_day') {
+        payload.customTimes = [formatTimeForBackend(frequencyData.time1), formatTimeForBackend(frequencyData.time2)];
+      } else {
+        payload.customTimes = [formatTimeForBackend(frequencyData.time1)];
       }
 
-      let days: string[] = [];
-      if (frequencyData.frequencyId === 'once_week') days.push(frequencyData.day1.toUpperCase());
-      if (frequencyData.frequencyId === 'twice_week') days.push(frequencyData.day1.toUpperCase(), frequencyData.day2.toUpperCase());
-
-      if (days.length > 0) {
-        payload.daysOfWeek = days;
+      // Günleri belirle (Sadece haftalık rutinler için)
+      if (frequencyData.frequencyId === 'once_week') {
+        payload.daysOfWeek = [frequencyData.day1.toUpperCase()];
+      } else if (frequencyData.frequencyId === 'twice_week') {
+        payload.daysOfWeek = [frequencyData.day1.toUpperCase(), frequencyData.day2.toUpperCase()];
+      } else {
+        payload.daysOfWeek = null;
       }
 
       await startStreak(payload);

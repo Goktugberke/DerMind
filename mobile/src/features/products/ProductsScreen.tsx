@@ -2,14 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity, FlatList, Modal, StatusBar, LayoutAnimation, Platform, UIManager, ActivityIndicator } from 'react-native';
 import { PurchasedProductCard } from '@components/PurchasedProductCard';
 import { theme } from '@constants/theme';
-import { SlidersHorizontal } from 'lucide-react-native';
+import { SlidersHorizontal, Edit3, Eye } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { PageHeader } from '@components/PageHeader';
 import { SearchBar } from '@components/SearchBar';
 import { FilterActions } from '@components/FilterActions';
 import { SortModal } from '@components/SortModal';
+import { FilterModal } from '@components/FilterModal';
 import { getAuth } from '@react-native-firebase/auth';
-import { purchaseService } from '@services/api';
+import { purchaseService, useMyStreaks, useMyReviews } from '@services/api';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -19,11 +20,16 @@ export const ProductsScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSortModalVisible, setSortModalVisible] = useState(false);
   const [selectedSort, setSelectedSort] = useState('newest');
+  const [isFilterModalVisible, setFilterModalVisible] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState('all');
   const navigation = useNavigation<any>();
   const [showFilterRow, setShowFilterRow] = useState(false);
-  
+
   const [purchases, setPurchases] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const { data: myStreaks } = useMyStreaks();
+  const { data: myReviews } = useMyReviews();
 
   useEffect(() => {
     const fetchPurchases = async () => {
@@ -33,18 +39,27 @@ export const ProductsScreen = () => {
         if (user) {
           const res = await purchaseService.getPurchasesByUser(user.uid);
           if (res.data && Array.isArray(res.data)) {
-            const apiPurchases = res.data.map((p: any) => ({
-              id: p.id ? p.id.toString() : Math.random().toString(),
-              brand: p.productBrand != null ? p.productBrand : 'null',
-              name: p.productName != null ? p.productName : 'null',
-              orderStatus: p.orderStatus != null ? p.orderStatus : 'null',
-              price: p.totalPrice != null ? p.totalPrice.toString() : 'null',
-              date: p.purchasedAt != null ? p.purchasedAt : 'null',
-              image: p.image || null
-            }));
-            setPurchases(apiPurchases);
+            const productMap = new Map();
+
+            res.data.forEach((p: any) => {
+              // Ürünü unique yapan ID (productId yoksa p.id'yi fallback kullanırız)
+              const pid = p.productId || p.id;
+              if (!productMap.has(pid)) {
+                productMap.set(pid, {
+                  id: pid.toString(),
+                  brand: p.productBrand != null ? p.productBrand : 'null',
+                  name: p.productName != null ? p.productName : 'null',
+                  orderStatus: p.orderStatus != null ? p.orderStatus : 'null',
+                  price: p.totalPrice != null ? p.totalPrice.toString() : 'null',
+                  date: p.purchasedAt != null ? p.purchasedAt : 'null',
+                  image: p.image || p.imageUrl || p.productImageUrl || p.product?.imageUrl || p.product?.image || null
+                });
+              }
+            });
+
+            setPurchases(Array.from(productMap.values()));
           } else {
-             setPurchases([]);
+            setPurchases([]);
           }
         }
       } catch (err) {
@@ -53,7 +68,7 @@ export const ProductsScreen = () => {
         setIsLoading(false);
       }
     };
-    
+
     fetchPurchases();
   }, []);
 
@@ -64,6 +79,13 @@ export const ProductsScreen = () => {
     { id: 'za', label: 'Brand: Z - A' },
     { id: 'priceLowHigh', label: 'Price: Low to High' },
     { id: 'priceHighLow', label: 'Price: High to Low' },
+  ];
+
+  const filterOptions = [
+    { id: 'all', label: 'All Products' },
+    { id: 'routine', label: 'In Active Routine' },
+    { id: 'rated', label: 'Rated by Me' },
+    { id: 'unrated', label: 'Not Rated Yet' },
   ];
 
   const toggleFilter = () => {
@@ -83,7 +105,22 @@ export const ProductsScreen = () => {
       item.brand.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    // 2. Sonra Sıralama
+    // 2. Filtreleme
+    if (selectedFilter !== 'all') {
+      filtered = filtered.filter(item => {
+        const hasStreak = myStreaks?.some((s: any) => String(s.productId) === String(item.id) || String(s.product_id) === String(item.id));
+        const hasReview = myReviews?.some((r: any) => String(r.productId) === String(item.id) || String(r.product_id) === String(item.id));
+
+        switch (selectedFilter) {
+          case 'routine': return hasStreak;
+          case 'rated': return hasReview;
+          case 'unrated': return !hasReview;
+          default: return true;
+        }
+      });
+    }
+
+    // 3. Sonra Sıralama
     return filtered.sort((a, b) => {
       switch (selectedSort) {
         case 'newest':
@@ -152,7 +189,7 @@ export const ProductsScreen = () => {
         <View style={styles.filterRowWrapper}>
           <FilterActions
             onSort={() => setSortModalVisible(true)}
-            onFilter={() => console.log("Filtreleme açıldı")}
+            onFilter={() => setFilterModalVisible(true)}
           />
         </View>
       )}
@@ -172,17 +209,54 @@ export const ProductsScreen = () => {
               <Text style={styles.emptySubtitle}>You don't have any products down here yet.</Text>
             </View>
           }
-          renderItem={({ item }) => (
-            <PurchasedProductCard
-              item={item}
-              onRate={() => {
-                navigation.navigate('RateScreen', { product: item });
-              }}
-              onStartStreak={() => {
-                navigation.navigate('StartRoutine', { product: item });
-              }}
-            />
-          )}
+          renderItem={({ item }) => {
+            const activeStreak = myStreaks?.find((s: any) => String(s.productId) === String(item.id) || String(s.product_id) === String(item.id));
+            const activeReview = myReviews?.find((r: any) => String(r.productId) === String(item.id) || String(r.product_id) === String(item.id));
+            return (
+              <PurchasedProductCard
+                item={item}
+                primaryAction={
+                  activeReview
+                    ? {
+                      label: 'Edit Rate',
+                      icon: <Edit3 size={18} color={theme.colors.primary} />,
+                      onPress: () => navigation.navigate('EditReview', {
+                        product: {
+                          ...activeReview,
+                          name: item.name,
+                          brand: item.brand,
+                          image: item.image
+                        }
+                      })
+                    }
+                    : undefined
+                }
+                onRate={
+                  !activeReview
+                    ? () => {
+                      navigation.navigate('RateScreen', { product: item });
+                    }
+                    : undefined
+                }
+                secondaryAction={
+                  activeStreak
+                    ? {
+                      label: 'Your Routine',
+                      icon: <Eye size={18} color={theme.colors.primary} />,
+                      onPress: () => navigation.navigate('RoutineDetail', { streak: activeStreak })
+                    }
+                    : undefined
+                }
+                onStartStreak={
+                  !activeStreak
+                    ? () => {
+                      navigation.navigate('StartRoutine', { product: item });
+                    }
+                    : undefined
+                }
+              />
+            );
+          }}
           contentContainerStyle={styles.listPadding}
           showsVerticalScrollIndicator={false}
         />
@@ -194,6 +268,15 @@ export const ProductsScreen = () => {
         options={sortOptions}
         selectedOption={selectedSort}
         onSelect={(id) => setSelectedSort(id)}
+        theme={theme}
+      />
+
+      <FilterModal
+        visible={isFilterModalVisible}
+        onClose={() => setFilterModalVisible(false)}
+        options={filterOptions}
+        selectedOption={selectedFilter}
+        onSelect={(id) => setSelectedFilter(id)}
         theme={theme}
       />
     </SafeAreaView>

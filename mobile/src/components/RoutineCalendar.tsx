@@ -5,10 +5,11 @@ import { theme } from '@constants/theme';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 
 interface RoutineCalendarProps {
-    onRangeSelect: (start: string, end: string) => void;
+    onRangeSelect?: (start: string, end: string) => void;
+    markedDates?: any;
 }
 
-export const RoutineCalendar = ({ onRangeSelect }: RoutineCalendarProps) => {
+export const RoutineCalendar = ({ onRangeSelect, markedDates: externalMarkedDates }: RoutineCalendarProps) => {
     const [markedDates, setMarkedDates] = useState<any>({});
     const [startDate, setStartDate] = useState<string>('');
     const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().split('T')[0]);
@@ -21,7 +22,7 @@ export const RoutineCalendar = ({ onRangeSelect }: RoutineCalendarProps) => {
                 [day.dateString]: { startingDay: true, color: 'black', textColor: 'white', endingDay: true }
             };
             setMarkedDates(newMarked);
-            onRangeSelect(day.dateString, day.dateString);
+            if (onRangeSelect) onRangeSelect(day.dateString, day.dateString);
 
         } else {
             // İkinci tıklama (Bitiş tarihini belirle ve arayı doldur)
@@ -41,7 +42,7 @@ export const RoutineCalendar = ({ onRangeSelect }: RoutineCalendarProps) => {
             }
             setMarkedDates(range);
             setStartDate(''); // Bir sonraki seçim için sıfırla
-            onRangeSelect(startDate, day.dateString);
+            if (onRangeSelect) onRangeSelect(startDate, day.dateString);
         }
     };
 
@@ -50,7 +51,7 @@ export const RoutineCalendar = ({ onRangeSelect }: RoutineCalendarProps) => {
         <View style={styles.calendarCard}>
             <Calendar
                 markingType={'period'}
-                markedDates={markedDates}
+                markedDates={externalMarkedDates || markedDates}
                 renderArrow={(direction: 'left' | 'right') => (
                     direction === 'left'
                         ? <ChevronLeft size={20} color="#64748B" />

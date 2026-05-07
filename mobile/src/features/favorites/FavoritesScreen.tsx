@@ -40,11 +40,11 @@ export const FavoritesScreen = ({ navigation }: any) => {
           brand: fav.product?.brand || 'Unknown',
           name: fav.product?.name || 'Product',
           price: fav.product?.price || '0',
-          image: fav.product?.image || null
+          image: fav.product?.image || fav.product?.imageUrl || fav.product?.productImageUrl || fav.image || null
         }));
         setFavorites(mapped);
       }
-    } catch(err) {
+    } catch (err) {
       console.error('Error fetching favorites:', err);
     } finally {
       setIsLoading(false);
@@ -72,41 +72,52 @@ export const FavoritesScreen = ({ navigation }: any) => {
     try {
       setFavorites(prev => prev.filter(item => item.id !== id));
       await favoriteService.removeFavorite(id);
-    } catch(err) {
+    } catch (err) {
       console.error(err);
-      loadFavorites(); 
+      loadFavorites();
     }
   };
 
   const [addingIds, setAddingIds] = useState<string[]>([]);
-  
+
   const handleAddToCart = async (item: any) => {
     if (addingIds.includes(item.id)) return;
     setAddingIds(prev => [...prev, item.id]);
     try {
       await cartService.addItem(item.id, 1);
-    } catch(err) {
+    } catch (err) {
       console.error(err);
     } finally {
       setAddingIds(prev => prev.filter(id => id !== item.id));
     }
   };
 
-  // Arama filtresi (Frontend tarafında basit filtreleme)
+  // Arama ve Sıralama filtresi
   const filteredData = useMemo(() => {
-    return favorites.filter(item =>
+    let result = [...favorites].filter(item =>
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.brand.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [searchQuery, favorites]);
+
+    // Sorting logic
+    if (selectedSort === 'newest') {
+      result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    } else if (selectedSort === 'priceLowHigh') {
+      result.sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
+    } else if (selectedSort === 'priceHighLow') {
+      result.sort((a, b) => parseFloat(b.price) - parseFloat(a.price));
+    }
+
+    return result;
+  }, [searchQuery, favorites, selectedSort]);
 
   // --- ÜRÜN KARTI BİLEŞENİ ---
   const FavoriteCard = ({ item }: any) => {
     const isAdding = addingIds.includes(item.id);
     return (
-      <TouchableOpacity 
-        style={styles.card} 
-        activeOpacity={0.9} 
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.9}
         onPress={() => navigation.navigate('ProductDetail', { product: item })}
       >
         <TouchableOpacity style={styles.heartButton} onPress={() => handleRemoveFavorite(item.id)}>
@@ -125,8 +136,8 @@ export const FavoritesScreen = ({ navigation }: any) => {
           <Text style={styles.priceText}>{item.price} TL</Text>
         </View>
 
-        <TouchableOpacity 
-          style={[styles.addToCartBtn, isAdding && { backgroundColor: '#34C759' }]} 
+        <TouchableOpacity
+          style={[styles.addToCartBtn, isAdding && { backgroundColor: '#34C759' }]}
           onPress={() => handleAddToCart(item)}
         >
           {isAdding ? <Check size={18} color="white" /> : <ShoppingCart size={18} color="white" />}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { theme } from '@constants/theme';
 import { ShieldCheck, ShieldAlert, Shield, Info } from 'lucide-react-native';
@@ -17,6 +17,11 @@ interface IngredientListBlockProps {
 }
 
 export const IngredientListBlock = ({ ingredients }: IngredientListBlockProps) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    // Defensive guard: ensure ingredients is always an array
+    const safeIngredients: IngredientDetails[] = Array.isArray(ingredients) ? ingredients : [];
+    const displayedIngredients = isExpanded ? safeIngredients : safeIngredients.slice(0, 5);
 
     return (
         <View style={styles.blockContainer}>
@@ -24,7 +29,7 @@ export const IngredientListBlock = ({ ingredients }: IngredientListBlockProps) =
             <View style={styles.headerArea}>
                 <View>
                     <Text style={styles.titleText}>Ingredient Analysis</Text>
-                    <Text style={styles.subtitleText}>{ingredients.length} INGREDIENTS FOUND</Text>
+                    <Text style={styles.subtitleText}>{safeIngredients.length} INGREDIENTS FOUND</Text>
                 </View>
                 <TouchableOpacity style={styles.infoButton}>
                     <Info size={16} color={theme.colors.gray} />
@@ -33,7 +38,7 @@ export const IngredientListBlock = ({ ingredients }: IngredientListBlockProps) =
 
             {/* List */}
             <View>
-                {ingredients.map((item, index) => (
+                {displayedIngredients.map((item, index) => (
                     <View key={index}>
                         <View style={styles.rowItem}>
                             {/* Icon Based on Severity */}
@@ -54,14 +59,22 @@ export const IngredientListBlock = ({ ingredients }: IngredientListBlockProps) =
                             <Text style={styles.chevron}>›</Text>
                         </View>
                         {/* Divider except last */}
-                        {index !== ingredients.length - 1 && <View style={styles.divider} />}
+                        {index !== displayedIngredients.length - 1 && <View style={styles.divider} />}
                     </View>
                 ))}
 
                 {/* Footer Action */}
-                <View style={styles.footerActionRow}>
-                    <Text style={styles.footerText}>View All Ingredients</Text>
-                </View>
+                {safeIngredients.length > 5 && (
+                    <TouchableOpacity
+                        style={styles.footerActionRow}
+                        onPress={() => setIsExpanded(!isExpanded)}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={styles.footerText}>
+                            {isExpanded ? 'Show Less' : 'View All Ingredients'}
+                        </Text>
+                    </TouchableOpacity>
+                )}
             </View>
         </View>
     );

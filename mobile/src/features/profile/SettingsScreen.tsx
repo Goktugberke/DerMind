@@ -3,16 +3,43 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, SafeAreaView, Switch, Image } from 'react-native';
 import { PageHeader } from '@components/PageHeader';
 import { ProfileMenuItem } from '@components/ProfileMenuItem';
-import { Bell, Mail, MessageCircle, User, CreditCard, Languages, ShieldCheck, Moon, Key, HelpCircle, LogOut } from 'lucide-react-native';
+import { Bell, Mail, MessageCircle, User, CreditCard, Languages, ShieldCheck, Moon, Key, HelpCircle, LogOut, MapPin } from 'lucide-react-native';
 import { theme } from '@constants/theme';
 import { useNavigation } from '@react-navigation/native';
+import { useGetCurrentUser, useUpdateUserProfile } from '@services/api';
+import { getAuth } from '@react-native-firebase/auth';
 
 export const SettingsScreen = () => {
-    const [notifications, setNotifications] = useState({ push: true, email: false, sms: true });
     const navigation = useNavigation<any>();
+    const { data: user } = useGetCurrentUser();
+    const updateProfile = useUpdateUserProfile();
+    const auth = getAuth();
+
+    const [notifications, setNotifications] = useState({
+        push: user?.notificationPreferences?.push ?? true,
+        email: user?.notificationPreferences?.email ?? false,
+        sms: user?.notificationPreferences?.sms ?? true
+    });
+
+    // Update local state when user data loads
+    React.useEffect(() => {
+        if (user?.notificationPreferences) {
+            setNotifications(user.notificationPreferences);
+        }
+    }, [user]);
 
     const toggleSwitch = (key: keyof typeof notifications) => {
-        setNotifications(prev => ({ ...prev, [key]: !prev[key] }));
+        const newPrefs = { ...notifications, [key]: !notifications[key] };
+        setNotifications(newPrefs);
+
+        if (user?.id) {
+            updateProfile.mutate({
+                userId: user.id,
+                profileData: {
+                    notificationPreferences: newPrefs
+                }
+            });
+        }
     };
 
     return (
@@ -28,8 +55,8 @@ export const SettingsScreen = () => {
                         <View style={styles.onlineDot} />
                     </View>
                     <View>
-                        <Text style={styles.profileName}>Ayşe Yılmaz</Text>
-                        <Text style={styles.profileEmail}>test@3.com</Text>
+                        <Text style={styles.profileName}>{user?.name || auth.currentUser?.displayName || 'User'}</Text>
+                        <Text style={styles.profileEmail}>{user?.email || auth.currentUser?.email || ''}</Text>
                     </View>
                 </View>
 
@@ -86,6 +113,7 @@ export const SettingsScreen = () => {
                 <Text style={styles.sectionTitle}>ACCOUNT & BILLING</Text>
                 <View style={styles.card}>
                     <ProfileMenuItem label="Personal Information" icon={<User size={20} color={theme.colors.primary} />} onPress={() => { navigation.navigate('PersonalInfo') }} />
+                    <ProfileMenuItem label="Delivery Addresses" icon={<MapPin size={20} color={theme.colors.primary} />} onPress={() => { navigation.navigate('Addresses') }} />
                     <ProfileMenuItem label="Payment Methods" value="Visa ....4242" icon={<CreditCard size={20} color={theme.colors.primary} />} onPress={() => { navigation.navigate('PaymentMethods') }} />
                     <ProfileMenuItem label="App Language" value="English (US)" icon={<Languages size={20} color={theme.colors.primary} />} onPress={() => { }} isLast />
                 </View>

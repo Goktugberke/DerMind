@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, SafeAreaView, TextInput, Switch, Alert, ActivityIndicator } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAuth } from '@react-native-firebase/auth';
 import { PageHeader } from '@components/PageHeader';
 import { CustomButton } from '@components/CustomButton';
@@ -24,9 +25,51 @@ export const SkinProfileScreen = () => {
     useEffect(() => {
         if (currentUser) {
             if (currentUser.skinType) setSelectedType(currentUser.skinType);
-            if (currentUser.allergens) setAllergens(currentUser.allergens);
+            if (currentUser.allergens && Array.isArray(currentUser.allergens)) {
+                setAllergens(currentUser.allergens.join(', '));
+            }
         }
     }, [currentUser]);
+
+    // Load AsyncStorage data on mount
+    useEffect(() => {
+        const loadStoredData = async () => {
+            try {
+                const storedAge = await AsyncStorage.getItem('skin_profile_age');
+                const storedConcerns = await AsyncStorage.getItem('skin_profile_concerns');
+                
+                if (storedAge) setAge(storedAge);
+                if (storedConcerns) setConcerns(JSON.parse(storedConcerns));
+            } catch (error) {
+                console.error('Error loading stored skin profile data:', error);
+            }
+        };
+        loadStoredData();
+    }, []);
+
+    // Save age to AsyncStorage
+    const handleAgeChange = async (newAge: string) => {
+        setAge(newAge);
+        try {
+            await AsyncStorage.setItem('skin_profile_age', newAge);
+        } catch (error) {
+            console.error('Error saving age:', error);
+        }
+    };
+
+    // Save concerns to AsyncStorage
+    const handleToggleConcern = async (val: string) => {
+        const updatedConcerns = concerns.includes(val) 
+            ? concerns.filter(c => c !== val) 
+            : [...concerns, val];
+        
+        setConcerns(updatedConcerns);
+        try {
+            await AsyncStorage.setItem('skin_profile_concerns', JSON.stringify(updatedConcerns));
+        } catch (error) {
+            console.error('Error saving concerns:', error);
+        }
+    };
 
     const skinTypes = [
         { id: 'oily', title: 'Oily', description: 'Excess sebum', icon: <Droplets size={24} color={theme.colors.primary} /> },
@@ -38,7 +81,7 @@ export const SkinProfileScreen = () => {
     ];
 
     const toggleConcern = (val: string) => {
-        setConcerns(prev => prev.includes(val) ? prev.filter(c => c !== val) : [...prev, val]);
+        handleToggleConcern(val);
     };
 
     const handleSaveProfile = async () => {
@@ -52,7 +95,7 @@ export const SkinProfileScreen = () => {
                 userId: authInstance.currentUser.uid,
                 profileData: {
                     skinType: selectedType,
-                    allergens: allergens.trim() || undefined,
+                    allergens: allergens ? allergens.split(',').map(s => s.trim()).filter(Boolean) : undefined,
                     name: currentUser?.name || authInstance.currentUser.displayName || undefined,
                     picture: authInstance.currentUser.photoURL || undefined,
                 }
@@ -77,7 +120,7 @@ export const SkinProfileScreen = () => {
                 </View>
                 <Text style={styles.inputLabel}>Your Age</Text>
                 <View style={styles.ageInputWrapper}>
-                    <TextInput style={styles.ageInput} value={age} onChangeText={setAge} keyboardType="numeric" />
+                    <TextInput style={styles.ageInput} value={age} onChangeText={handleAgeChange} keyboardType="numeric" />
                     <Text style={styles.ageUnit}>years</Text>
                 </View>
 
