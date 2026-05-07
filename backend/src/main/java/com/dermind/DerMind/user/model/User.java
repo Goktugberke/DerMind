@@ -60,13 +60,13 @@ public class User {
     @Column(name = "has_acne", nullable = false)
     private boolean hasAcne = false;
 
-    @Column(name = "push_notifications_enabled", nullable = false)
+    @Column(name = "push_notifications_enabled", nullable = false, columnDefinition = "boolean default true")
     private boolean pushNotificationsEnabled = true;
 
-    @Column(name = "email_notifications_enabled", nullable = false)
+    @Column(name = "email_notifications_enabled", nullable = false, columnDefinition = "boolean default true")
     private boolean emailNotificationsEnabled = true;
 
-    @Column(name = "sms_notifications_enabled", nullable = false)
+    @Column(name = "sms_notifications_enabled", nullable = false, columnDefinition = "boolean default true")
     private boolean smsNotificationsEnabled = true;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
