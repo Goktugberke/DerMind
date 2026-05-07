@@ -18,6 +18,9 @@ public class UserDetailDTO {
     private List<String> allergens;
     private String skinType;
     private boolean hasAcne;
+    private boolean pushNotificationsEnabled;
+    private boolean emailNotificationsEnabled;
+    private boolean smsNotificationsEnabled;
     private String picture;
     private int totalPurchases;
     private int totalRatings;

@@ -257,7 +257,7 @@ public class NotificationScheduler {
 
                 if (now.isAfter(reminderTimeStart) && now.isBefore(reminderTimeEnd)) {
                     User user = streak.getUser();
-                    if (user.getEmail() != null && !user.getEmail().isBlank()) {
+                    if (user.isEmailNotificationsEnabled() && user.getEmail() != null && !user.getEmail().isBlank()) {
                         mailServiceClient.sendStreakReminderMail(user.getEmail(), user.getName(), streak.getProduct().getName());
                         
                         // Aynı gün bir daha atılmasın diye kaydet

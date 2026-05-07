@@ -132,4 +132,16 @@ public class UserService {
                             .orElseThrow(() -> new BusinessException("Login çakışması, lütfen tekrar deneyin")));
         }
     }
+
+    @Transactional
+    public UserResponseDTO updateNotificationPreferences(String id, NotificationPreferencesDTO dto) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
+
+        user.setPushNotificationsEnabled(dto.isPushNotificationsEnabled());
+        user.setEmailNotificationsEnabled(dto.isEmailNotificationsEnabled());
+        user.setSmsNotificationsEnabled(dto.isSmsNotificationsEnabled());
+
+        return userMapper.toResponseDTO(userRepository.save(user));
+    }
 }
