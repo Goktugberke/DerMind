@@ -74,11 +74,17 @@ class UserControllerTest {
     }
 
     private UserResponseDTO makeResponse(String id, String email) {
-        return new UserResponseDTO(id, email, "Test User", null, null, false, null);
+        return UserResponseDTO.builder()
+                .id(id).email(email).name("Test User").admin(false)
+                .build();
     }
 
     private UserDetailDTO makeDetail(String id) {
-        return new UserDetailDTO(id, "user@test.com", "Test User", null, "normal", false, null, 0, 0, 0);
+        return UserDetailDTO.builder()
+                .id(id).email("user@test.com").name("Test User")
+                .skinType("normal").hasAcne(false).admin(false)
+                .totalPurchases(0).totalRatings(0).activeStreaks(0)
+                .build();
     }
 
     // ── POST /api/users/firebase (public endpoint) ────────────────────────

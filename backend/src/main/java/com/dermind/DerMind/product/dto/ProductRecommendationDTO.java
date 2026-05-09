@@ -16,4 +16,6 @@ public class ProductRecommendationDTO {
     private Double matchScore; // Kullanıcıya uygunluk puanı
     private String recommendation; // "Highly Recommended", "Suitable", "Not Recommended"
     private String reason; // Öneri nedeni açıklaması
+    private Double price;
+    private String imageUrl;
 }

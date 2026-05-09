@@ -26,7 +26,8 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * AI Server proxy. Mobile/frontend AI server'a doğrudan erişemez;
- * her istek backend'in @CurrentUser ile authenticate edilmiş kullanıcısı üzerinden geçer.
+ * her istek backend'in @CurrentUser ile authenticate edilmiş kullanıcısı
+ * üzerinden geçer.
  */
 @RestController
 @RequestMapping("/api/ai")
@@ -37,6 +38,7 @@ public class AiController {
     private final AiServerClient aiServerClient;
     private final ProductRepository productRepository;
     private final UserProductRatingRepository ratingRepository;
+    private final com.dermind.DerMind.user.repository.UserRepository userRepository;
 
     @Value("${ai.server.url}")
     private String aiServerUrl;
@@ -54,7 +56,7 @@ public class AiController {
 
         AiScoreRequestDTO request = AiScoreRequestDTO.builder()
                 .sephoraProductId(product.getSephoraProductId())
-                .user(buildUserProfile(user))
+                .user(buildUserProfile(getFreshUser(user)))
                 .isRecommended(recommendRate)
                 .build();
 
@@ -72,7 +74,7 @@ public class AiController {
         // Override user profile with the authenticated user
         AiBatchScoreRequestDTO secured = AiBatchScoreRequestDTO.builder()
                 .sephoraProductIds(request.getSephoraProductIds())
-                .user(buildUserProfile(user))
+                .user(buildUserProfile(getFreshUser(user)))
                 .isRecommended(request.getIsRecommended())
                 .build();
 
@@ -91,13 +93,32 @@ public class AiController {
 
         int clampedTopK = Math.min(Math.max(topK, 1), 20);
         AiRecommendRequestDTO request = AiRecommendRequestDTO.builder()
-                .user(buildUserProfile(user))
+                .user(buildUserProfile(getFreshUser(user)))
                 .category(category)
                 .secondaryCategory(secondaryCategory)
                 .topK(clampedTopK)
                 .build();
 
-        return ResponseEntity.ok(aiServerClient.recommend(request));
+        AiRecommendResponseDTO response = aiServerClient.recommend(request);
+        return ResponseEntity.ok(mapRecommendations(response));
+    }
+
+    // ── GET /api/ai/similar/{productId} ───────────────────────────────────
+
+    @GetMapping("/similar/{productId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<AiRecommendResponseDTO> getSimilarProducts(
+            @CurrentUser User user,
+            @PathVariable Long productId) {
+
+        Product product = resolveProduct(productId);
+        AiScoreRequestDTO request = AiScoreRequestDTO.builder()
+                .sephoraProductId(product.getSephoraProductId())
+                .user(buildUserProfile(getFreshUser(user)))
+                .build();
+
+        AiRecommendResponseDTO response = aiServerClient.similar(request);
+        return ResponseEntity.ok(mapRecommendations(response));
     }
 
     // ── GET /api/ai/explain/{productId} ──────────────────────────────────
@@ -115,7 +136,7 @@ public class AiController {
         String lang = "en".equalsIgnoreCase(language) ? "en" : "tr";
         AiExplainRequestDTO request = AiExplainRequestDTO.builder()
                 .sephoraProductId(product.getSephoraProductId())
-                .user(buildUserProfile(user))
+                .user(buildUserProfile(getFreshUser(user)))
                 .language(lang)
                 .isRecommended(recommendRate)
                 .build();
@@ -142,7 +163,7 @@ public class AiController {
         String lang = "en".equalsIgnoreCase(language) ? "en" : "tr";
         AiExplainRequestDTO request = AiExplainRequestDTO.builder()
                 .sephoraProductId(product.getSephoraProductId())
-                .user(buildUserProfile(user))
+                .user(buildUserProfile(getFreshUser(user)))
                 .language(lang)
                 .isRecommended(recommendRate)
                 .build();
@@ -159,8 +180,7 @@ public class AiController {
         boolean healthy = aiServerClient.isHealthy();
         return ResponseEntity.ok(Map.of(
                 "ai_server_status", healthy ? "UP" : "DOWN",
-                "ai_server_url", aiServerUrl
-        ));
+                "ai_server_url", aiServerUrl));
     }
 
     // ── GET /api/ai/metrics ───────────────────────────────────────────────
@@ -184,6 +204,46 @@ public class AiController {
             throw new BusinessException("Bu ürünün Sephora ID'si yok, AI puanı hesaplanamaz.");
         }
         return product;
+    }
+
+    private AiRecommendResponseDTO mapRecommendations(AiRecommendResponseDTO response) {
+        if (response == null || response.getRecommendations() == null) {
+            return response;
+        }
+
+        List<AiRecommendItemDTO> mappedItems = new ArrayList<>();
+        for (AiRecommendItemDTO item : response.getRecommendations()) {
+            String sId = item.getProductId();
+            productRepository.findBySephoraProductId(sId).ifPresentOrElse(p -> {
+                System.out.println("[AiController] Mapping product: " + sId + " to DB ID: " + p.getId() + " with Price: " + p.getPrice());
+                item.setProductId(p.getId().toString());
+                if (p.getPrice() != null) item.setPriceUsd(p.getPrice());
+                if (p.getName() != null) item.setProductName(p.getName());
+                if (p.getBrand() != null) item.setBrand(p.getBrand());
+                
+                // Use DB qualityScore (0-10)
+                if (p.getQualityScore() != null) {
+                    item.setBaseScore(p.getQualityScore());
+                    item.setRating(p.getQualityScore());
+                } else {
+                    // Fallback: multiply AI score (0-5) by 2
+                    if (item.getBaseScore() != null) item.setBaseScore(item.getBaseScore() * 2);
+                    if (item.getRating() != null) item.setRating(item.getRating() * 2);
+                }
+            }, () -> {
+                // Not in DB: just normalize AI scores (0-5 -> 0-10)
+                if (item.getBaseScore() != null) item.setBaseScore(item.getBaseScore() * 2);
+                if (item.getRating() != null) item.setRating(item.getRating() * 2);
+            });
+            mappedItems.add(item);
+        }
+        response.setRecommendations(mappedItems);
+        return response;
+    }
+
+    private User getFreshUser(User user) {
+        return userRepository.findById(user.getId())
+                .orElse(user);
     }
 
     private UserProfileDTO buildUserProfile(User user) {

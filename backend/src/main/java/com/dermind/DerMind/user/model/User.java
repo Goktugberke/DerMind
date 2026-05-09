@@ -24,7 +24,7 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode(of = "id")
-@ToString(exclude = {"purchases", "ratings", "streaks", "favorites"})
+@ToString(exclude = { "purchases", "ratings", "streaks", "favorites" })
 public class User {
 
     @Id
@@ -60,6 +60,15 @@ public class User {
     @Column(name = "has_acne", nullable = false)
     private boolean hasAcne = false;
 
+    @Column(name = "push_notifications_enabled", nullable = false, columnDefinition = "boolean default true")
+    private boolean pushNotificationsEnabled = true;
+
+    @Column(name = "email_notifications_enabled", nullable = false, columnDefinition = "boolean default true")
+    private boolean emailNotificationsEnabled = true;
+
+    @Column(name = "sms_notifications_enabled", nullable = false, columnDefinition = "boolean default true")
+    private boolean smsNotificationsEnabled = true;
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Purchase> purchases = new ArrayList<>();
 
@@ -71,4 +80,7 @@ public class User {
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Favorite> favorites = new ArrayList<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<com.dermind.DerMind.address.model.Address> addresses = new ArrayList<>();
 }

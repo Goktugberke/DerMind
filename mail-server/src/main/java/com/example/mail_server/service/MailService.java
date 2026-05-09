@@ -18,6 +18,7 @@ public class MailService {
     }
 
     public void sendMail(MailRequestDto mailRequest) {
+        System.out.println("Attempting to send mail from: " + fromEmail);
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(fromEmail);
         message.setTo(mailRequest.getTo());

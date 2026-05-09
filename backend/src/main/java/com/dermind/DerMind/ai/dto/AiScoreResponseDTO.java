@@ -34,4 +34,10 @@ public class AiScoreResponseDTO {
     /** Kullanıcının alerjenlerine uyan içerik uyarıları. Boş liste = güvenli. */
     @JsonProperty("allergen_warnings")
     private List<String> allergenWarnings;
+
+    @JsonProperty("price_usd")
+    private Double priceUsd;
+
+    @JsonProperty("rating")
+    private Double rating;
 }

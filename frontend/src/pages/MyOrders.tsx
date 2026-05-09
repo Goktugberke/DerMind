@@ -15,7 +15,7 @@ const MyOrders = () => {
     if (isAuthenticated && user?.id) {
       const fetchOrders = async () => {
         try {
-          const data = await purchaseApi.getPurchasesByUserId(user.id);
+          const data = await purchaseApi.getPurchasesByUserId();
           // Sort by purchase date descending
           const sorted = data.sort((a, b) => new Date(b.purchasedAt).getTime() - new Date(a.purchasedAt).getTime());
           setOrders(sorted);
@@ -44,14 +44,14 @@ const MyOrders = () => {
     );
   }
 
-  const getStatusBadgeClass = (status: string) => {
+  const getStatusClass = (status: string) => {
     switch (status) {
-      case 'PENDING': return 'badge-warning';
-      case 'PROCESSING': return 'badge-info';
-      case 'SHIPPED': return 'badge-primary';
-      case 'DELIVERED': return 'badge-success';
-      case 'CANCELLED': return 'badge-danger';
-      default: return 'badge-secondary';
+      case 'PENDING': return 'status-pending';
+      case 'PROCESSING': return 'status-processing';
+      case 'SHIPPED': return 'status-shipped';
+      case 'DELIVERED': return 'status-delivered';
+      case 'CANCELLED': return 'status-cancelled';
+      default: return '';
     }
   };
 
@@ -67,57 +67,61 @@ const MyOrders = () => {
   };
 
   return (
-    <div className="container" style={{ padding: '40px 0' }}>
-      <h1 style={{ marginBottom: '30px', color: '#1f2937' }}>Siparişlerim</h1>
+    <div className="orders-page container">
+      <h1>Siparişlerim</h1>
       
-      {error && <div className="alert alert-danger">{error}</div>}
+      {error && <div className="error-message">{error}</div>}
 
       {orders.length === 0 && !error ? (
-        <div style={{ textAlign: 'center', padding: '50px 0', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
-          <p style={{ fontSize: '1.2em', color: '#6b7280', marginBottom: '20px' }}>Henüz bir siparişiniz bulunmuyor.</p>
+        <div className="empty-state">
+          <p>Henüz bir siparişiniz bulunmuyor.</p>
           <Link to="/products" className="btn btn-primary">Alışverişe Başla</Link>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div className="order-list">
           {orders.map((order) => (
-            <div key={order.id} style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '20px', backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e5e7eb', paddingBottom: '15px', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
-                <div>
-                  <div style={{ color: '#6b7280', fontSize: '0.9em' }}>Sipariş Tarihi</div>
-                  <div style={{ fontWeight: '500' }}>{new Date(order.purchasedAt).toLocaleDateString('tr-TR')}</div>
+            <div key={order.id} className="order-card">
+              <div className="order-card-header">
+                <div className="order-meta">
+                  <div className="meta-item">
+                    <span className="meta-label">Sipariş Tarihi</span>
+                    <span className="meta-value">{new Date(order.purchasedAt).toLocaleDateString('tr-TR')}</span>
+                  </div>
+                  <div className="meta-item">
+                    <span className="meta-label">Toplam Tutar</span>
+                    <span className="meta-value">${order.totalPrice.toFixed(2)}</span>
+                  </div>
+                  <div className="meta-item">
+                    <span className="meta-label">Sipariş No</span>
+                    <span className="meta-value">#{order.id}</span>
+                  </div>
                 </div>
-                <div>
-                  <div style={{ color: '#6b7280', fontSize: '0.9em' }}>Toplam Tutar</div>
-                  <div style={{ fontWeight: '500' }}>{order.totalPrice.toFixed(2)} ₺</div>
-                </div>
-                <div>
-                  <div style={{ color: '#6b7280', fontSize: '0.9em' }}>Sipariş No</div>
-                  <div style={{ fontWeight: '500' }}>#{order.id}</div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <span className={`badge ${getStatusBadgeClass(order.orderStatus)}`} style={{ padding: '6px 12px', borderRadius: '20px', fontSize: '0.85em', fontWeight: 'bold' }}>
+                <div className="status-container">
+                  <span className={`order-status-badge ${getStatusClass(order.orderStatus)}`}>
                     {translateStatus(order.orderStatus)}
                   </span>
                 </div>
               </div>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                <div style={{ flex: 1 }}>
-                  <h3 style={{ margin: '0 0 5px 0', fontSize: '1.1em' }}>
-                    <Link to={`/products/${order.productId}`} style={{ color: '#3b82f6', textDecoration: 'none' }}>
+              <div className="order-card-body">
+                <div className="order-product-info">
+                  <div className="product-detail-main">
+                    <Link to={`/products/${order.productId}`} className="order-product-name">
                       {order.productName}
                     </Link>
-                  </h3>
-                  <div style={{ color: '#6b7280', fontSize: '0.9em', marginBottom: '5px' }}>{order.productBrand}</div>
-                  <div style={{ fontSize: '0.95em' }}>Adet: {order.quantity} | Birim Fiyat: {order.unitPrice.toFixed(2)} ₺</div>
-                </div>
-                
-                {order.trackingNumber && (
-                  <div style={{ backgroundColor: '#f3f4f6', padding: '10px 15px', borderRadius: '6px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.85em', color: '#4b5563', marginBottom: '4px' }}>Kargo Takip No</div>
-                    <div style={{ fontWeight: 'bold', letterSpacing: '1px' }}>{order.trackingNumber}</div>
+                    <div className="order-product-brand">{order.productBrand}</div>
+                    <div className="order-quantity-info">
+                      Adet: <strong>{order.quantity}</strong> | Birim Fiyat: <strong>${order.unitPrice.toFixed(2)}</strong>
+                    </div>
                   </div>
-                )}
+                  
+                  {order.trackingNumber && (
+                    <div className="tracking-info-box">
+                      <div className="tracking-label">Kargo Takip No</div>
+                      <div className="tracking-number">{order.trackingNumber}</div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ))}

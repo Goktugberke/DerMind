@@ -5,6 +5,7 @@ import { addToCartAsync } from '../store/slices/cartSlice';
 import type { Product } from '../store/slices/cartSlice';
 import SearchBar from '../components/SearchBar';
 import { productApi } from '../types/api';
+import { convertToProduct } from '../utils/productUtils';
 
 const Landing = () => {
   const dispatch = useAppDispatch();
@@ -16,19 +17,10 @@ const Landing = () => {
       try {
         setLoading(true);
         const data = await productApi.getTopQualityProducts(6);
-        
+
         // Convert DTO to UI Product type
-        const converted = data.map(dto => ({
-          id: dto.id.toString(),
-          name: dto.name,
-          price: dto.price || (100 + (parseInt(dto.id.toString(), 10) * 12345 % 400)),
-          description: dto.ingredients 
-            ? (dto.ingredients.length > 60 ? dto.ingredients.substring(0, 57) + '...' : dto.ingredients)
-            : '',
-          rating: dto.qualityScore || 0,
-          image: undefined
-        }));
-        
+        const converted = data.map(convertToProduct);
+
         setTopProducts(converted);
       } catch (error) {
         console.error('Anasayfa ürünleri yüklenirken hata:', error);
@@ -98,7 +90,7 @@ const Landing = () => {
           <p className="section-subtitle">
             Kullanıcılarımızın en çok beğendiği ve ML modelimizin en yüksek puan verdiği ürünler
           </p>
-          
+
           {loading ? (
             <div style={{ textAlign: 'center', padding: '40px' }}>
               <p>Ürünler yükleniyor...</p>
@@ -110,28 +102,37 @@ const Landing = () => {
                   <Link to={`/products/${product.id}`} className="product-link">
                     <div className="product-image">
                       {product.image ? (
-                        <img src={product.image} alt={product.name} />
+                        <img
+                          src={product.image}
+                          alt={product.name}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            (e.target as HTMLImageElement).parentElement?.classList.add('show-placeholder');
+                          }}
+                        />
                       ) : (
                         <div className="product-placeholder">📦</div>
                       )}
+                      <div className="product-placeholder hidden-placeholder">📦</div>
                       {product.rating && product.rating >= 8.0 && (
                         <div className="product-badge">Top Rated</div>
                       )}
                     </div>
                     <div className="product-info">
                       <h3 className="product-name">{product.name}</h3>
+                      {product.brand && <p className="product-brand">{product.brand}</p>}
                       {product.description && (
                         <p className="product-description">{product.description}</p>
                       )}
-                      {product.rating && (
+                      {product.rating > 0 && (
                         <div className="product-rating">
-                          {'⭐'.repeat(Math.round(product.rating / 2))} {(product.rating / 2).toFixed(1)}
+                          ⭐ {product.rating.toFixed(1)}/10
                         </div>
                       )}
                     </div>
                   </Link>
                   <div className="product-footer">
-                    <span className="product-price">{product.price.toFixed(2)} ₺</span>
+                    <span className="product-price">${product.price.toFixed(2)}</span>
                     <button
                       className="btn btn-primary btn-sm"
                       onClick={() => dispatch(addToCartAsync(product))}

@@ -14,6 +14,11 @@ import java.util.Optional;
 public interface UserProductRatingRepository extends JpaRepository<UserProductRating, Long> {
 
     @EntityGraph(attributePaths = {"user", "product"})
+    @Query("SELECT r FROM UserProductRating r")
+    List<UserProductRating> findAllWithUserAndProduct();
+
+
+    @EntityGraph(attributePaths = {"user", "product"})
     List<UserProductRating> findByUserId(String userId);
 
     @EntityGraph(attributePaths = {"user", "product"})
@@ -49,7 +54,7 @@ public interface UserProductRatingRepository extends JpaRepository<UserProductRa
      * Bir ürün için aggregate stats — tek sorguda recommendRate hesaplar.
      * AI server'a gönderilen is_recommended için.
      */
-    @Query("SELECT COALESCE(SUM(CASE WHEN r.wouldRecommend = true THEN 1 ELSE 0 END), 0) * 1.0 / NULLIF(COUNT(r), 0) " +
+    @Query("SELECT AVG(CASE WHEN r.wouldRecommend = true THEN 1.0 ELSE 0.0 END) " +
            "FROM UserProductRating r WHERE r.product.id = :productId AND r.wouldRecommend IS NOT NULL")
     Double getRecommendRateByProductId(@Param("productId") Long productId);
 }

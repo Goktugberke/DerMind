@@ -13,17 +13,32 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Mapper(componentModel = "spring")
-public interface UserMapper {
+public abstract class UserMapper {
+
+    @org.springframework.beans.factory.annotation.Value("${admin.emails:}")
+    protected List<String> adminEmails;
+
+    protected boolean checkAdmin(String email) {
+        if (email == null || adminEmails == null) return false;
+        String trimmedEmail = email.trim().toLowerCase();
+        return adminEmails.stream()
+                .filter(e -> e != null)
+                .map(String::trim)
+                .map(String::toLowerCase)
+                .anyMatch(trimmedEmail::equals);
+    }
 
     @Mapping(target = "hasAcne", source = "hasAcne")
     @Mapping(target = "allergens", expression = "java(setToList(user.getAllergens()))")
-    UserResponseDTO toResponseDTO(User user);
+    @Mapping(target = "admin", expression = "java(checkAdmin(user.getEmail()))")
+    public abstract UserResponseDTO toResponseDTO(User user);
 
     @Mapping(target = "allergens", expression = "java(setToList(user.getAllergens()))")
     @Mapping(target = "totalPurchases", expression = "java(user.getPurchases() != null ? user.getPurchases().size() : 0)")
     @Mapping(target = "totalRatings",   expression = "java(user.getRatings() != null ? user.getRatings().size() : 0)")
     @Mapping(target = "activeStreaks",  expression = "java(user.getStreaks() != null ? (int) user.getStreaks().stream().filter(s -> s.getCurrentStreak() != null && s.getCurrentStreak() > 0).count() : 0)")
-    UserDetailDTO toDetailDTO(User user);
+    @Mapping(target = "admin", expression = "java(checkAdmin(user.getEmail()))")
+    public abstract UserDetailDTO toDetailDTO(User user);
 
     @Mapping(target = "purchases",  ignore = true)
     @Mapping(target = "ratings",    ignore = true)
@@ -32,7 +47,7 @@ public interface UserMapper {
     @Mapping(target = "provider",   ignore = true)
     @Mapping(target = "providerId", ignore = true)
     @Mapping(target = "allergens",  expression = "java(normalizeAllergenList(dto.getAllergens()))")
-    User toEntity(UserCreateDto dto);
+    public abstract User toEntity(UserCreateDto dto);
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "id",         ignore = true)
@@ -44,14 +59,14 @@ public interface UserMapper {
     @Mapping(target = "provider",   ignore = true)
     @Mapping(target = "providerId", ignore = true)
     @Mapping(target = "allergens",  expression = "java(dto.getAllergens() != null ? normalizeAllergenList(dto.getAllergens()) : user.getAllergens())")
-    void updateEntity(@MappingTarget User user, UserUpdateDto dto);
+    public abstract void updateEntity(@MappingTarget User user, UserUpdateDto dto);
 
-    default List<String> setToList(Set<String> set) {
+    protected List<String> setToList(Set<String> set) {
         if (set == null || set.isEmpty()) return List.of();
         return List.copyOf(set);
     }
 
-    default Set<String> normalizeAllergenList(List<String> list) {
+    protected Set<String> normalizeAllergenList(List<String> list) {
         if (list == null || list.isEmpty()) return new LinkedHashSet<>();
         return list.stream()
                 .filter(s -> s != null && !s.isBlank())

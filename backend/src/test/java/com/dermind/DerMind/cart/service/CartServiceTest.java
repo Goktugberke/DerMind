@@ -58,7 +58,9 @@ class CartServiceTest {
     }
 
     private ProductResponseDTO makeProductDTO(Long id) {
-        return new ProductResponseDTO(id, "Product " + id, null, null, null, null, null, null, null, null, null, null);
+        return ProductResponseDTO.builder()
+                .id(id).name("Product " + id)
+                .build();
     }
 
     // ── getCart ───────────────────────────────────────────────────────────

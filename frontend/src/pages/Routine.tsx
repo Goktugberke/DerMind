@@ -16,10 +16,16 @@ const Routine = () => {
   const [allProducts, setAllProducts] = useState<ProductResponseDTO[]>([]);
   const [backendStreaks, setBackendStreaks] = useState<StreakResponseDTO[]>([]);
   const [loading, setLoading] = useState(false);
+  
   // Form State
   const [selectedProduct, setSelectedProduct] = useState('');
   const [dailyFrequency, setDailyFrequency] = useState<1 | 2>(1); // 1 or 2 times daily
   const [customTimes, setCustomTimes] = useState<string[]>(['08:00']); // Default 1 time
+  const [editingStreakId, setEditingStreakId] = useState<number | null>(null);
+  
+  // Action State
+  const [deletingStreakId, setDeletingStreakId] = useState<number | null>(null);
+  const [recordingUsageId, setRecordingUsageId] = useState<number | null>(null);
 
   // Fetch streaks function - simplified to separate loading state
   const fetchStreaks = async (silent = false) => {
@@ -77,25 +83,45 @@ const Routine = () => {
     setCustomTimes(newTimes);
   };
 
+  const handleEditClick = (streak: StreakResponseDTO) => {
+    setEditingStreakId(streak.id);
+    setSelectedProduct(streak.productId.toString());
+    setDailyFrequency(streak.usageFrequency === 'TWICE_DAILY' ? 2 : 1);
+    setCustomTimes(streak.customTimes && streak.customTimes.length > 0 ? streak.customTimes : (streak.usageFrequency === 'TWICE_DAILY' ? ['08:00', '20:00'] : ['08:00']));
+    setShowAddTask(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleAddTask = async () => {
     if (!selectedProduct) {
       alert('Lütfen bir ürün seçin');
       return;
     }
 
-    // Map logic to DTO
     let finalFrequency: UsageFrequency = UsageFrequency.DAILY;
     if (dailyFrequency === 2) finalFrequency = UsageFrequency.TWICE_DAILY;
 
     try {
-      await streakApi.createStreak({
-        productId: parseInt(selectedProduct),
-        usageFrequency: finalFrequency,
-        customTimes: customTimes, // Send specific times (HH:mm)
-      });
+      const sortedTimes = [...customTimes].sort();
+      
+      if (editingStreakId) {
+        // Update existing
+        await streakApi.updateStreak(editingStreakId, {
+          usageFrequency: finalFrequency,
+          customTimes: sortedTimes,
+        });
+      } else {
+        // Create new
+        await streakApi.createStreak({
+          productId: parseInt(selectedProduct),
+          usageFrequency: finalFrequency,
+          customTimes: sortedTimes,
+        });
+      }
 
       // Reset form
       setShowAddTask(false);
+      setEditingStreakId(null);
       setSelectedProduct('');
       setDailyFrequency(1);
       setCustomTimes(['08:00']);
@@ -103,35 +129,41 @@ const Routine = () => {
       // Refresh
       fetchStreaks();
     } catch (err) {
-      console.error('Error creating routin:', err);
-      alert('Rutin oluşturulurken bir hata oluştu.');
+      console.error('Error saving routine:', err);
+      alert('Rutin kaydedilirken bir hata oluştu.');
     }
   };
 
   const handleRecordUsage = async (streakId: number) => {
+    if (recordingUsageId) return;
+    setRecordingUsageId(streakId);
     try {
       await streakApi.recordUsage(streakId);
       // Silent refresh to avoid page flicker or scroll jump
-      fetchStreaks(true);
+      await fetchStreaks(true);
     } catch (err) {
       console.error('Error recording usage:', err);
+    } finally {
+      setRecordingUsageId(null);
     }
   };
 
-  const handleDeleteStreak = async (streakId: number) => {
-    if (!confirm("Bu rutini silmek istediğinize emin misiniz?")) return;
+  const confirmDelete = async () => {
+    if (!deletingStreakId) return;
     try {
-      await streakApi.deleteStreak(streakId);
+      await streakApi.deleteStreak(deletingStreakId);
       fetchStreaks();
     } catch (err) {
       console.error('Error deleting streak:', err);
+    } finally {
+      setDeletingStreakId(null);
     }
   };
 
-  // Helper to check if used today
+  // Helper to check if used today (using local date to match backend)
   const isUsedToday = (streak: StreakResponseDTO) => {
     if (!streak.lastUsedDate) return false;
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD format in local time
     return streak.lastUsedDate === today;
   };
 
@@ -166,7 +198,7 @@ const Routine = () => {
 
         {showAddTask && (
           <div className="add-task-card">
-            <h3>Yeni Rutin Oluştur</h3>
+            <h3>{editingStreakId ? 'Rutin Düzenle' : 'Yeni Rutin Oluştur'}</h3>
 
             {/* 1. Ürün Seçimi */}
             <div className="form-group">
@@ -175,6 +207,7 @@ const Routine = () => {
                 className="form-select"
                 value={selectedProduct}
                 onChange={(e) => setSelectedProduct(e.target.value)}
+                disabled={!!editingStreakId}
               >
                 <option value="">Bir ürün seçin...</option>
                 {allProducts.map(p => (
@@ -221,7 +254,7 @@ const Routine = () => {
             </div>
 
             <button className="btn btn-success full-width" onClick={handleAddTask}>
-              Rutin Ekle
+              {editingStreakId ? 'Güncelle' : 'Rutin Ekle'}
             </button>
           </div>
         )}
@@ -233,71 +266,111 @@ const Routine = () => {
             </div>
           ) : (
             backendStreaks.map(streak => {
-              const used = isUsedToday(streak);
+              const usedOnce = (streak.dailyUsageCounter || 0) >= 1;
+              const usedTwice = (streak.dailyUsageCounter || 0) >= 2;
+              
               return (
                 <div key={streak.id} className="task-card">
-                  <div className="task-header">
-                    <h3>{streak.productName || 'Ürün'}</h3>
-                    {streak.isActive ? (
-                      <span className="badge success">Aktif</span>
-                    ) : <span className="badge">Pasif</span>}
-                  </div>
-
-                  <div className="task-details">
-                    <div className="streak-stats">
-                      <div className="stat">
-                        <span className="value">🔥 {streak.currentStreak}</span>
-                        <span className="label">Gün Seri</span>
-                      </div>
-                      <div className="stat">
-                        <span className="value">🏆 {streak.longestStreak}</span>
-                        <span className="label">Rekor</span>
-                      </div>
+                  <div className="task-card-header">
+                    <div className="product-info-mini">
+                      <span className="product-brand-tag">{streak.productBrand || 'Marka'}</span>
+                      <h3 className="product-name-heading">{streak.productName || 'Ürün İsmi'}</h3>
                     </div>
-
-                    <div className="schedule-info">
-                      <p>
-                        <strong>Sıklık:</strong> {
-                          streak.usageFrequency === 'TWICE_DAILY' ? 'Günde 2 Kez' : 'Günde 1 Kez'
-                        }
-                      </p>
-                      {streak.customTimes && streak.customTimes.length > 0 && (
-                        <p><strong>Saatler:</strong> {streak.customTimes.join(', ')}</p>
+                    <div className="status-badge-container">
+                      {streak.isActive ? (
+                        <span className="status-badge active">Aktif</span>
+                      ) : (
+                        <span className="status-badge inactive">Pasif</span>
                       )}
                     </div>
                   </div>
 
-                  <div className="task-actions" style={{ display: 'flex', gap: '10px' }}>
-                    {/* Usage Button 1 */}
+                  <div className="task-card-body">
+                    <div className="routine-stats-grid">
+                      <div className="routine-stat-item current">
+                        <span className="stat-icon">🔥</span>
+                        <div className="stat-text">
+                          <span className="stat-value">{streak.currentStreak}</span>
+                          <span className="stat-label">Gün Seri</span>
+                        </div>
+                      </div>
+                      <div className="routine-stat-item record">
+                        <span className="stat-icon">🏆</span>
+                        <div className="stat-text">
+                          <span className="stat-value">{streak.longestStreak}</span>
+                          <span className="stat-label">Rekor</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="routine-schedule-section">
+                      <div className="schedule-item">
+                        <span className="schedule-icon">📅</span>
+                        <span className="schedule-text">
+                          <strong>Sıklık:</strong> {streak.usageFrequency === 'TWICE_DAILY' ? 'Günde 2 Kez' : 'Günde 1 Kez'}
+                        </span>
+                      </div>
+                      {streak.customTimes && streak.customTimes.length > 0 && (
+                        <div className="schedule-item">
+                          <span className="schedule-icon">⏰</span>
+                          <span className="schedule-text">
+                            <strong>Saatler:</strong> {streak.customTimes.join(', ')}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="task-card-actions">
                     <button
-                      className={`btn ${used ? 'btn-secondary' : 'btn-outline-success'}`}
-                      onClick={() => !used && handleRecordUsage(streak.id)}
-                      disabled={used}
-                      style={{ flex: 1 }}
+                      className={`usage-action-btn ${usedOnce ? 'completed' : 'pending'}`}
+                      onClick={() => !usedOnce && handleRecordUsage(streak.id)}
+                      disabled={usedOnce || recordingUsageId === streak.id}
                     >
-                      {streak.dailyUsageCounter && streak.dailyUsageCounter >= 1 ? (streak.customTimes && streak.customTimes[0] ? `${streak.customTimes[0]} - Kullanıldı` : '1 kez kullanıldı') : (streak.customTimes && streak.customTimes[0] ? `${streak.customTimes[0]} - Kullan` : '1 kez kullan')}
+                      <span className="btn-time-label">
+                        {streak.customTimes?.[0] || '1. Kullanım'}
+                      </span>
+                      <span className="btn-status-label">
+                        {recordingUsageId === streak.id && !usedOnce ? '...' : (usedOnce ? '✓ Kullanıldı' : 'Kullan')}
+                      </span>
                     </button>
 
-                    {/* Usage Button 2 (Only for TWICE_DAILY) */}
                     {streak.usageFrequency === 'TWICE_DAILY' && (
                       <button
-                        className={`btn ${streak.dailyUsageCounter && streak.dailyUsageCounter >= 2 ? 'btn-secondary' : 'btn-outline-success'}`}
-                        onClick={() => !((streak.dailyUsageCounter || 0) >= 2) && handleRecordUsage(streak.id)}
-                        disabled={(streak.dailyUsageCounter || 0) >= 2}
-                        style={{ flex: 1 }}
+                        className={`usage-action-btn ${usedTwice ? 'completed' : 'pending'}`}
+                        onClick={() => !usedTwice && handleRecordUsage(streak.id)}
+                        disabled={usedTwice || !usedOnce || recordingUsageId === streak.id}
+                        style={{ opacity: !usedOnce ? 0.6 : 1, cursor: !usedOnce ? 'not-allowed' : 'pointer' }}
                       >
-                        {streak.dailyUsageCounter && streak.dailyUsageCounter >= 2 ? (streak.customTimes && streak.customTimes[1] ? `${streak.customTimes[1]} - Kullanıldı` : '2 kez kullanıldı') : (streak.customTimes && streak.customTimes[1] ? `${streak.customTimes[1]} - Kullan` : '2 kez kullan')}
+                        <span className="btn-time-label">
+                          {streak.customTimes?.[1] || '2. Kullanım'}
+                        </span>
+                        <span className="btn-status-label">
+                          {usedTwice ? '✓ Kullanıldı' : (usedOnce ? 'Kullan' : 'Bekleniyor')}
+                        </span>
                       </button>
                     )}
                   </div>
-                  {/* Separate Delete Button */}
-                  <div style={{ marginTop: '10px', textAlign: 'right' }}>
-                    <button
-                      className="btn btn-text-danger"
-                      onClick={() => handleDeleteStreak(streak.id)}
-                    >
-                      Sil
-                    </button>
+
+                  <div className="task-card-footer">
+                    {deletingStreakId === streak.id ? (
+                      <div className="delete-confirm-prompt" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                        <span style={{ fontSize: '0.85rem', color: '#ef4444', fontWeight: 'bold' }}>Emin misiniz?</span>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button className="confirm-btn" onClick={confirmDelete} style={{ background: '#ef4444', color: 'white', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>Evet, Sil</button>
+                          <button className="cancel-btn" onClick={() => setDeletingStreakId(null)} style={{ background: '#e5e7eb', color: '#374151', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>İptal</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <button className="edit-link" onClick={() => handleEditClick(streak)}>
+                          📝 Düzenle
+                        </button>
+                        <button className="delete-link" onClick={() => setDeletingStreakId(streak.id)}>
+                          🗑️ Sil
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               );
@@ -307,69 +380,246 @@ const Routine = () => {
       </div>
 
       <style>{`
-        .frequency-tabs, .count-selector, .day-selector {
+        .frequency-tabs {
           display: flex;
-          gap: 10px;
-          margin-bottom: 15px;
+          gap: 12px;
+          margin-bottom: 20px;
         }
-        .freq-btn, .count-btn, .day-btn {
-          padding: 8px 16px;
-          border: 1px solid #ddd;
-          background: white;
-          border-radius: 20px;
+        .freq-btn {
+          padding: 10px 20px;
+          border: 2px solid var(--border-color);
+          background: var(--bg-color);
+          border-radius: 50px;
           cursor: pointer;
+          font-weight: 500;
+          transition: all 0.2s;
         }
-        .freq-btn.active, .count-btn.active, .day-btn.active {
-          background: #0d6efd;
+        .freq-btn.active {
+          background: var(--primary-color);
           color: white;
-          border-color: #0d6efd;
+          border-color: var(--primary-color);
         }
-        [data-theme='dark'] .freq-btn,
-        [data-theme='dark'] .count-btn,
-        [data-theme='dark'] .day-btn {
-          color: #1f2937;
+        
+        /* Task Card Styles */
+        .routine-list {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+          gap: 24px;
+          margin-top: 24px;
         }
-        [data-theme='dark'] .form-select,
-        [data-theme='dark'] .form-control {
-          background-color: #ffffff;
-          color: #1f2937;
-        }
-        .time-selector {
+
+        .task-card {
+          background: var(--bg-color);
+          border-radius: 16px;
+          padding: 20px;
+          box-shadow: var(--shadow-md);
+          border: 1px solid var(--border-color);
           display: flex;
-          gap: 15px;
+          flex-direction: column;
+          gap: 16px;
+          transition: transform 0.2s, box-shadow 0.2s;
         }
-        .time-checkbox {
+
+        .task-card:hover {
+          transform: translateY(-4px);
+          box-shadow: var(--shadow-lg);
+        }
+
+        .task-card-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 12px;
+        }
+
+        .product-info-mini {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          flex: 1;
+        }
+
+        .product-brand-tag {
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: var(--primary-color);
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+
+        .product-name-heading {
+          font-size: 1.1rem;
+          font-weight: 600;
+          color: var(--text-color);
+          margin: 0;
+          line-height: 1.4;
+        }
+
+        .status-badge {
+          padding: 4px 10px;
+          border-radius: 20px;
+          font-size: 0.7rem;
+          font-weight: 600;
+          text-transform: uppercase;
+        }
+
+        .status-badge.active {
+          background: #dcfce7;
+          color: #166534;
+        }
+
+        .status-badge.inactive {
+          background: #f3f4f6;
+          color: #4b5563;
+        }
+
+        .task-card-body {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+
+        .routine-stats-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+        }
+
+        .routine-stat-item {
           display: flex;
           align-items: center;
-          gap: 5px;
-          padding: 8px 12px;
-          border: 1px solid #ddd;
-          border-radius: 8px;
+          gap: 12px;
+          padding: 12px;
+          border-radius: 12px;
+          background: var(--bg-light);
+        }
+
+        .routine-stat-item.current { border-left: 4px solid #f59e0b; }
+        .routine-stat-item.record { border-left: 4px solid #6366f1; }
+
+        .stat-icon { font-size: 1.5rem; }
+        
+        .stat-text {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .stat-value {
+          font-size: 1.25rem;
+          font-weight: 700;
+          color: var(--text-color);
+        }
+
+        .stat-label {
+          font-size: 0.75rem;
+          color: var(--text-light);
+        }
+
+        .routine-schedule-section {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          padding: 12px;
+          background: #f8fafc;
+          border-radius: 12px;
+          font-size: 0.9rem;
+        }
+        
+        [data-theme='dark'] .routine-schedule-section {
+          background: #374151;
+        }
+
+        .schedule-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: var(--text-color);
+        }
+
+        .task-card-actions {
+          display: flex;
+          gap: 12px;
+          margin-top: auto;
+        }
+
+        .usage-action-btn {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 10px;
+          border-radius: 12px;
+          border: 2px solid;
           cursor: pointer;
+          transition: all 0.2s;
+          font-family: inherit;
         }
-        .time-checkbox.active {
-          border-color: #0d6efd;
-          background-color: #e7f1ff;
+
+        .usage-action-btn.pending {
+          background: white;
+          border-color: var(--primary-color);
+          color: var(--primary-color);
         }
+
+        .usage-action-btn.pending:hover {
+          background: var(--primary-color);
+          color: white;
+        }
+
+        .usage-action-btn.completed {
+          background: #f1f5f9;
+          border-color: #cbd5e1;
+          color: #64748b;
+          cursor: not-allowed;
+        }
+        
+        [data-theme='dark'] .usage-action-btn.completed {
+           background: #1f2937;
+           border-color: #374151;
+           color: #9ca3af;
+        }
+
+        .btn-time-label {
+          font-size: 0.7rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          opacity: 0.8;
+        }
+
+        .btn-status-label {
+          font-size: 0.95rem;
+          font-weight: 600;
+        }
+
+        .task-card-footer {
+          display: flex;
+          justify-content: space-between;
+          padding-top: 12px;
+          border-top: 1px solid var(--border-color);
+        }
+
+        .edit-link, .delete-link {
+          background: none;
+          border: none;
+          font-size: 0.85rem;
+          font-weight: 600;
+          cursor: pointer;
+          padding: 4px 8px;
+          border-radius: 4px;
+          transition: background 0.2s;
+        }
+
+        .edit-link { color: var(--primary-color); }
+        .edit-link:hover { background: #eef2ff; }
+        
+        .delete-link { color: #ef4444; }
+        .delete-link:hover { background: #fef2f2; }
+
         .full-width { width: 100%; }
-        .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.8em; background: #eee; }
-        .badge.success { background: #d1e7dd; color: #0f5132; }
-        .streak-stats { display: flex; gap: 20px; margin: 15px 0; }
-        .stat { display: flex; flex-direction: column; align-items: center; }
-        .stat .value { font-size: 1.2em; font-weight: bold; }
-        .stat .label { font-size: 0.8em; color: #666; }
-        .btn-text-danger { background: none; border: none; color: #dc3545; cursor: pointer; }
-        .btn-outline-success { 
-          background: white; border: 1px solid #198754; color: #198754; padding: 8px 16px; border-radius: 6px; cursor: pointer;
-        }
-        .btn-outline-success:hover { background: #198754; color: white; }
-        .btn-secondary {
-            background-color: #6c757d;
-            border-color: #6c757d;
-            color: white;
-            cursor: not-allowed;
-            padding: 8px 16px; 
-            border-radius: 6px; 
+        
+        @media (max-width: 640px) {
+          .routine-list { grid-template-columns: 1fr; }
         }
       `}</style>
     </div>

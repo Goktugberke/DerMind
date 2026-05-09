@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface FilterOptions {
   minPrice: number;
@@ -20,83 +20,108 @@ const ProductFilters = ({
   onReset,
 }: ProductFiltersProps) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [localMin, setLocalMin] = useState(filters.minPrice.toString());
+  const [localMax, setLocalMax] = useState(filters.maxPrice.toString());
+  const [localRating, setLocalRating] = useState(filters.minRating);
 
-  const handleChange = (key: keyof FilterOptions, value: string | number) => {
+  // Sync with parent when filters are reset or changed externally
+  useEffect(() => {
+    setLocalMin(filters.minPrice.toString());
+    setLocalMax(filters.maxPrice.toString());
+    setLocalRating(filters.minRating);
+  }, [filters.minPrice, filters.maxPrice, filters.minRating]);
+
+  const handleApply = () => {
     onFilterChange({
       ...filters,
-      [key]: value,
+      minPrice: parseInt(localMin) || 0,
+      maxPrice: parseInt(localMax) || 1000,
+      minRating: localRating
     });
   };
 
+  const handleRatingChange = (rating: number) => {
+    setLocalRating(localRating === rating ? 0 : rating);
+  };
+
   return (
-    <div className="product-filters">
+    <div className="product-filters" style={{ marginBottom: '20px' }}>
       <button
         className="filter-toggle"
         onClick={() => setIsOpen(!isOpen)}
+        style={{
+          padding: '10px 20px',
+          backgroundColor: '#fff',
+          border: '1px solid #e5e7eb',
+          borderRadius: '8px',
+          cursor: 'pointer',
+          fontWeight: '600',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          color: '#374151',
+          transition: 'all 0.2s'
+        }}
       >
-        🔍 Filtrele {isOpen ? '▲' : '▼'}
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+        </svg>
+        Filtrele {isOpen ? '▲' : '▼'}
       </button>
 
       {isOpen && (
         <div className="filter-panel">
           <div className="filter-section">
             <h3>Fiyat Aralığı</h3>
-            <div className="filter-range">
-              <div className="range-inputs">
-                <input
-                  type="number"
-                  placeholder="Min"
-                  value={filters.minPrice || ''}
-                  onChange={(e) => {
-                    const val = e.target.value === '' ? 0 : parseInt(e.target.value);
-                    handleChange('minPrice', val);
-                  }}
-                  className="range-input"
-                  min="0"
-                />
-                <span>-</span>
-                <input
-                  type="number"
-                  placeholder="Max"
-                  value={filters.maxPrice || ''}
-                  onChange={(e) => {
-                    const val = e.target.value === '' ? 1000 : parseInt(e.target.value);
-                    handleChange('maxPrice', val);
-                  }}
-                  className="range-input"
-                  min="0"
-                />
-              </div>
+            <div className="range-inputs">
+              <input
+                type="number"
+                placeholder="Min"
+                value={localMin}
+                onChange={(e) => setLocalMin(e.target.value)}
+                className="range-input"
+                min="0"
+              />
+              <span style={{ color: '#9ca3af', flexShrink: 0 }}>-</span>
+              <input
+                type="number"
+                placeholder="Max"
+                value={localMax}
+                onChange={(e) => setLocalMax(e.target.value)}
+                className="range-input"
+                min="0"
+              />
             </div>
           </div>
 
           <div className="filter-section">
             <h3>Minimum Puan</h3>
             <div className="rating-filter">
-              {[1, 2, 3, 4, 5].map((rating) => (
+              {[2, 4, 6, 8, 10].map((rating) => (
                 <button
                   key={rating}
-                  className={`rating-btn ${
-                    filters.minRating >= rating ? 'active' : ''
-                  }`}
-                  onClick={() =>
-                    handleChange(
-                      'minRating',
-                      filters.minRating === rating ? 0 : rating
-                    )
-                  }
+                  className={`rating-btn ${localRating === rating ? 'active' : ''}`}
+                  onClick={() => handleRatingChange(rating)}
                 >
-                  {'⭐'.repeat(rating)}
+                  <span>★</span>
+                  <span>{rating}+</span>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Unused Category and Skin Type filters removed as requested */}
-
           <div className="filter-actions">
-            <button className="btn btn-secondary" onClick={onReset}>
-              Filtreleri Temizle
+            <button 
+              className="btn-reset" 
+              onClick={onReset}
+            >
+              Temizle
+            </button>
+            <button 
+              className="btn-apply" 
+              onClick={handleApply}
+            >
+              Filtreleri Uygula
             </button>
           </div>
         </div>

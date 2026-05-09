@@ -111,6 +111,20 @@ public class AiServerClient {
         }
     }
 
+    public AiRecommendResponseDTO similar(AiScoreRequestDTO request) {
+        String url = aiServerUrl + "/similar";
+        try {
+            ResponseEntity<AiRecommendResponseDTO> response = restTemplate.exchange(
+                    url, HttpMethod.POST, buildJsonEntity(request), AiRecommendResponseDTO.class);
+            return response.getBody();
+        } catch (ResourceAccessException e) {
+            throw new AiServerUnavailableException(url, e.getMessage());
+        } catch (Exception e) {
+            log.error("AI /similar hatası: {}", e.getMessage());
+            return null;
+        }
+    }
+
     // ─────────────────────────────────────────────
     // POST /explain
     // ─────────────────────────────────────────────

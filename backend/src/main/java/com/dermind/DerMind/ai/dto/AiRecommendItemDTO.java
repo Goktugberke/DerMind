@@ -38,4 +38,7 @@ public class AiRecommendItemDTO {
 
     @JsonProperty("price_usd")
     private Double priceUsd;
+
+    @JsonProperty("image_url")
+    private String imageUrl;
 }

@@ -8,20 +8,32 @@ import cartReducer from './slices/cartSlice';
 import routineReducer from './slices/routineSlice';
 import themeReducer from './slices/themeSlice';
 
+const authPersistConfig = {
+  key: 'auth',
+  storage,
+  blacklist: ['loading', 'error'],
+};
+
+const cartPersistConfig = {
+  key: 'cart',
+  storage,
+  blacklist: ['loading', 'error'],
+};
+
 const rootReducer = combineReducers({
-  auth: authReducer,
-  cart: cartReducer,
+  auth: persistReducer(authPersistConfig, authReducer),
+  cart: persistReducer(cartPersistConfig, cartReducer),
   routine: routineReducer,
   theme: themeReducer,
 });
 
-const persistConfig = {
+const rootPersistConfig = {
   key: 'root',
   storage,
-  whitelist: ['auth', 'cart', 'routine', 'theme'], // Tüm state'leri persist et
+  whitelist: ['routine', 'theme'], // auth ve cart kendi içlerinde persist ediliyor
 };
 
-const persistedReducer = persistReducer(persistConfig, rootReducer);
+const persistedReducer = persistReducer(rootPersistConfig, rootReducer);
 
 export const store = configureStore({
   reducer: persistedReducer,

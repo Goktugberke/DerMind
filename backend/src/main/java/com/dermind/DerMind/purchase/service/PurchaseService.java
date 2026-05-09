@@ -54,7 +54,6 @@ public class PurchaseService {
                 .notes(dto.getNotes())
                 .purchasedAt(LocalDateTime.now())
                 .build();
-
         PurchaseResponseDTO response = purchaseMapper.toResponseDTO(purchaseRepository.save(purchase));
 
         if (user.getEmail() != null && !user.getEmail().isBlank()) {

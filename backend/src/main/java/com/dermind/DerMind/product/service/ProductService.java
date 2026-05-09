@@ -32,11 +32,43 @@ public class ProductService {
     private final UserProductRatingRepository ratingRepository;
     private final AiServiceClient aiServiceClient;
     private final ProductMapper productMapper;
+    private final IngredientSafetyChecker ingredientSafetyChecker;
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "products-page", key = "#pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort.toString()")
     public Page<ProductResponseDTO> getAllProducts(Pageable pageable) {
-        return productRepository.findAll(pageable).map(productMapper::toResponseDTO);
+        Page<ProductResponseDTO> page = productRepository.filterProducts(null, null, null, null, pageable)
+                .map(productMapper::toResponseDTO);
+        return populatePersonalScores(page);
+    }
+
+    private Page<ProductResponseDTO> populatePersonalScores(Page<ProductResponseDTO> page) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName())) {
+            String email = auth.getName();
+            userRepository.findByEmail(email).ifPresent(user -> {
+                List<String> sephoraIds = page.getContent().stream()
+                        .map(ProductResponseDTO::getSephoraProductId)
+                        .filter(id -> id != null && !id.isBlank())
+                        .collect(Collectors.toList());
+
+                if (!sephoraIds.isEmpty()) {
+                    java.util.Map<String, Double> scores = aiServiceClient.getBatchScores(sephoraIds, user);
+                    for (ProductResponseDTO dto : page.getContent()) {
+                        if (dto.getSephoraProductId() != null && scores.containsKey(dto.getSephoraProductId())) {
+                            dto.setPersonalScore(scores.get(dto.getSephoraProductId()));
+                        } else {
+                            dto.setPersonalScore(dto.getQualityScore());
+                        }
+                    }
+                }
+            });
+        } else {
+            // Unauthenticated: personal score = quality score
+            for (ProductResponseDTO dto : page.getContent()) {
+                dto.setPersonalScore(dto.getQualityScore());
+            }
+        }
+        return page;
     }
 
     @Transactional(readOnly = true)
@@ -72,6 +104,12 @@ public class ProductService {
         if (dto.getPersonalScore() == null) {
             dto.setPersonalScore(product.getQualityScore());
         }
+
+        IngredientSafetyChecker.IngredientCounts counts = ingredientSafetyChecker.analyze(product.getIngredients());
+        dto.setSafeIngredientCount(counts.safeCount());
+        dto.setCautionIngredientCount(counts.cautionCount());
+        dto.setRiskyIngredientCount(counts.riskyCount());
+
         return dto;
     }
 
@@ -102,30 +140,35 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public Page<ProductResponseDTO> getProductsByBrand(String brand, Pageable pageable) {
-        return productRepository.findByBrand(brand, pageable).map(productMapper::toResponseDTO);
+        Page<ProductResponseDTO> page = productRepository.findByBrandAndHiddenFalse(brand, pageable).map(productMapper::toResponseDTO);
+        return populatePersonalScores(page);
     }
 
     @Transactional(readOnly = true)
     public Page<ProductResponseDTO> searchProductsByName(String name, Pageable pageable) {
-        return productRepository.searchByName(name, pageable).map(productMapper::toResponseDTO);
+        Page<ProductResponseDTO> page = productRepository.searchByName(name, pageable).map(productMapper::toResponseDTO);
+        return populatePersonalScores(page);
     }
 
     @Transactional(readOnly = true)
     public Page<ProductResponseDTO> searchProducts(String searchTerm, Pageable pageable) {
-        return productRepository.searchProducts(searchTerm, pageable).map(productMapper::toResponseDTO);
+        Page<ProductResponseDTO> page = productRepository.searchProducts(searchTerm, pageable).map(productMapper::toResponseDTO);
+        return populatePersonalScores(page);
     }
 
     @Transactional(readOnly = true)
     public Page<ProductResponseDTO> getProductsByMinQuality(Double minScore, Pageable pageable) {
-        return productRepository.findByQualityScoreGreaterThanEqual(minScore, pageable)
+        Page<ProductResponseDTO> page = productRepository.findByQualityScoreGreaterThanEqualAndHiddenFalse(minScore, pageable)
                 .map(productMapper::toResponseDTO);
+        return populatePersonalScores(page);
     }
 
     @Transactional(readOnly = true)
     public Page<ProductResponseDTO> filterProducts(String searchTerm, Double minPrice, Double maxPrice,
             Double minQuality, Pageable pageable) {
-        return productRepository.filterProducts(searchTerm, minPrice, maxPrice, minQuality, pageable)
+        Page<ProductResponseDTO> page = productRepository.filterProducts(searchTerm, minPrice, maxPrice, minQuality, pageable)
                 .map(productMapper::toResponseDTO);
+        return populatePersonalScores(page);
     }
 
     @Transactional(readOnly = true)
@@ -192,7 +235,8 @@ public class ProductService {
                 product.getId(), product.getName(), product.getBrand(),
                 product.getQualityScore(), matchScore, recommendation,
                 reason.toString().trim().isEmpty() ? "Highly Recommended for your skin profile."
-                        : reason.toString().trim());
+                        : reason.toString().trim(),
+                product.getPrice(), null);
     }
 
     /**
@@ -203,5 +247,67 @@ public class ProductService {
         if (product.getId() == null)
             return null;
         return ratingRepository.getRecommendRateByProductId(product.getId());
+    }
+
+    @Transactional
+    public void syncPricesFromCsv() {
+        String infoPath = "ai-server/datasets/sephora_dataset/product_info.csv";
+        java.io.File file = new java.io.File(infoPath);
+        if (!file.exists()) {
+            log.error("CSV file not found at: {}", infoPath);
+            return;
+        }
+
+        try (java.io.BufferedReader br = new java.io.BufferedReader(new java.io.FileReader(file))) {
+            String line;
+            String headerLine = br.readLine();
+            if (headerLine == null) return;
+            
+            String[] headers = headerLine.split(",");
+            int pidIdx = -1, priceIdx = -1, ratingIdx = -1;
+            
+            for (int i = 0; i < headers.length; i++) {
+                if (headers[i].equals("product_id")) pidIdx = i;
+                if (headers[i].equals("price_usd")) priceIdx = i;
+                if (headers[i].equals("rating")) ratingIdx = i;
+            }
+
+            if (pidIdx == -1 || priceIdx == -1) {
+                log.error("Required columns missing in CSV");
+                return;
+            }
+
+            int count = 0;
+            while ((line = br.readLine()) != null) {
+                String[] values = line.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
+                if (values.length > Math.max(pidIdx, priceIdx)) {
+                    String pid = values[pidIdx].replace("\"", "");
+                    String priceStr = values[priceIdx].replace("\"", "");
+                    String ratingStr = (ratingIdx != -1 && values.length > ratingIdx) ? values[ratingIdx].replace("\"", "") : null;
+                    
+                    try {
+                        Double price = (priceStr == null || priceStr.isEmpty() || priceStr.equals("null")) ? null : Double.parseDouble(priceStr);
+                        Double rawRating = (ratingStr == null || ratingStr.isEmpty() || ratingStr.equals("null")) ? null : Double.parseDouble(ratingStr);
+                        Double scaledRating = (rawRating != null) ? rawRating * 2.0 : null;
+                        
+                        productRepository.findBySephoraProductId(pid).ifPresent(p -> {
+                            boolean changed = false;
+                            if (price != null) { p.setPrice(price); changed = true; }
+                            if (scaledRating != null) { p.setQualityScore(scaledRating); changed = true; }
+                            if (changed) productRepository.save(p);
+                        });
+                        count++;
+                        if (count % 100 == 0) {
+                            productRepository.flush();
+                        }
+                    } catch (NumberFormatException e) {
+                        // Skip
+                    }
+                }
+            }
+            log.info("Successfully synced {} prices from CSV", count);
+        } catch (java.io.IOException e) {
+            log.error("Error reading CSV for price sync: {}", e.getMessage());
+        }
     }
 }

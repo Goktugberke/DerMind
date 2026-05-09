@@ -12,9 +12,16 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
-        Page<Product> findByBrand(String brand, Pageable pageable);
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @org.springframework.data.jpa.repository.Query(value = "UPDATE products SET is_hidden = :hidden WHERE id = :id", nativeQuery = true)
+    int updateHiddenStatusNative(@org.springframework.data.repository.query.Param("id") Long id, @org.springframework.data.repository.query.Param("hidden") boolean hidden);
 
-        @Query("SELECT p FROM Product p WHERE LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%'))")
+
+        Page<Product> findByBrandAndHiddenFalse(String brand, Pageable pageable);
+        
+        java.util.Optional<Product> findBySephoraProductId(String sephoraProductId);
+
+        @Query("SELECT p FROM Product p WHERE LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%')) AND p.hidden = false")
         Page<Product> searchByName(@Param("name") String name, Pageable pageable);
 
         /**
@@ -37,21 +44,23 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                 Long getTotalPurchases();
         }
 
-        @Query("SELECT p FROM Product p WHERE LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
-                        "OR LOWER(p.brand) LIKE LOWER(CONCAT('%', :searchTerm, '%'))")
+        @Query("SELECT p FROM Product p WHERE (LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+                        "OR LOWER(p.brand) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) AND p.hidden = false")
         Page<Product> searchProducts(@Param("searchTerm") String searchTerm, Pageable pageable);
 
-        Page<Product> findByQualityScoreGreaterThanEqual(Double minScore, Pageable pageable);
+        Page<Product> findByQualityScoreGreaterThanEqualAndHiddenFalse(Double minScore, Pageable pageable);
 
-        @Query("SELECT p FROM Product p ORDER BY p.qualityScore DESC NULLS LAST")
+        @Query("SELECT p FROM Product p WHERE p.hidden = false ORDER BY p.qualityScore DESC NULLS LAST")
         Page<Product> findTopQualityProducts(Pageable pageable);
 
         @EntityGraph(attributePaths = { "ratings" })
         @Query("SELECT p FROM Product p LEFT JOIN p.ratings r " +
+                        "WHERE p.hidden = false " +
                         "GROUP BY p.id ORDER BY AVG(r.rating) DESC NULLS LAST")
         Page<Product> findHighestRatedProducts(Pageable pageable);
 
         @Query("SELECT p FROM Product p LEFT JOIN p.purchases pur " +
+                        "WHERE p.hidden = false " +
                         "GROUP BY p.id ORDER BY COUNT(pur.id) DESC")
         Page<Product> findMostPurchasedProducts(Pageable pageable);
 
@@ -61,7 +70,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                         "OR LOWER(p.brand) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) AND " +
                         "(:minPrice IS NULL OR p.price >= :minPrice) AND " +
                         "(:maxPrice IS NULL OR p.price <= :maxPrice) AND " +
-                        "(:minQuality IS NULL OR p.qualityScore >= :minQuality)")
+                        "(:minQuality IS NULL OR p.qualityScore >= :minQuality) AND " +
+                        "p.hidden = false")
         Page<Product> filterProducts(
                         @Param("searchTerm") String searchTerm,
                         @Param("minPrice") Double minPrice,

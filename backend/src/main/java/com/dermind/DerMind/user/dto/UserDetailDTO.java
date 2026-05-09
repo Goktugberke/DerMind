@@ -1,12 +1,14 @@
 package com.dermind.DerMind.user.dto;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserDetailDTO {
@@ -16,8 +18,13 @@ public class UserDetailDTO {
     private List<String> allergens;
     private String skinType;
     private boolean hasAcne;
+    private boolean pushNotificationsEnabled;
+    private boolean emailNotificationsEnabled;
+    private boolean smsNotificationsEnabled;
     private String picture;
     private int totalPurchases;
     private int totalRatings;
     private int activeStreaks;
+    @com.fasterxml.jackson.annotation.JsonProperty("isAdmin")
+    private boolean admin;
 }

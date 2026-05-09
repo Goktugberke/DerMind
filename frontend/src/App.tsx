@@ -14,6 +14,7 @@ import Profile from './pages/Profile';
 import Favorites from './pages/Favorites';
 import ForgotPassword from './pages/ForgotPassword';
 import MyOrders from './pages/MyOrders';
+import AdminPanel from './pages/AdminPanel';
 import './App.css';
 
 function App() {
@@ -40,6 +41,7 @@ function App() {
           <Route path="favorites" element={<Favorites />} />
           <Route path="forgot-password" element={<ForgotPassword />} />
           <Route path="orders" element={<MyOrders />} />
+          <Route path="admin" element={<AdminPanel />} />
         </Route>
       </Routes>
     </BrowserRouter>

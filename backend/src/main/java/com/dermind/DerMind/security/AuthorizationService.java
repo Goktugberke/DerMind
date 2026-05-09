@@ -23,6 +23,9 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class AuthorizationService {
 
+    @org.springframework.beans.factory.annotation.Value("${admin.emails:}")
+    private java.util.List<String> adminEmails;
+
     private final UserRepository userRepository;
     private final PurchaseRepository purchaseRepository;
     private final StreakRepository streakRepository;
@@ -43,12 +46,17 @@ public class AuthorizationService {
         return userRepository.findByEmail(email).map(u -> u.getId()).orElse(null);
     }
 
-    /** Mevcut auth user'ın id'si verilen userId'ye eşit mi (kendi profilini düzenleme/silme). */
     public boolean isSelf(String userId) {
         String currentId = currentUserId();
         boolean ok = currentId != null && currentId.equals(userId);
         if (!ok) log.warn("isSelf=false (current={}, target={})", currentId, userId);
         return ok;
+    }
+
+    public boolean isAdmin() {
+        String email = currentEmail();
+        if (email == null) return false;
+        return adminEmails.contains(email);
     }
 
     public boolean isPurchaseOwner(Long purchaseId) {

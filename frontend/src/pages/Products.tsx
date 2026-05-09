@@ -7,22 +7,8 @@ import SearchBar from '../components/SearchBar';
 import ProductFilters from '../components/ProductFilters';
 import { productApi, favoriteApi } from '../types/api';
 import type { ProductResponseDTO, PageResponse } from '../types/api';
+import { convertToProduct } from '../utils/productUtils';
 
-// Convert ProductResponseDTO to Product (for cart)
-const convertToProduct = (dto: ProductResponseDTO): Product => {
-  const mockPrice = dto.price || (100 + (parseInt(dto.id.toString(), 10) * 12345 % 400));
-
-  return {
-    id: dto.id.toString(),
-    name: dto.name,
-    brand: dto.brand,
-    price: mockPrice,
-    description: dto.ingredients || '',
-    rating: dto.qualityScore || 0,
-    category: dto.category,
-    image: dto.imageUrl,
-  };
-};
 
 interface FilterOptions {
   minPrice: number;
@@ -70,18 +56,11 @@ const Products = () => {
     }
   };
 
-  // Reset when sort or search or filters change
-  useEffect(() => {
-    setProducts([]);
-    pageRef.current = 0;
-    setHasMore(true);
-    const query = searchParams.get('search') || '';
-    setSearchQuery(query);
-  }, [searchParams, filters.sortBy, filters.minPrice, filters.maxPrice, filters.minRating]);
-
   // Fetch products from API
-  const fetchProducts = useCallback(async (pageNum: number, isInitial = false) => {
+  const fetchProducts = useCallback(async (pageNum: number, isInitial = false, explicitQuery?: string) => {
+    const currentQuery = explicitQuery !== undefined ? explicitQuery : searchQuery;
     if (!hasMore && !isInitial) return;
+    if (loading || loadingMore) return; // Prevent parallel fetches
 
     try {
       if (isInitial) {
@@ -93,24 +72,32 @@ const Products = () => {
       setError(null);
       
       const response: PageResponse<ProductResponseDTO> = await productApi.filterProducts({
-        query: searchQuery,
+        query: currentQuery,
         minPrice: filters.minPrice > 0 ? filters.minPrice : undefined,
         maxPrice: filters.maxPrice < 1000 ? filters.maxPrice : undefined,
-        minQuality: filters.minRating > 0 ? filters.minRating * 2 : undefined, // Convert 5-star back to 0-10
+        minQuality: filters.minRating > 0 ? filters.minRating : undefined, 
         page: pageNum,
         size: 12,
         sort: getSortString(filters.sortBy)
       });
+
+
 
       const convertedProducts = response.content.map(convertToProduct);
       
       if (isInitial) {
         setProducts(convertedProducts);
       } else {
-        setProducts(prev => [...prev, ...convertedProducts]);
+        setProducts(prev => {
+          // Deduplicate based on product ID to prevent React "duplicate key" warnings
+          const existingIds = new Set(prev.map(p => p.id));
+          const newOnes = convertedProducts.filter(p => !existingIds.has(p.id));
+          return [...prev, ...newOnes];
+        });
       }
       
-      setHasMore(response.number + 1 < response.totalPages);
+      const more = response.page.number + 1 < response.page.totalPages;
+      setHasMore(more);
     } catch (err) {
       setError('Ürünler yüklenirken bir hata oluştu');
       console.error('Error fetching products:', err);
@@ -118,12 +105,18 @@ const Products = () => {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [searchQuery, filters, hasMore]);
+  }, [searchQuery, filters, hasMore, loading, loadingMore]);
 
-  // Initial fetch
+  // Handle Search and Filter changes
   useEffect(() => {
-    fetchProducts(0, true);
-  }, [fetchProducts, searchQuery, filters.sortBy, filters.minPrice, filters.maxPrice, filters.minRating]);
+    setProducts([]);
+    pageRef.current = 0;
+    setHasMore(true);
+    
+    const query = searchParams.get('search') || '';
+    setSearchQuery(query);
+    fetchProducts(0, true, query);
+  }, [searchParams, filters.sortBy, filters.minPrice, filters.maxPrice, filters.minRating]);
 
   // Loader Intersection Observer
   const handleObserver = useCallback((entries: IntersectionObserverEntry[]) => {
@@ -248,14 +241,13 @@ const Products = () => {
       <div className="container">
         <div className="products-header">
           <h1>Ürünler</h1>
-          <div className="products-controls" style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div className="products-search" style={{ flex: 1, minWidth: '250px' }}>
+          <div className="products-controls">
+            <div className="products-search">
               <SearchBar onSearch={handleSearch} initialValue={searchQuery} />
             </div>
             <div className="products-sort">
               <select 
                 className="filter-select"
-                style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
                 value={filters.sortBy}
                 onChange={(e) => handleFilterChange({...filters, sortBy: e.target.value as FilterOptions['sortBy']})}
               >
@@ -292,10 +284,16 @@ const Products = () => {
                         src={product.image} 
                         alt={product.name} 
                         loading="lazy"
+                        onError={(e) => {
+                          // If image fails to load, show placeholder
+                          (e.target as HTMLImageElement).style.display = 'none';
+                          (e.target as HTMLImageElement).parentElement?.classList.add('show-placeholder');
+                        }}
                       />
                     ) : (
                       <div className="product-placeholder">📦</div>
                     )}
+                    <div className="product-placeholder hidden-placeholder">📦</div>
                     {isAuthenticated && (
                       <button 
                         className={`add-favorite-btn ${favoriteIds.has(String(product.id)) ? 'active' : ''}`}
@@ -311,19 +309,29 @@ const Products = () => {
                   </div>
                   <div className="product-info">
                     <h3 className="product-name">{product.name}</h3>
-                    {product.brand && <p className="product-brand" style={{ fontSize: '0.85em', color: '#666' }}>{product.brand}</p>}
+                    {product.brand && <p className="product-brand">{product.brand}</p>}
                     {product.description && (
-                      <p className="product-description" style={{ maxHeight: '40px', overflow: 'hidden' }}>{product.description}</p>
+                      <p className="product-description">{product.description}</p>
                     )}
-                    {product.rating !== undefined && (
-                      <div className="product-rating">
-                        {'⭐'.repeat(Math.round(product.rating / 2))} {(product.rating / 2).toFixed(1)}
-                      </div>
-                    )}
+                    <div className="product-rating" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>⭐ {product.rating ? product.rating.toFixed(1) : '0.0'}</span>
+                      {isAuthenticated && product.personalScore !== undefined && (
+                        <span style={{ 
+                          fontSize: '0.8em', 
+                          backgroundColor: product.personalScore > 7 ? '#ecfdf5' : product.personalScore > 4 ? '#fffbeb' : '#fef2f2',
+                          color: product.personalScore > 7 ? '#059669' : product.personalScore > 4 ? '#d97706' : '#dc2626',
+                          padding: '2px 8px',
+                          borderRadius: '12px',
+                          fontWeight: 'bold'
+                        }}>
+                          Sana Özel: {product.personalScore.toFixed(1)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </Link>
                 <div className="product-footer">
-                  <span className="product-price">{product.price.toFixed(2)} ₺</span>
+                  <span className="product-price">${product.price.toFixed(2)}</span>
                   <button
                     className="btn btn-primary btn-sm"
                     onClick={() => dispatch(addToCartAsync(product))}

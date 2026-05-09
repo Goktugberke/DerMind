@@ -63,23 +63,26 @@ public class Streak {
     @Column(name = "last_completed_date")
     private LocalDate lastCompletedDate;
 
+    @Column(name = "last_reminder_sent_date")
+    private LocalDate lastReminderSentDate;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "usage_frequency", length = 32)
     private UsageFrequency usageFrequency;
 
-    @ElementCollection(targetClass = UsageTime.class, fetch = FetchType.LAZY)
+    @ElementCollection(targetClass = UsageTime.class, fetch = FetchType.EAGER)
     @Enumerated(EnumType.STRING)
     @CollectionTable(name = "streak_usage_times", joinColumns = @JoinColumn(name = "streak_id"))
     @Column(name = "usage_time")
     private Set<UsageTime> usageTimes;
 
-    @ElementCollection(targetClass = DayOfWeek.class, fetch = FetchType.LAZY)
+    @ElementCollection(targetClass = DayOfWeek.class, fetch = FetchType.EAGER)
     @Enumerated(EnumType.STRING)
     @CollectionTable(name = "streak_days_of_week", joinColumns = @JoinColumn(name = "streak_id"))
     @Column(name = "day_of_week")
     private Set<DayOfWeek> daysOfWeek;
 
-    @ElementCollection(fetch = FetchType.LAZY)
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "streak_custom_times", joinColumns = @JoinColumn(name = "streak_id"))
     @Column(name = "custom_time")
     private List<LocalTime> customTimes;

@@ -1,11 +1,13 @@
 package com.dermind.DerMind.product.dto;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 // DTO for Product with Details (including ratings)
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class ProductDetailDTO {
@@ -18,4 +20,9 @@ public class ProductDetailDTO {
     private int totalRatings;
     private int totalPurchases;
     private Double personalScore;
+    private Double price;
+    private String imageUrl;
+    private int safeIngredientCount;
+    private int cautionIngredientCount;
+    private int riskyIngredientCount;
 }

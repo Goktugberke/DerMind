@@ -1,10 +1,7 @@
 package com.dermind.DerMind.user.controller;
 
 import com.dermind.DerMind.security.CurrentUser;
-import com.dermind.DerMind.user.dto.UserCreateDto;
-import com.dermind.DerMind.user.dto.UserDetailDTO;
-import com.dermind.DerMind.user.dto.UserResponseDTO;
-import com.dermind.DerMind.user.dto.UserUpdateDto;
+import com.dermind.DerMind.user.dto.*;
 import com.dermind.DerMind.user.model.User;
 import com.dermind.DerMind.user.service.UserService;
 import jakarta.validation.Valid;
@@ -59,6 +56,13 @@ public class UserController {
     @GetMapping("/me")
     public ResponseEntity<UserDetailDTO> getCurrentUser(@CurrentUser User user) {
         return ResponseEntity.ok(userService.getUserById(user.getId()));
+    }
+
+    @PutMapping("/me/notification-preferences")
+    public ResponseEntity<UserResponseDTO> updateNotificationPreferences(
+            @CurrentUser User user,
+            @Valid @RequestBody NotificationPreferencesDTO dto) {
+        return ResponseEntity.ok(userService.updateNotificationPreferences(user.getId(), dto));
     }
 
     @GetMapping("/email/{email}")

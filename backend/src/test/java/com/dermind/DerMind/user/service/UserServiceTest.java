@@ -44,7 +44,9 @@ class UserServiceTest {
     }
 
     private UserResponseDTO makeResponse(String id, String email) {
-        return new UserResponseDTO(id, email, "Test User", null, null, false, null);
+        return UserResponseDTO.builder()
+                .id(id).email(email).name("Test User").admin(false)
+                .build();
     }
 
     // ── handleFirebaseLogin ─────────────────────────────────────────────
