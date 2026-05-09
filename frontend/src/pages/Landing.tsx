@@ -124,9 +124,9 @@ const Landing = () => {
                       {product.description && (
                         <p className="product-description">{product.description}</p>
                       )}
-                      {product.rating > 0 && (
+                      {(product.rating ?? 0) > 0 && (
                         <div className="product-rating">
-                          ⭐ {product.rating.toFixed(1)}/10
+                          ⭐ {product.rating!.toFixed(1)}/10
                         </div>
                       )}
                     </div>

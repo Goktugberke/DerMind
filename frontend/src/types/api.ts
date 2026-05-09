@@ -108,6 +108,7 @@ export interface StreakResponseDTO {
   id: number;
   productId: number;
   productName?: string;
+  productBrand?: string;
   currentStreak: number;
   longestStreak: number;
   totalUses: number;

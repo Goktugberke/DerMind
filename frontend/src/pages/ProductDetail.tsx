@@ -493,7 +493,7 @@ const ProductDetail = () => {
                         <span style={{ fontSize: '0.85em', color: '#6b7280', marginBottom: '5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{simProd.brand}</span>
                         <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ fontWeight: 'bold', color: '#10b981' }}>${simProd.price.toFixed(2)}</span>
-                          {simProd.rating > 0 && <span style={{ fontSize: '0.8em', backgroundColor: '#e5e7eb', padding: '2px 6px', borderRadius: '4px' }}>⭐ {simProd.rating.toFixed(1)}/10</span>}
+                          {(simProd.rating ?? 0) > 0 && <span style={{ fontSize: '0.8em', backgroundColor: '#e5e7eb', padding: '2px 6px', borderRadius: '4px' }}>⭐ {simProd.rating!.toFixed(1)}/10</span>}
                         </div>
                       </Link>
                     );
